@@ -388,46 +388,78 @@ export function winProbability(
 }
 
 /**
- * Calculate win probabilities for all riders against each other
- * Returns estimated win probability for each rider
+ * Calculate all probabilities (win, podium, top10) for all riders in a single simulation batch
+ * This is much more efficient than calculating each probability separately
  */
-export function calculateWinProbabilities(
+export function calculateAllProbabilities(
   skills: Map<string, RiderSkill>
-): Map<string, number> {
+): Map<string, { win: number; podium: number; top10: number }> {
   const riderIds = Array.from(skills.keys());
-  const probabilities = new Map<string, number>();
+  const results = new Map<string, { win: number; podium: number; top10: number }>();
 
-  // Monte Carlo simulation
-  const numSimulations = 10000;
+  // Initialize counters
   const wins = new Map<string, number>();
+  const podiums = new Map<string, number>();
+  const top10s = new Map<string, number>();
 
   for (const riderId of riderIds) {
     wins.set(riderId, 0);
+    podiums.set(riderId, 0);
+    top10s.set(riderId, 0);
   }
+
+  // Single batch of simulations - reduced from 10000 to 1000 for speed
+  const numSimulations = 1000;
+  const skillsArray = Array.from(skills.entries());
 
   for (let sim = 0; sim < numSimulations; sim++) {
     // Generate random performance for each rider
     const performances: Array<{ riderId: string; performance: number }> = [];
 
-    for (const [riderId, skill] of skills) {
-      // Sample from rider's skill distribution
+    for (const [riderId, skill] of skillsArray) {
       const performance =
         skill.mean + Math.sqrt(skill.variance + BETA * BETA) * gaussianRandom();
       performances.push({ riderId, performance });
     }
 
-    // Find winner (highest performance)
+    // Sort by performance (highest first)
     performances.sort((a, b) => b.performance - a.performance);
-    const winnerId = performances[0].riderId;
-    wins.set(winnerId, (wins.get(winnerId) || 0) + 1);
+
+    // Count positions for each rider
+    for (let i = 0; i < performances.length; i++) {
+      const riderId = performances[i].riderId;
+      if (i === 0) wins.set(riderId, (wins.get(riderId) || 0) + 1);
+      if (i < 3) podiums.set(riderId, (podiums.get(riderId) || 0) + 1);
+      if (i < 10) top10s.set(riderId, (top10s.get(riderId) || 0) + 1);
+    }
   }
 
-  // Convert wins to probabilities
-  for (const [riderId, winCount] of wins) {
-    probabilities.set(riderId, winCount / numSimulations);
+  // Convert counts to probabilities
+  for (const riderId of riderIds) {
+    results.set(riderId, {
+      win: (wins.get(riderId) || 0) / numSimulations,
+      podium: (podiums.get(riderId) || 0) / numSimulations,
+      top10: (top10s.get(riderId) || 0) / numSimulations,
+    });
   }
 
-  return probabilities;
+  return results;
+}
+
+/**
+ * Calculate win probabilities for all riders against each other
+ * Returns estimated win probability for each rider
+ * @deprecated Use calculateAllProbabilities instead for better performance
+ */
+export function calculateWinProbabilities(
+  skills: Map<string, RiderSkill>
+): Map<string, number> {
+  const allProbs = calculateAllProbabilities(skills);
+  const winProbs = new Map<string, number>();
+  for (const [riderId, probs] of allProbs) {
+    winProbs.set(riderId, probs.win);
+  }
+  return winProbs;
 }
 
 /**

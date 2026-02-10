@@ -4,7 +4,6 @@ import { Header } from "@/components/header";
 import { CommunityIntel, RumourBadge } from "@/components/rumour-badge";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -161,7 +160,7 @@ export default async function RiderDetailPage({ params }: PageProps) {
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
-      <main className="flex-1 container py-8">
+      <main className="flex-1 container mx-auto px-4 sm:px-6 lg:px-8 py-8 max-w-6xl">
         {/* Rider Header */}
         <div className="flex flex-col md:flex-row gap-6 mb-8">
           <Avatar className="h-24 w-24">
@@ -196,200 +195,213 @@ export default async function RiderDetailPage({ params }: PageProps) {
 
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Main Content */}
-          <div className="lg:col-span-2">
-            <Tabs defaultValue="stats" className="space-y-6">
-              <TabsList>
-                <TabsTrigger value="stats">Stats</TabsTrigger>
-                <TabsTrigger value="results">Recent Results</TabsTrigger>
-              </TabsList>
+          <div className="lg:col-span-2 space-y-6">
+            {/* Stats Cards */}
+            {statsData.length > 0 ? (
+              statsData.map(({ stats, team }) => {
+                const elo = parseFloat(stats.currentElo || "1500");
+                const tier = getEloTier(elo);
+                const affinities = (stats.profileAffinities as Record<string, number>) || {};
 
-              <TabsContent value="stats" className="space-y-6">
-                {statsData.length > 0 ? (
-                  statsData.map(({ stats, team }) => {
-                    const elo = parseFloat(stats.currentElo || "1500");
-                    const tier = getEloTier(elo);
-                    const affinities = (stats.profileAffinities as Record<string, number>) || {};
-
-                    return (
-                      <Card key={stats.id}>
-                        <CardHeader>
-                          <div className="flex items-center justify-between">
-                            <CardTitle>
-                              {stats.discipline === "road"
-                                ? "Road Cycling"
-                                : stats.discipline === "mtb_xco"
-                                  ? "MTB XCO"
-                                  : stats.discipline === "mtb_xcc"
-                                    ? "MTB XCC"
-                                    : stats.discipline}
-                            </CardTitle>
-                            <Badge className={tier.color}>{tier.label}</Badge>
-                          </div>
-                          {team && (
-                            <p className="text-sm text-muted-foreground">
-                              {team.name}
-                            </p>
-                          )}
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                          {/* ELO Display */}
-                          <div>
-                            <div className="flex justify-between mb-2">
-                              <span className="text-sm text-muted-foreground">
-                                ELO Rating
-                              </span>
-                              <span className="text-2xl font-bold">
-                                {Math.round(elo)}
-                              </span>
-                            </div>
-                            <Progress
-                              value={((elo - 1000) / 1000) * 100}
-                              className="h-2"
-                            />
-                            <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                              <span>1000</span>
-                              <span>2000</span>
-                            </div>
-                          </div>
-
-                          {/* Career Stats */}
-                          <div className="grid grid-cols-3 gap-4 text-center">
-                            <div>
-                              <div className="text-2xl font-bold">
-                                {stats.winsTotal || 0}
-                              </div>
-                              <div className="text-sm text-muted-foreground">
-                                Wins
-                              </div>
-                            </div>
-                            <div>
-                              <div className="text-2xl font-bold">
-                                {stats.podiumsTotal || 0}
-                              </div>
-                              <div className="text-sm text-muted-foreground">
-                                Podiums
-                              </div>
-                            </div>
-                            <div>
-                              <div className="text-2xl font-bold">
-                                {stats.racesTotal || 0}
-                              </div>
-                              <div className="text-sm text-muted-foreground">
-                                Races
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Specialties */}
-                          {stats.specialty && stats.specialty.length > 0 && (
-                            <div>
-                              <div className="text-sm text-muted-foreground mb-2">
-                                Specialties
-                              </div>
-                              <div className="flex flex-wrap gap-2">
-                                {stats.specialty.map((s) => (
-                                  <Badge key={s} variant="outline">
-                                    {getSpecialtyIcon(s)} {s}
-                                  </Badge>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Profile Affinities */}
-                          {Object.keys(affinities).length > 0 && (
-                            <div>
-                              <div className="text-sm text-muted-foreground mb-2">
-                                Profile Affinities
-                              </div>
-                              <div className="space-y-2">
-                                {Object.entries(affinities).map(
-                                  ([profile, value]) => (
-                                    <div key={profile}>
-                                      <div className="flex justify-between text-sm mb-1">
-                                        <span className="capitalize">
-                                          {profile}
-                                        </span>
-                                        <span>
-                                          {Math.round(value * 100)}%
-                                        </span>
-                                      </div>
-                                      <Progress
-                                        value={value * 100}
-                                        className="h-1.5"
-                                      />
-                                    </div>
-                                  )
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    );
-                  })
-                ) : (
-                  <Card>
-                    <CardContent className="py-12 text-center text-muted-foreground">
-                      No stats available yet for this rider.
-                    </CardContent>
-                  </Card>
-                )}
-              </TabsContent>
-
-              <TabsContent value="results">
-                {resultsData.length > 0 ? (
-                  <Card>
-                    <CardContent className="py-4">
-                      <div className="space-y-2">
-                        {resultsData.map(({ result, race }) => (
-                          <Link
-                            key={result.id}
-                            href={`/races/${race.id}`}
-                            className="flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors"
-                          >
-                            <div className="min-w-0">
-                              <p className="font-medium truncate">{race.name}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {new Date(race.date).toLocaleDateString()}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {result.dnf ? (
-                                <Badge variant="destructive">DNF</Badge>
-                              ) : result.dns ? (
-                                <Badge variant="outline">DNS</Badge>
-                              ) : (
-                                <Badge
-                                  variant={
-                                    result.position === 1
-                                      ? "default"
-                                      : result.position! <= 3
-                                        ? "secondary"
-                                        : "outline"
-                                  }
-                                >
-                                  {result.position}
-                                  {result.position === 1 && " 🥇"}
-                                  {result.position === 2 && " 🥈"}
-                                  {result.position === 3 && " 🥉"}
-                                </Badge>
-                              )}
-                            </div>
-                          </Link>
-                        ))}
+                return (
+                  <Card key={stats.id}>
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <CardTitle>
+                          {stats.discipline === "road"
+                            ? "Road Cycling"
+                            : stats.discipline === "mtb_xco"
+                              ? "MTB XCO"
+                              : stats.discipline === "mtb_xcc"
+                                ? "MTB XCC"
+                                : stats.discipline === "mtb"
+                                  ? "MTB"
+                                  : stats.discipline}
+                        </CardTitle>
+                        <Badge className={tier.color}>{tier.label}</Badge>
                       </div>
+                      {team && (
+                        <p className="text-sm text-muted-foreground">
+                          {team.name}
+                        </p>
+                      )}
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      {/* ELO Display */}
+                      <div>
+                        <div className="flex justify-between mb-2">
+                          <span className="text-sm text-muted-foreground">
+                            ELO Rating
+                          </span>
+                          <span className="text-2xl font-bold">
+                            {Math.round(elo)}
+                          </span>
+                        </div>
+                        <Progress
+                          value={((elo - 1000) / 1000) * 100}
+                          className="h-2"
+                        />
+                        <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                          <span>1000</span>
+                          <span>2000</span>
+                        </div>
+                      </div>
+
+                      {/* UCI Ranking (for MTB) */}
+                      {(stats.discipline.startsWith("mtb") && (stats.uciRank || stats.uciPoints)) ? (
+                        <div className="flex items-center justify-between p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-900">
+                          <div className="flex items-center gap-3">
+                            <span className="text-2xl">🏅</span>
+                            <div>
+                              <div className="text-sm text-muted-foreground">UCI Ranking</div>
+                              <div className="font-bold">
+                                {stats.uciRank ? `#${stats.uciRank}` : "Unranked"}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-sm text-muted-foreground">UCI Points</div>
+                            <div className="font-bold text-lg">{stats.uciPoints || 0}</div>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {/* Career Stats */}
+                      <div className="grid grid-cols-3 gap-4 text-center">
+                        <div>
+                          <div className="text-2xl font-bold">
+                            {stats.winsTotal || 0}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            Wins
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-2xl font-bold">
+                            {stats.podiumsTotal || 0}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            Podiums
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-2xl font-bold">
+                            {stats.racesTotal || 0}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            Races
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Specialties */}
+                      {stats.specialty && stats.specialty.length > 0 && (
+                        <div>
+                          <div className="text-sm text-muted-foreground mb-2">
+                            Specialties
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {stats.specialty.map((s) => (
+                              <Badge key={s} variant="outline">
+                                {getSpecialtyIcon(s)} {s}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Profile Affinities */}
+                      {Object.keys(affinities).length > 0 && (
+                        <div>
+                          <div className="text-sm text-muted-foreground mb-2">
+                            Profile Affinities
+                          </div>
+                          <div className="space-y-2">
+                            {Object.entries(affinities).map(
+                              ([profile, value]) => (
+                                <div key={profile}>
+                                  <div className="flex justify-between text-sm mb-1">
+                                    <span className="capitalize">
+                                      {profile}
+                                    </span>
+                                    <span>
+                                      {Math.round(value * 100)}%
+                                    </span>
+                                  </div>
+                                  <Progress
+                                    value={value * 100}
+                                    className="h-1.5"
+                                  />
+                                </div>
+                              )
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
+                );
+              })
+            ) : (
+              <Card>
+                <CardContent className="py-12 text-center text-muted-foreground">
+                  No stats available yet for this rider.
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Recent Results */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Results</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {resultsData.length > 0 ? (
+                  <div className="space-y-2">
+                    {resultsData.map(({ result, race }) => (
+                      <Link
+                        key={result.id}
+                        href={`/races/${race.id}`}
+                        className="flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-medium truncate">{race.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {new Date(race.date).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {result.dnf ? (
+                            <Badge variant="destructive">DNF</Badge>
+                          ) : result.dns ? (
+                            <Badge variant="outline">DNS</Badge>
+                          ) : (
+                            <Badge
+                              variant={
+                                result.position === 1
+                                  ? "default"
+                                  : result.position! <= 3
+                                    ? "secondary"
+                                    : "outline"
+                              }
+                            >
+                              {result.position}
+                              {result.position === 1 && " 🥇"}
+                              {result.position === 2 && " 🥈"}
+                              {result.position === 3 && " 🥉"}
+                            </Badge>
+                          )}
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
                 ) : (
-                  <Card>
-                    <CardContent className="py-12 text-center text-muted-foreground">
-                      No recent results available.
-                    </CardContent>
-                  </Card>
+                  <p className="text-center text-muted-foreground py-6">
+                    No recent results available.
+                  </p>
                 )}
-              </TabsContent>
-            </Tabs>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Sidebar */}

@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 const navigation = [
   { name: "Races", href: "/races" },
   { name: "Riders", href: "/riders" },
+  { name: "Teams", href: "/teams" },
 ];
 
 const authNavigation = [

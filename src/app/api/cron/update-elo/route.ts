@@ -15,7 +15,7 @@ import {
   type RiderSkill,
   type RaceResult,
 } from "@/lib/prediction";
-import { eq, and } from "drizzle-orm";
+import { eq, and, notExists, sql } from "drizzle-orm";
 
 // Vercel cron jobs are authenticated via CRON_SECRET header
 async function verifyCronAuth(): Promise<boolean> {
@@ -51,26 +51,24 @@ export async function GET() {
   }> = [];
 
   try {
-    // Find completed races that haven't had ELO processed
-    // We track this by checking if there are any eloHistory entries for the race
+    // Find completed races that haven't had ELO processed yet
     const completedRaces = await db
       .select()
       .from(races)
-      .where(eq(races.status, "completed"))
+      .where(
+        and(
+          eq(races.status, "completed"),
+          notExists(
+            db.select({ id: eloHistory.id })
+              .from(eloHistory)
+              .where(eq(eloHistory.raceId, races.id))
+          )
+        )
+      )
       .orderBy(races.date)
-      .limit(10);
+      .limit(20);
 
     for (const race of completedRaces) {
-      // Check if ELO already processed for this race
-      const [existingHistory] = await db
-        .select()
-        .from(eloHistory)
-        .where(eq(eloHistory.raceId, race.id))
-        .limit(1);
-
-      if (existingHistory) {
-        continue; // Already processed
-      }
 
       try {
         // Get race results

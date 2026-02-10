@@ -9,11 +9,12 @@
 
 import * as cheerio from "cheerio";
 import { scrapeStartlist as pcsStartlist, type PCSStartlistEntry } from "./pcs";
+import { detectRockthesportUrl } from "./rockthesport";
 
 export interface ParsedStartlistEntry {
   riderName: string;
   sourceId: string; // ID from the source (pcs_id, firstcycling_id, etc.)
-  sourceType: "pcs" | "firstcycling" | "official" | "unknown";
+  sourceType: "pcs" | "firstcycling" | "official" | "rockthesport" | "unknown";
   teamName: string | null;
   bibNumber: number | null;
   nationality: string | null;
@@ -32,9 +33,12 @@ export interface ParsedStartlist {
  */
 export function detectSourceType(
   url: string
-): "pcs" | "firstcycling" | "official" | "unknown" {
+): "pcs" | "firstcycling" | "official" | "rockthesport" | "unknown" {
   if (url.includes("procyclingstats.com")) {
     return "pcs";
+  }
+  if (detectRockthesportUrl(url)) {
+    return "rockthesport";
   }
   if (url.includes("firstcycling.com")) {
     return "firstcycling";

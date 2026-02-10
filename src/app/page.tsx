@@ -9,7 +9,7 @@ export default function Home() {
       <Header />
       <main className="flex-1">
         {/* Hero Section */}
-        <section className="container py-24 md:py-32">
+        <section className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-24 md:py-32">
           <div className="flex flex-col items-center text-center space-y-8">
             <div className="space-y-4">
               <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl">
@@ -35,7 +35,7 @@ export default function Home() {
         </section>
 
         {/* Features Section */}
-        <section className="container py-16 border-t">
+        <section className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-16 border-t">
           <div className="grid gap-6 md:grid-cols-3">
             <Card>
               <CardHeader>
@@ -77,7 +77,7 @@ export default function Home() {
         </section>
 
         {/* How It Works Section */}
-        <section className="container py-16 border-t">
+        <section className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-16 border-t">
           <h2 className="text-3xl font-bold text-center mb-12">
             How It Works
           </h2>
@@ -122,7 +122,7 @@ export default function Home() {
         </section>
 
         {/* CTA Section */}
-        <section className="container py-16 border-t">
+        <section className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-16 border-t">
           <Card className="bg-primary text-primary-foreground">
             <CardContent className="py-12 text-center space-y-6">
               <h2 className="text-3xl font-bold">
@@ -147,7 +147,7 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="border-t py-6">
-        <div className="container flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
           <p>
             Data from{" "}
             <a

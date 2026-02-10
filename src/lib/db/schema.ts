@@ -27,6 +27,7 @@ export const riders = pgTable("riders", {
   name: varchar("name", { length: 255 }).notNull(),
   nationality: char("nationality", { length: 3 }),
   birthDate: date("birth_date"),
+  teamId: uuid("team_id").references(() => teams.id), // Current team
   photoUrl: varchar("photo_url", { length: 500 }),
   instagramHandle: varchar("instagram_handle", { length: 100 }),
   stravaId: varchar("strava_id", { length: 100 }),
@@ -64,6 +65,12 @@ export const riderDisciplineStats = pgTable(
     winsTotal: integer("wins_total").default(0),
     podiumsTotal: integer("podiums_total").default(0),
     racesTotal: integer("races_total").default(0),
+    // UCI ranking data (primarily for MTB)
+    uciPoints: integer("uci_points").default(0),
+    uciRank: integer("uci_rank"),
+    // World Cup points (separate from UCI ranking points)
+    worldCupPoints: integer("world_cup_points").default(0),
+    worldCupRank: integer("world_cup_rank"),
     // Profile affinities as JSON: {"flat": 0.6, "hilly": 0.8, "mountain": 0.9}
     profileAffinities: jsonb("profile_affinities").$type<Record<string, number>>(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -83,13 +90,38 @@ export const riderDisciplineStats = pgTable(
 // RACES
 // ============================================================================
 
+// Multi-category events (e.g., MTB events with separate Elite/U23/Junior races)
+export const raceEvents = pgTable(
+  "race_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: varchar("name", { length: 255 }).notNull(),
+    slug: varchar("slug", { length: 255 }), // URL-friendly slug (e.g., "shimano-supercup-2026")
+    date: date("date").notNull(),
+    endDate: date("end_date"), // For multi-day events
+    discipline: varchar("discipline", { length: 20 }).notNull(), // 'mtb' | 'road' | 'gravel' | 'cyclocross'
+    subDiscipline: varchar("sub_discipline", { length: 20 }), // 'xco' | 'xcc' | 'xce' | 'xcm' for MTB
+    country: char("country", { length: 3 }),
+    sourceUrl: varchar("source_url", { length: 500 }),
+    sourceType: varchar("source_type", { length: 50 }), // "rockthesport", "pcs", etc.
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_race_events_date").on(table.date),
+    index("idx_race_events_discipline").on(table.discipline),
+    unique("race_events_discipline_slug_unique").on(table.discipline, table.slug),
+  ]
+);
+
 export const races = pgTable(
   "races",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     name: varchar("name", { length: 255 }).notNull(),
+    categorySlug: varchar("category_slug", { length: 50 }), // URL-friendly category slug (e.g., "elite-men", "u23-women")
     date: date("date").notNull(),
-    discipline: varchar("discipline", { length: 20 }).notNull(), // 'road' | 'mtb_xco' | 'mtb_xcc'
+    endDate: date("end_date"), // For multi-day events
+    discipline: varchar("discipline", { length: 20 }).notNull(), // 'mtb' | 'road' | 'gravel' | 'cyclocross'
     raceType: varchar("race_type", { length: 20 }), // 'one_day' | 'stage_race' | 'xco' | 'xcc'
     profileType: varchar("profile_type", { length: 20 }), // 'flat' | 'hilly' | 'mountain' | 'tt' | 'cobbles'
     ageCategory: varchar("age_category", { length: 20 }).default("elite"), // 'elite' | 'u23' | 'junior' | 'masters'
@@ -100,6 +132,7 @@ export const races = pgTable(
     country: char("country", { length: 3 }),
     parentRaceId: uuid("parent_race_id"), // For stages within stage races
     stageNumber: integer("stage_number"),
+    raceEventId: uuid("race_event_id").references(() => raceEvents.id), // Link to multi-category event
     // Submission tracking
     startlistUrl: varchar("startlist_url", { length: 500 }), // Official source URL
     submittedBy: uuid("submitted_by").references(() => users.id),
@@ -112,6 +145,8 @@ export const races = pgTable(
     index("idx_races_date").on(table.date),
     index("idx_races_discipline").on(table.discipline),
     index("idx_races_status").on(table.status),
+    index("idx_races_race_event").on(table.raceEventId),
+    index("idx_races_category_slug").on(table.categorySlug),
   ]
 );
 
@@ -148,6 +183,7 @@ export const raceResults = pgTable(
     riderId: uuid("rider_id")
       .references(() => riders.id, { onDelete: "cascade" })
       .notNull(),
+    teamId: uuid("team_id").references(() => teams.id),
     position: integer("position"),
     timeSeconds: integer("time_seconds"),
     timeGapSeconds: integer("time_gap_seconds"),
@@ -397,10 +433,18 @@ export const riderDisciplineStatsRelations = relations(riderDisciplineStats, ({ 
   }),
 }));
 
+export const raceEventsRelations = relations(raceEvents, ({ many }) => ({
+  races: many(races),
+}));
+
 export const racesRelations = relations(races, ({ one, many }) => ({
   parentRace: one(races, {
     fields: [races.parentRaceId],
     references: [races.id],
+  }),
+  raceEvent: one(raceEvents, {
+    fields: [races.raceEventId],
+    references: [raceEvents.id],
   }),
   submitter: one(users, {
     fields: [races.submittedBy],
@@ -552,6 +596,8 @@ export type Team = typeof teams.$inferSelect;
 export type NewTeam = typeof teams.$inferInsert;
 export type RiderDisciplineStats = typeof riderDisciplineStats.$inferSelect;
 export type NewRiderDisciplineStats = typeof riderDisciplineStats.$inferInsert;
+export type RaceEvent = typeof raceEvents.$inferSelect;
+export type NewRaceEvent = typeof raceEvents.$inferInsert;
 export type Race = typeof races.$inferSelect;
 export type NewRace = typeof races.$inferInsert;
 export type RaceStartlist = typeof raceStartlist.$inferSelect;

@@ -10,32 +10,99 @@ import { z } from "zod";
 // RACE SCHEMAS
 // ============================================================================
 
+const startlistEntrySchema = z.object({
+  riderName: z.string(),
+  riderPcsId: z.string().optional(),
+  teamName: z.string().nullable().optional(),
+  bibNumber: z.number().nullable().optional(),
+});
+
+// New discipline enum (consolidated)
+export const disciplineEnum = z.enum(["mtb", "road", "gravel", "cyclocross"]);
+
+// Sub-discipline enum (for MTB)
+export const subDisciplineEnum = z.enum(["xco", "xcc", "xce", "xcm"]);
+
+// Legacy discipline enum (for backwards compatibility during migration)
+export const legacyDisciplineEnum = z.enum(["road", "mtb_xco", "mtb_xcc", "mtb", "gravel", "cyclocross"]);
+
 export const createRaceSchema = z.object({
   name: z
     .string()
     .min(1, "Race name is required")
     .max(255, "Race name too long"),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD)"),
-  discipline: z.enum(["road", "mtb_xco", "mtb_xcc"]),
+  discipline: disciplineEnum,
+  subDiscipline: subDisciplineEnum.nullable().optional(),
   raceType: z.enum(["one_day", "stage_race", "xco", "xcc"]).optional(),
-  profileType: z.enum(["flat", "hilly", "mountain", "tt", "cobbles"]).optional(),
+  profileType: z.enum(["flat", "hilly", "mountain", "tt", "cobbles"]).nullable().optional(),
   ageCategory: z.enum(["elite", "u23", "junior", "masters"]).default("elite"),
   gender: z.enum(["men", "women"]).default("men"),
-  distanceKm: z.coerce.number().positive().optional(),
-  elevationM: z.coerce.number().nonnegative().optional(),
-  uciCategory: z.string().max(50).optional(),
+  distanceKm: z.coerce.number().positive().nullable().optional(),
+  elevationM: z.coerce.number().nonnegative().nullable().optional(),
+  uciCategory: z.string().max(50).nullable().optional(),
   country: z
     .string()
-    .length(3, "Country code must be 3 characters")
+    .max(3, "Country code must be 3 characters max")
     .toUpperCase()
+    .nullable()
     .optional(),
-  startlistUrl: z.string().url("Invalid startlist URL").optional(),
-  pcsUrl: z.string().url("Invalid PCS URL").optional(),
+  startlistUrl: z.string().url("Invalid startlist URL").nullable().optional(),
+  pcsUrl: z.string().url("Invalid PCS URL").nullable().optional(),
+  startlistEntries: z.array(startlistEntrySchema).optional(),
 });
 
 export const parseStartlistSchema = z.object({
   url: z.string().url("Invalid URL"),
 });
+
+// ============================================================================
+// MTB EVENT SCHEMAS
+// ============================================================================
+
+export const parseMtbEventSchema = z.object({
+  url: z.string().url("Invalid URL"),
+});
+
+const mtbCategorySchema = z.object({
+  ageCategory: z.enum(["elite", "u23", "junior"]),
+  gender: z.enum(["men", "women"]),
+  riderCount: z.number().int().nonnegative(),
+});
+
+export const createMtbEventSchema = z.object({
+  name: z
+    .string()
+    .min(1, "Event name is required")
+    .max(255, "Event name too long"),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD)"),
+  discipline: z.literal("mtb").default("mtb"),
+  subDiscipline: subDisciplineEnum.default("xco"),
+  country: z
+    .string()
+    .length(3, "Country code must be 3 characters")
+    .toUpperCase()
+    .optional(),
+  sourceUrl: z.string().url("Invalid source URL").optional(),
+  sourceType: z.string().max(50).optional(),
+  // Categories to create races for
+  categories: z.array(z.string()).min(1, "At least one category is required"),
+  // All entries from the parsed event
+  entries: z.array(z.object({
+    firstName: z.string(),
+    lastName: z.string(),
+    category: z.string(),
+    teamName: z.string().nullable().optional(),
+    clubName: z.string().nullable().optional(),
+    nationality: z.string().nullable().optional(),
+    bibNumber: z.number().nullable().optional(),
+    // PDF startlist specific fields
+    uciId: z.string().nullable().optional(),
+    gender: z.enum(["M", "W"]).nullable().optional(),
+  })),
+});
+
+export const mtbCategoriesSchema = z.array(mtbCategorySchema);
 
 // ============================================================================
 // RIDER SCHEMAS
@@ -62,7 +129,8 @@ export const createRiderSchema = z.object({
 
 export const searchRidersSchema = z.object({
   q: z.string().min(1).max(100).optional(),
-  discipline: z.enum(["road", "mtb_xco", "mtb_xcc"]).optional(),
+  discipline: disciplineEnum.optional(),
+  subDiscipline: subDisciplineEnum.optional(),
   limit: z.coerce.number().min(1).max(100).default(50),
   offset: z.coerce.number().min(0).default(0),
 });
@@ -89,7 +157,7 @@ export const submitTipSchema = z.object({
 
 export const getPredictionsSchema = z.object({
   raceId: z.string().uuid("Invalid race ID"),
-  limit: z.coerce.number().min(1).max(200).default(50),
+  limit: z.coerce.number().min(1).max(1000).default(500),
 });
 
 // ============================================================================

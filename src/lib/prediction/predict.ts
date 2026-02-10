@@ -11,9 +11,7 @@
 import {
   type RiderSkill,
   calculateElo,
-  calculateWinProbabilities,
-  podiumProbability,
-  top10Probability,
+  calculateAllProbabilities,
   createInitialSkill,
 } from "./trueskill";
 import { type FormScore, formMultiplier } from "./form";
@@ -262,16 +260,12 @@ export function generateRacePredictions(
     });
   }
 
-  // Calculate win probabilities
-  const winProbs = calculateWinProbabilities(skillsMap);
+  // Calculate all probabilities in a single efficient batch
+  const allProbs = calculateAllProbabilities(skillsMap);
 
-  // Calculate podium and top-10 probabilities
+  // Build predictions using pre-calculated probabilities
   const predictions: RacePrediction[] = scoredRiders.map((scored) => {
-    const skill = skillsMap.get(scored.input.riderId) || createInitialSkill(scored.input.riderId);
-
-    const winProb = winProbs.get(scored.input.riderId) || 0;
-    const podiumProb = podiumProbability(skill, skillsMap);
-    const top10Prob = top10Probability(skill, skillsMap);
+    const probs = allProbs.get(scored.input.riderId) || { win: 0, podium: 0, top10: 0 };
 
     const confidence = calculateConfidence(scored.input);
     const reasoning = generateReasoning(
@@ -281,15 +275,15 @@ export function generateRacePredictions(
         profileMult: scored.profileMult,
         rumourMod: scored.rumourMod,
       },
-      winProb
+      probs.win
     );
 
     return {
       riderId: scored.input.riderId,
       riderName: scored.input.riderName,
-      winProbability: winProb,
-      podiumProbability: podiumProb,
-      top10Probability: top10Prob,
+      winProbability: probs.win,
+      podiumProbability: probs.podium,
+      top10Probability: probs.top10,
       finalScore: scored.finalScore,
       eloScore: scored.eloScore,
       formMultiplier: scored.formMult,
