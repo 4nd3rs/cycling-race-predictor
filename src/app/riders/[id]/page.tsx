@@ -125,11 +125,30 @@ export default async function RiderDetailPage({ params }: PageProps) {
     notFound();
   }
 
-  const [statsData, resultsData, rumoursData] = await Promise.all([
+  const [rawStatsData, resultsData, rumoursData] = await Promise.all([
     getRiderStats(id),
     getRiderResults(id),
     getRiderRumours(id),
   ]);
+
+  // Merge duplicate MTB stats (mtb + mtb_xco) — keep the one with more data
+  const statsData = (() => {
+    const mtbEntries = rawStatsData.filter(({ stats }) => stats.discipline.startsWith("mtb"));
+    const otherEntries = rawStatsData.filter(({ stats }) => !stats.discipline.startsWith("mtb"));
+    if (mtbEntries.length <= 1) return rawStatsData;
+
+    // Group by ageCategory, keep entry with highest UCI points (or most races)
+    const byCategory = new Map<string, (typeof mtbEntries)[0]>();
+    for (const entry of mtbEntries) {
+      const key = entry.stats.ageCategory;
+      const existing = byCategory.get(key);
+      if (!existing || (entry.stats.uciPoints ?? 0) > (existing.stats.uciPoints ?? 0)) {
+        // Normalize discipline label to "mtb"
+        byCategory.set(key, { ...entry, stats: { ...entry.stats, discipline: "mtb" } });
+      }
+    }
+    return [...otherEntries, ...byCategory.values()];
+  })();
 
   const birthDate = rider.birthDate ? new Date(rider.birthDate) : null;
   const now = new Date();
@@ -262,6 +281,25 @@ export default async function RiderDetailPage({ params }: PageProps) {
                           <div className="text-right">
                             <div className="text-sm text-muted-foreground">UCI Points</div>
                             <div className="font-bold text-lg">{stats.uciPoints || 0}</div>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {/* SuperCup Ranking (for MTB) */}
+                      {(stats.discipline.startsWith("mtb") && (stats.supercupRank || stats.supercupPoints)) ? (
+                        <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-900">
+                          <div className="flex items-center gap-3">
+                            <span className="text-2xl">SC</span>
+                            <div>
+                              <div className="text-sm text-muted-foreground">SuperCup Ranking</div>
+                              <div className="font-bold">
+                                {stats.supercupRank ? `#${stats.supercupRank}` : "Unranked"}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-sm text-muted-foreground">SuperCup Points</div>
+                            <div className="font-bold text-lg">{stats.supercupPoints || 0}</div>
                           </div>
                         </div>
                       ) : null}

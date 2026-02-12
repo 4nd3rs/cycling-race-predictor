@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { isAdmin } from "@/lib/auth";
 import { Header } from "@/components/header";
 import { RaceCard, RaceList } from "@/components/race-card";
 import { EventCard, EventList } from "@/components/event-card";
@@ -382,7 +383,9 @@ async function DisciplinesSection() {
   );
 }
 
-export default function RacesPage() {
+export default async function RacesPage() {
+  const admin = await isAdmin();
+
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
@@ -394,9 +397,11 @@ export default function RacesPage() {
               Browse cycling events by discipline
             </p>
           </div>
-          <Button asChild>
-            <Link href="/races/new">+ Add Race</Link>
-          </Button>
+          {admin && (
+            <Button asChild>
+              <Link href="/races/new">+ Add Race</Link>
+            </Button>
+          )}
         </div>
 
         {/* Discipline Cards */}

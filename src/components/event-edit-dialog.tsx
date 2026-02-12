@@ -22,7 +22,14 @@ interface EventEditDialogProps {
   date: string;
   endDate?: string | null;
   country?: string | null;
+  series?: string | null;
 }
+
+const SERIES_OPTIONS = [
+  { value: "", label: "None" },
+  { value: "supercup", label: "SuperCup MTB" },
+  { value: "copa_catalana", label: "Copa Catalana" },
+];
 
 export function EventEditDialog({
   eventId,
@@ -30,6 +37,7 @@ export function EventEditDialog({
   date: initialDate,
   endDate: initialEndDate,
   country: initialCountry,
+  series: initialSeries,
 }: EventEditDialogProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -38,6 +46,7 @@ export function EventEditDialog({
   const [date, setDate] = useState(initialDate);
   const [endDate, setEndDate] = useState(initialEndDate || "");
   const [country, setCountry] = useState(initialCountry || "");
+  const [series, setSeries] = useState(initialSeries || "");
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -54,6 +63,7 @@ export function EventEditDialog({
           date,
           endDate: endDate || null,
           country: country || null,
+          series: series || null,
         }),
       });
 
@@ -131,6 +141,21 @@ export function EventEditDialog({
                 placeholder="ESP"
                 maxLength={3}
               />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="series">Series</Label>
+              <select
+                id="series"
+                value={series}
+                onChange={(e) => setSeries(e.target.value)}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                {SERIES_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
             </div>
             {error && (
               <p className="text-sm text-destructive">{error}</p>

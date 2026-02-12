@@ -2,6 +2,8 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { db, users } from "@/lib/db";
 import { eq } from "drizzle-orm";
 
+const ADMIN_EMAIL = "a@andmag.se";
+
 export type UserRole = "admin" | "premium" | "free";
 
 export interface AuthUser {
@@ -62,6 +64,15 @@ export async function getAuthUser(): Promise<AuthUser | null> {
     tier: user.tier || "free",
     role,
   };
+}
+
+/**
+ * Lightweight admin check for server components (no DB call).
+ */
+export async function isAdmin(): Promise<boolean> {
+  const user = await currentUser();
+  if (!user) return false;
+  return user.emailAddresses.some((e) => e.emailAddress === ADMIN_EMAIL);
 }
 
 /**

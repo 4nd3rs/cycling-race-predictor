@@ -1,10 +1,12 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { isAdmin } from "@/lib/auth";
 import { Header } from "@/components/header";
 import { PredictionList } from "@/components/prediction-card";
 import { RefreshStartlistButton } from "@/components/refresh-startlist-button";
 import { ReimportResultsButton } from "@/components/reimport-results-button";
 import { SyncRankingsButton } from "@/components/sync-rankings-button";
+import { SyncSupercupButton } from "@/components/sync-supercup-button";
 import { AddInfoButton } from "@/components/add-info-button";
 import { DeleteRaceButton } from "@/components/delete-race-button";
 import { Badge } from "@/components/ui/badge";
@@ -147,17 +149,32 @@ async function getRacePredictions(raceId: string, race: typeof races.$inferSelec
   }
 }
 
-async function getRaceStartlist(raceId: string) {
+async function getRaceStartlist(raceId: string, race?: typeof races.$inferSelect) {
   try {
+    const isMtb = race?.discipline === "mtb";
     const results = await db
       .select({
         entry: raceStartlist,
         rider: riders,
         team: teams,
+        stats: riderDisciplineStats,
       })
       .from(raceStartlist)
       .innerJoin(riders, eq(raceStartlist.riderId, riders.id))
       .leftJoin(teams, eq(raceStartlist.teamId, teams.id))
+      .leftJoin(
+        riderDisciplineStats,
+        isMtb
+          ? and(
+              eq(riderDisciplineStats.riderId, riders.id),
+              eq(riderDisciplineStats.discipline, "mtb"),
+              eq(riderDisciplineStats.ageCategory, race?.ageCategory || "elite")
+            )
+          : and(
+              eq(riderDisciplineStats.riderId, riders.id),
+              eq(riderDisciplineStats.discipline, race?.discipline || "road")
+            )
+      )
       .where(eq(raceStartlist.raceId, raceId))
       .orderBy(raceStartlist.bibNumber);
 
@@ -402,6 +419,7 @@ function getProfileIcon(profile?: string | null) {
 
 export default async function CategoryPage({ params }: PageProps) {
   const { discipline, eventSlug, categorySlug } = await params;
+  const admin = await isAdmin();
 
   // Validate discipline
   if (!isValidDiscipline(discipline)) {
@@ -425,8 +443,8 @@ export default async function CategoryPage({ params }: PageProps) {
   const hasResults = results.length > 0;
   const isCompleted = race.status === "completed" || hasResults;
 
-  // Get startlist
-  const startlist = await getRaceStartlist(race.id);
+  // Get startlist (with stats for point-based sorting)
+  const startlist = await getRaceStartlist(race.id, race);
 
   // Get sibling races
   const siblingRaces = await getSiblingRaces(event.id, race.id, discipline, eventSlug);
@@ -460,6 +478,7 @@ export default async function CategoryPage({ params }: PageProps) {
         reasoning: prediction.reasoning || undefined,
         uciPoints: stats?.uciPoints ? parseInt(String(stats.uciPoints)) : 0,
         uciRank: stats?.uciRank || null,
+        supercupPoints: stats?.supercupPoints ? parseInt(String(stats.supercupPoints)) : 0,
         eloScore: prediction.eloScore ? parseFloat(prediction.eloScore) : undefined,
         confidence,
         hasEnoughData,
@@ -483,6 +502,8 @@ export default async function CategoryPage({ params }: PageProps) {
       return a.riderName.localeCompare(b.riderName);
     })
 ;
+
+  const isSuperCup = event.series === "supercup";
 
   const raceDate = new Date(race.date);
   const isUpcoming = raceDate > new Date() && !isCompleted;
@@ -553,17 +574,20 @@ export default async function CategoryPage({ params }: PageProps) {
                 {race.elevationM && <span>• {race.elevationM}m ↑</span>}
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {discipline === "mtb" && <SyncRankingsButton raceId={race.id} />}
-              {discipline === "mtb" && (
-                <AddInfoButton raceId={race.id} raceName={`${event.name} - ${categoryDisplay}`} />
-              )}
-              {!isCompleted && <RefreshStartlistButton raceId={race.id} />}
-              {isCompleted && event.sourceType === "copa_catalana" && (
-                <ReimportResultsButton raceId={race.id} />
-              )}
-              <DeleteRaceButton raceId={race.id} raceName={race.name} />
-            </div>
+            {admin && (
+              <div className="flex flex-wrap gap-2">
+                {discipline === "mtb" && <SyncRankingsButton raceId={race.id} />}
+                {discipline === "mtb" && isSuperCup && <SyncSupercupButton raceId={race.id} />}
+                {discipline === "mtb" && (
+                  <AddInfoButton raceId={race.id} raceName={`${event.name} - ${categoryDisplay}`} />
+                )}
+                {!isCompleted && <RefreshStartlistButton raceId={race.id} />}
+                {isCompleted && event.sourceType === "copa_catalana" && (
+                  <ReimportResultsButton raceId={race.id} />
+                )}
+                <DeleteRaceButton raceId={race.id} raceName={race.name} />
+              </div>
+            )}
           </div>
 
           {/* Source link */}
@@ -698,7 +722,7 @@ export default async function CategoryPage({ params }: PageProps) {
           {!isCompleted && (
             <TabsContent value="predictions">
               {formattedPredictions.length > 0 ? (
-                <PredictionList predictions={formattedPredictions} />
+                <PredictionList predictions={formattedPredictions} isSuperCup={isSuperCup} />
               ) : (
                 <Card>
                   <CardContent className="py-12 text-center">
@@ -716,38 +740,76 @@ export default async function CategoryPage({ params }: PageProps) {
           <TabsContent value="startlist">
             {startlist.length > 0 ? (
               <div className="border rounded-lg divide-y">
-                {startlist.map(({ entry, rider, team }) => (
-                  <Link
-                    key={entry.id}
-                    href={`/riders/${rider.id}`}
-                    className="flex items-center gap-3 py-2 px-3 hover:bg-muted/50 rounded-lg transition-colors"
-                  >
-                    {/* Bib Number */}
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground text-sm font-bold">
-                      {entry.bibNumber || "–"}
-                    </div>
+                {(() => {
+                  // For SuperCup races, sort by UCI points desc -> SuperCup points desc
+                  const sortedStartlist = isSuperCup
+                    ? [...startlist].sort((a, b) => {
+                        const aUci = a.stats?.uciPoints ?? 0;
+                        const bUci = b.stats?.uciPoints ?? 0;
+                        if (aUci !== bUci) return bUci - aUci;
+                        const aSc = a.stats?.supercupPoints ?? 0;
+                        const bSc = b.stats?.supercupPoints ?? 0;
+                        return bSc - aSc;
+                      })
+                    : startlist;
 
-                    {/* Name, Flag & Team */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium truncate hover:underline">{rider.name}</span>
-                        {rider.nationality && (
-                          <span className="text-sm flex-shrink-0" title={rider.nationality}>
-                            {countryToFlag(rider.nationality)}
-                          </span>
-                        )}
-                        {rider.birthDate && (
-                          <span className="text-xs text-muted-foreground flex-shrink-0">
-                            {calculateAge(rider.birthDate)}y
-                          </span>
+                  return sortedStartlist.map(({ entry, rider, team, stats }, index) => (
+                    <Link
+                      key={entry.id}
+                      href={`/riders/${rider.id}`}
+                      className="flex items-center gap-3 py-2 px-3 hover:bg-muted/50 rounded-lg transition-colors"
+                    >
+                      {/* Position badge for SuperCup / Bib for others */}
+                      <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
+                        isSuperCup
+                          ? index === 0
+                            ? "bg-yellow-500 text-yellow-950"
+                            : index === 1
+                            ? "bg-gray-300 text-gray-800"
+                            : index === 2
+                            ? "bg-amber-600 text-amber-50"
+                            : "bg-muted text-muted-foreground"
+                          : "bg-muted text-muted-foreground"
+                      }`}>
+                        {isSuperCup ? index + 1 : entry.bibNumber || "–"}
+                      </div>
+
+                      {/* Name, Flag & Team */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium truncate hover:underline">{rider.name}</span>
+                          {rider.nationality && (
+                            <span className="text-sm flex-shrink-0" title={rider.nationality}>
+                              {countryToFlag(rider.nationality)}
+                            </span>
+                          )}
+                          {rider.birthDate && (
+                            <span className="text-xs text-muted-foreground flex-shrink-0">
+                              {calculateAge(rider.birthDate)}y
+                            </span>
+                          )}
+                        </div>
+                        {team && (
+                          <div className="text-xs text-muted-foreground truncate">{team.name}</div>
                         )}
                       </div>
-                      {team && (
-                        <div className="text-xs text-muted-foreground truncate">{team.name}</div>
+
+                      {/* UCI points column */}
+                      <div className="w-14 text-right shrink-0">
+                        <div className="text-xs text-muted-foreground">UCI</div>
+                        <div className="font-semibold text-sm">{stats?.uciPoints || "—"}</div>
+                      </div>
+
+                      {/* SC column for SuperCup races only */}
+                      {isSuperCup && (
+                        <div className="w-14 text-right shrink-0">
+                          <div className="text-xs text-muted-foreground">SC</div>
+                          <div className="font-semibold text-sm">{stats?.supercupPoints || "—"}</div>
+                        </div>
                       )}
-                    </div>
-                  </Link>
-                ))}
+                    </Link>
+                  ));
+                })()}
               </div>
             ) : (
               <Card>

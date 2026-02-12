@@ -1,10 +1,13 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { isAdmin } from "@/lib/auth";
 import { Header } from "@/components/header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DeleteEventButton } from "@/components/delete-event-button";
+import { EventEditDialog } from "@/components/event-edit-dialog";
 import { ImportResultsButton } from "@/components/import-results-button";
+import { UploadStartlistButton } from "@/components/upload-startlist-button";
 import { db, races, raceEvents, raceStartlist, raceResults } from "@/lib/db";
 import { eq, and, sql } from "drizzle-orm";
 import { format } from "date-fns";
@@ -100,6 +103,7 @@ function countryToFlag(countryCode?: string | null) {
 
 export default async function EventPage({ params }: PageProps) {
   const { discipline, eventSlug } = await params;
+  const admin = await isAdmin();
 
   // Validate discipline
   if (!isValidDiscipline(discipline)) {
@@ -199,17 +203,31 @@ export default async function EventPage({ params }: PageProps) {
               <span>{categories.length} categories</span>
               {totalRiders > 0 && <span>{totalRiders} total riders</span>}
             </div>
-            <div className="flex gap-2">
-              <ImportResultsButton
-                eventId={event.id}
-                eventName={event.name}
-              />
-              <DeleteEventButton
-                eventId={event.id}
-                eventName={event.name}
-                redirectTo={`/races/${discipline}`}
-              />
-            </div>
+            {admin && (
+              <div className="flex gap-2">
+                <EventEditDialog
+                  eventId={event.id}
+                  name={event.name}
+                  date={event.date}
+                  endDate={event.endDate}
+                  country={event.country}
+                  series={event.series}
+                />
+                <UploadStartlistButton
+                  eventId={event.id}
+                  eventName={event.name}
+                />
+                <ImportResultsButton
+                  eventId={event.id}
+                  eventName={event.name}
+                />
+                <DeleteEventButton
+                  eventId={event.id}
+                  eventName={event.name}
+                  redirectTo={`/races/${discipline}`}
+                />
+              </div>
+            )}
           </div>
         </div>
 

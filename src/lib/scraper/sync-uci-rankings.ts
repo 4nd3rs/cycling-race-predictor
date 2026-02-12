@@ -266,8 +266,8 @@ export async function syncUciRankingsForCategory(
       continue;
     }
 
-    // Determine discipline (default to mtb_xco)
-    const discipline = "mtb_xco";
+    // Use "mtb" as the canonical discipline
+    const discipline = "mtb";
 
     // Find or create discipline stats
     const [existingStats] = await db

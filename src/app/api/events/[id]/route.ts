@@ -8,6 +8,7 @@ const updateEventSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   country: z.string().length(3).nullable().optional(),
+  series: z.string().max(50).nullable().optional(),
 });
 
 export async function GET(
@@ -74,6 +75,7 @@ export async function PATCH(
     if (data.date !== undefined) updateData.date = data.date;
     if (data.endDate !== undefined) updateData.endDate = data.endDate;
     if (data.country !== undefined) updateData.country = data.country;
+    if (data.series !== undefined) updateData.series = data.series;
 
     if (Object.keys(updateData).length > 0) {
       await db

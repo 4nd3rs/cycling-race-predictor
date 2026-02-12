@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-type SortMode = "predicted" | "elo" | "uci";
+type SortMode = "predicted" | "elo" | "uci" | "supercup";
 
 function countryToFlag(countryCode?: string | null) {
   if (!countryCode) return null;
@@ -34,8 +34,10 @@ interface PredictionRowProps {
   birthDate?: string;
   teamName?: string;
   uciPoints?: number;
+  supercupPoints?: number;
   eloScore?: number;
   hasEnoughData?: boolean;
+  showSupercup?: boolean;
 }
 
 function PredictionRow({
@@ -46,8 +48,10 @@ function PredictionRow({
   birthDate,
   teamName,
   uciPoints,
+  supercupPoints,
   eloScore,
   hasEnoughData,
+  showSupercup,
 }: PredictionRowProps) {
   const getPositionStyle = (pos: number) => {
     if (pos === 1) return "bg-yellow-500 text-yellow-950";
@@ -97,6 +101,14 @@ function PredictionRow({
         <div className="font-semibold text-sm">{uciPoints ? uciPoints : "—"}</div>
       </div>
 
+      {/* SuperCup Points */}
+      {showSupercup && (
+        <div className="w-14 text-right shrink-0">
+          <div className="text-xs text-muted-foreground">SC</div>
+          <div className="font-semibold text-sm">{supercupPoints ? supercupPoints : "—"}</div>
+        </div>
+      )}
+
       {/* ELO Score */}
       {hasEnoughData && eloScore !== undefined && eloScore > 0 ? (
         <div className="w-14 text-right shrink-0">
@@ -126,15 +138,18 @@ interface PredictionListProps {
     reasoning?: string;
     uciPoints?: number;
     uciRank?: number | null;
+    supercupPoints?: number;
     eloScore?: number;
     hasEnoughData?: boolean;
   }>;
   maxItems?: number;
+  isSuperCup?: boolean;
 }
 
 export function PredictionList({
   predictions,
   maxItems,
+  isSuperCup,
 }: PredictionListProps) {
   const [sortMode, setSortMode] = useState<SortMode>("predicted");
 
@@ -158,7 +173,7 @@ export function PredictionList({
       if (aElo !== bElo) return bElo - aElo;
       // Tiebreak: UCI points
       return (b.uciPoints ?? 0) - (a.uciPoints ?? 0);
-    } else {
+    } else if (sortMode === "uci") {
       const aUci = a.uciPoints ?? 0;
       const bUci = b.uciPoints ?? 0;
       // Riders with UCI points first, then by points desc
@@ -166,6 +181,13 @@ export function PredictionList({
       if (aUci !== bUci) return bUci - aUci;
       // Tiebreak: ELO
       return (b.eloScore ?? 0) - (a.eloScore ?? 0);
+    } else {
+      // supercup: sort by SuperCup points desc, tiebreak UCI points
+      const aSc = a.supercupPoints ?? 0;
+      const bSc = b.supercupPoints ?? 0;
+      if (aSc > 0 !== bSc > 0) return aSc > 0 ? -1 : 1;
+      if (aSc !== bSc) return bSc - aSc;
+      return (b.uciPoints ?? 0) - (a.uciPoints ?? 0);
     }
   });
 
@@ -214,6 +236,19 @@ export function PredictionList({
         >
           UCI Points
         </button>
+        {isSuperCup && (
+          <button
+            onClick={() => setSortMode("supercup")}
+            className={cn(
+              "px-3 py-1 text-sm rounded-md transition-colors",
+              sortMode === "supercup"
+                ? "bg-background shadow-sm font-medium"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            SuperCup
+          </button>
+        )}
       </div>
 
       <div className="border rounded-lg divide-y">
@@ -227,8 +262,10 @@ export function PredictionList({
             birthDate={pred.birthDate}
             teamName={pred.teamName}
             uciPoints={pred.uciPoints}
+            supercupPoints={pred.supercupPoints}
             eloScore={pred.eloScore}
             hasEnoughData={pred.hasEnoughData}
+            showSupercup={isSuperCup}
           />
         ))}
       </div>

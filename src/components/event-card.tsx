@@ -31,6 +31,7 @@ interface EventCardProps {
   country?: string | null;
   discipline: string;
   subDiscipline?: string | null;
+  series?: string | null;
   categories: RaceCategory[];
   className?: string;
 }
@@ -44,6 +45,7 @@ export function EventCard({
   country,
   discipline,
   subDiscipline,
+  series,
   categories,
   className,
 }: EventCardProps) {
@@ -141,6 +143,7 @@ export function EventCard({
               date={date}
               endDate={endDate}
               country={country}
+              series={series}
             />
             {getStatusBadge()}
           </div>
@@ -199,6 +202,7 @@ interface EventListProps {
     country?: string | null;
     discipline: string;
     subDiscipline?: string | null;
+    series?: string | null;
     categories: RaceCategory[];
   }>;
   emptyMessage?: string;
@@ -229,6 +233,7 @@ export function EventList({
           country={event.country}
           discipline={event.discipline}
           subDiscipline={event.subDiscipline}
+          series={event.series}
           categories={event.categories}
         />
       ))}

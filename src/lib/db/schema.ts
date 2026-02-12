@@ -71,6 +71,9 @@ export const riderDisciplineStats = pgTable(
     // World Cup points (separate from UCI ranking points)
     worldCupPoints: integer("world_cup_points").default(0),
     worldCupRank: integer("world_cup_rank"),
+    // SuperCup MTB points
+    supercupPoints: integer("supercup_points").default(0),
+    supercupRank: integer("supercup_rank"),
     // Profile affinities as JSON: {"flat": 0.6, "hilly": 0.8, "mountain": 0.9}
     profileAffinities: jsonb("profile_affinities").$type<Record<string, number>>(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -104,6 +107,7 @@ export const raceEvents = pgTable(
     country: char("country", { length: 3 }),
     sourceUrl: varchar("source_url", { length: 500 }),
     sourceType: varchar("source_type", { length: 50 }), // "rockthesport", "pcs", etc.
+    series: varchar("series", { length: 50 }), // "supercup", "copa_catalana", etc.
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [

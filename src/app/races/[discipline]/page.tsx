@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { isAdmin } from "@/lib/auth";
 import { Header } from "@/components/header";
 import { EventCard, EventList } from "@/components/event-card";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ interface GroupedEvent {
   country: string | null;
   discipline: string;
   subDiscipline: string | null;
+  series: string | null;
   categories: Array<{
     id: string;
     ageCategory: string;
@@ -76,6 +78,7 @@ async function getEventsByDiscipline(discipline: Discipline, upcoming: boolean) 
           country: event.country,
           discipline: event.discipline,
           subDiscipline: event.subDiscipline,
+          series: event.series,
           categories: [],
         });
       }
@@ -166,6 +169,7 @@ function DisciplineEventList({
           country={event.country || undefined}
           discipline={event.discipline}
           subDiscipline={event.subDiscipline}
+          series={event.series}
           slug={event.slug}
           categories={event.categories}
         />
@@ -176,6 +180,7 @@ function DisciplineEventList({
 
 export default async function DisciplinePage({ params }: PageProps) {
   const { discipline } = await params;
+  const admin = await isAdmin();
 
   // Validate discipline
   if (!isValidDiscipline(discipline)) {
@@ -205,12 +210,14 @@ export default async function DisciplinePage({ params }: PageProps) {
               Browse {disciplineLabel.toLowerCase()} cycling events and races
             </p>
           </div>
-          <div className="flex gap-2">
-            {discipline === "mtb" && <ImportHistoricalButton />}
-            <Button asChild>
-              <Link href="/races/new">+ Add Race</Link>
-            </Button>
-          </div>
+          {admin && (
+            <div className="flex gap-2">
+              {discipline === "mtb" && <ImportHistoricalButton />}
+              <Button asChild>
+                <Link href="/races/new">+ Add Race</Link>
+              </Button>
+            </div>
+          )}
         </div>
 
         <Tabs defaultValue="upcoming" className="space-y-6">
