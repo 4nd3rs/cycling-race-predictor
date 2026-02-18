@@ -1,36 +1,105 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Cycling Race Predictor
+
+Predicts cycling race results using a TrueSkill ELO rating system. Supports road and MTB (XCO) disciplines.
+
+## Tech Stack
+
+- **Framework**: Next.js 16 (Turbopack)
+- **Database**: PostgreSQL (Neon) with Drizzle ORM
+- **Auth**: Clerk
+- **Styling**: Tailwind CSS + shadcn/ui
+- **Deployment**: Vercel
+
+## Data Sources
+
+- **XCOdata** — Complete UCI MTB XCO rankings (primary source for MTB riders)
+- **UCI DataRide** — Official UCI rankings (supplementary age/UCI ID data, requires Firecrawl API key)
+- **ProCyclingStats** — Road cycling startlists and results
+- **Rockthesport / Cronomancha** — Regional MTB event data (Spain)
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
+npm install
+cp .env.example .env.local  # Fill in your env vars
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Environment Variables
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- `DATABASE_URL` — Neon PostgreSQL connection string
+- `CLERK_SECRET_KEY` / `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` — Clerk auth
+- `CRON_SECRET` — Secret for authenticating cron job requests
+- `FIRECRAWL_API_KEY` — (Optional) For scraping UCI DataRide for rider ages
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Database Migrations
 
-## Learn More
+Migrations are in `drizzle/migrations/`. To push schema changes:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm run db:push
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Or run a specific migration manually via the Neon SQL console.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Key Features
 
-## Deploy on Vercel
+### ELO Rating System
+Riders are rated using a TrueSkill-based ELO system. Ratings update after each race based on finishing positions. New riders get an initial ELO estimate from their UCI ranking points.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### UCI Rankings Sync
+The system mirrors the complete UCI MTB rankings database. This provides rider data (name, nationality, team, UCI points) and initial ELO estimates for all ranked riders.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Admin dashboard** (`/admin`): View sync history and trigger manual syncs
+- **Automatic sync**: Runs every Tuesday at 10:00 UTC via Vercel cron (UCI updates on Tuesdays)
+- **Flow**: Sync once → all ranked riders exist in DB → startlist imports match against them
+
+### Rider Matching
+Centralized matching logic (`src/lib/riders/find-or-create.ts`) prevents duplicate riders:
+1. Match by XCO ID (exact)
+2. Match by UCI ID (exact)
+3. Match by PCS ID (exact)
+4. Match by name (case-insensitive)
+5. Match by accent-stripped name
+6. Create new rider if no match
+
+Partial unique indexes on `riders.xco_id` and `riders.uci_id` enforce uniqueness at the DB level.
+
+### Race Predictions
+For each race, the system generates predictions based on:
+- ELO rating (primary signal)
+- UCI ranking points
+- Form (recent results)
+- Profile affinity (course characteristics)
+- Community tips/rumours
+
+## Admin
+
+The admin dashboard at `/admin` is accessible to users with the admin email (`a@andmag.se`). It provides:
+- UCI sync status and history
+- Per-category sync breakdown
+- Manual "Sync Now" trigger
+
+## Project Structure
+
+```
+src/
+├── app/
+│   ├── admin/              # Admin dashboard
+│   ├── api/
+│   │   ├── admin/          # Admin API routes
+│   │   ├── cron/           # Scheduled jobs
+│   │   ├── events/         # Event management
+│   │   └── races/          # Race management
+│   ├── races/              # Race pages
+│   ├── riders/             # Rider pages
+│   └── teams/              # Team pages
+├── components/             # React components
+├── lib/
+│   ├── auth/               # Authentication helpers
+│   ├── db/                 # Database schema and connection
+│   ├── prediction/         # ELO and prediction logic
+│   ├── riders/             # Rider matching (find-or-create)
+│   └── scraper/            # Data source scrapers
+└── middleware.ts            # Auth middleware
+```
