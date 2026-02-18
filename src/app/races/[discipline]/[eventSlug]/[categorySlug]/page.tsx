@@ -5,7 +5,6 @@ import { Header } from "@/components/header";
 import { PredictionList } from "@/components/prediction-card";
 import { RefreshStartlistButton } from "@/components/refresh-startlist-button";
 import { ReimportResultsButton } from "@/components/reimport-results-button";
-import { SyncRankingsButton } from "@/components/sync-rankings-button";
 import { SyncSupercupButton } from "@/components/sync-supercup-button";
 import { AddInfoButton } from "@/components/add-info-button";
 import { DeleteRaceButton } from "@/components/delete-race-button";
@@ -578,7 +577,6 @@ export default async function CategoryPage({ params }: PageProps) {
             </div>
             {admin && (
               <div className="flex flex-wrap gap-2">
-                {discipline === "mtb" && <SyncRankingsButton raceId={race.id} />}
                 {discipline === "mtb" && isSuperCup && <SyncSupercupButton raceId={race.id} />}
                 {discipline === "mtb" && (
                   <AddInfoButton raceId={race.id} raceName={`${event.name} - ${categoryDisplay}`} />
