@@ -23,7 +23,7 @@ export const disciplineEnum = z.enum(["mtb", "road", "gravel", "cyclocross"]);
 // Sub-discipline enum (for MTB)
 export const subDisciplineEnum = z.enum(["xco", "xcc", "xce", "xcm"]);
 
-// Legacy discipline enum (for backwards compatibility during migration)
+// Legacy discipline enum (kept for backwards compatibility)
 export const legacyDisciplineEnum = z.enum(["road", "mtb_xco", "mtb_xcc", "mtb", "gravel", "cyclocross"]);
 
 export const createRaceSchema = z.object({

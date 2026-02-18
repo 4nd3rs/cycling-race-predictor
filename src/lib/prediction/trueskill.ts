@@ -113,7 +113,7 @@ function wFunction(t: number, epsilon: number): number {
  * Uses the "conservative" estimate: μ - 3σ
  */
 export function calculateElo(mean: number, variance: number): number {
-  return mean - 3 * Math.sqrt(variance);
+  return Math.max(0, mean - 3 * Math.sqrt(variance));
 }
 
 /**

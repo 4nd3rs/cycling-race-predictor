@@ -57,7 +57,7 @@ async function TeamsList() {
               <div className="flex items-center gap-2">
                 {team.discipline && (
                   <Badge variant="secondary">
-                    {team.discipline === "mtb_xco" ? "MTB" : team.discipline}
+                    {team.discipline === "mtb" ? "MTB" : team.discipline}
                   </Badge>
                 )}
                 {team.country && (

@@ -58,9 +58,6 @@ export function EventCard({
   const getDisciplineBadge = (disc: string) => {
     if (disc === "road") return { label: "Road", variant: "default" as const };
     if (disc === "mtb") return { label: "MTB", variant: "secondary" as const };
-    // Legacy support
-    if (disc === "mtb_xco") return { label: "MTB XCO", variant: "secondary" as const };
-    if (disc === "mtb_xcc") return { label: "MTB XCC", variant: "secondary" as const };
     if (disc === "gravel") return { label: "Gravel", variant: "secondary" as const };
     if (disc === "cyclocross") return { label: "CX", variant: "secondary" as const };
     return { label: disc, variant: "outline" as const };

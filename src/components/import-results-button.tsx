@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -26,29 +28,44 @@ export function ImportResultsButton({
   eventName,
 }: ImportResultsButtonProps) {
   const [open, setOpen] = useState(false);
+  const [pageUrl, setPageUrl] = useState("");
   const [urls, setUrls] = useState("");
   const [isImporting, setIsImporting] = useState(false);
   const router = useRouter();
 
-  const handleImport = async () => {
-    const pdfUrls = urls
-      .split("\n")
-      .map((u) => u.trim())
-      .filter((u) => u.length > 0);
+  const hasPageUrl = pageUrl.trim().length > 0;
+  const hasPdfUrls = urls.trim().length > 0;
 
-    if (pdfUrls.length === 0) {
-      toast.error("Please enter at least one PDF URL");
+  const handleImport = async () => {
+    if (!hasPageUrl && !hasPdfUrls) {
+      toast.error("Please enter a results page URL or PDF URLs");
       return;
     }
 
     setIsImporting(true);
-    const toastId = toast.loading("Importing results from PDFs...");
+
+    let requestBody: Record<string, unknown>;
+    let loadingMessage: string;
+
+    if (hasPageUrl) {
+      requestBody = { resultsPageUrl: pageUrl.trim() };
+      loadingMessage = "Discovering and importing results...";
+    } else {
+      const pdfUrls = urls
+        .split("\n")
+        .map((u) => u.trim())
+        .filter((u) => u.length > 0);
+      requestBody = { pdfUrls };
+      loadingMessage = "Importing results from PDFs...";
+    }
+
+    const toastId = toast.loading(loadingMessage);
 
     try {
       const response = await fetch(`/api/events/${eventId}/import-results`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pdfUrls }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -63,6 +80,7 @@ export function ImportResultsButton({
         `Imported ${data.totalImported} results across ${data.racesUpdated} categories`
       );
       setOpen(false);
+      setPageUrl("");
       setUrls("");
       router.refresh();
     } catch (error) {
@@ -87,17 +105,44 @@ export function ImportResultsButton({
         <DialogHeader>
           <DialogTitle>Import Results</DialogTitle>
           <DialogDescription>
-            Paste Vola Timing PDF URLs (one per line) to import results for{" "}
-            {eventName}. Results will be matched to existing race categories.
+            Import results for {eventName}. Provide a results page URL to
+            auto-discover PDFs, or paste individual PDF URLs.
           </DialogDescription>
         </DialogHeader>
-        <Textarea
-          placeholder={"https://example.com/results-elite.pdf\nhttps://example.com/results-women.pdf\nhttps://example.com/results-junior.pdf"}
-          value={urls}
-          onChange={(e) => setUrls(e.target.value)}
-          rows={5}
-          disabled={isImporting}
-        />
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="page-url">Results Page URL</Label>
+            <Input
+              id="page-url"
+              placeholder="https://example.com/downloads/"
+              value={pageUrl}
+              onChange={(e) => setPageUrl(e.target.value)}
+              disabled={isImporting || hasPdfUrls}
+            />
+            <p className="text-xs text-muted-foreground">
+              Auto-discovers result PDFs from a downloads page
+            </p>
+          </div>
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">or</span>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="pdf-urls">PDF URLs (one per line)</Label>
+            <Textarea
+              id="pdf-urls"
+              placeholder={"https://example.com/results-elite.pdf\nhttps://example.com/results-women.pdf"}
+              value={urls}
+              onChange={(e) => setUrls(e.target.value)}
+              rows={4}
+              disabled={isImporting || hasPageUrl}
+            />
+          </div>
+        </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)} disabled={isImporting}>
             Cancel

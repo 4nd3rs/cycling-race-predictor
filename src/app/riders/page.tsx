@@ -87,7 +87,7 @@ async function RidersSection({ query }: { query?: string }) {
       age,
       stats: stats.map((s) => ({
         discipline: s.discipline,
-        currentElo: parseFloat(s.currentElo || "1500"),
+        currentElo: parseFloat(s.currentElo || "0"),
         winsTotal: s.winsTotal || 0,
         podiumsTotal: s.podiumsTotal || 0,
         racesTotal: s.racesTotal || 0,

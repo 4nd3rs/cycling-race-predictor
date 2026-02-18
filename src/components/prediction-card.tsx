@@ -110,16 +110,12 @@ function PredictionRow({
       )}
 
       {/* ELO Score */}
-      {hasEnoughData && eloScore !== undefined && eloScore > 0 ? (
-        <div className="w-14 text-right shrink-0">
-          <div className="text-xs text-muted-foreground">ELO</div>
-          <div className="font-semibold text-sm">{Math.round(eloScore)}</div>
+      <div className="w-14 text-right shrink-0">
+        <div className="text-xs text-muted-foreground">ELO</div>
+        <div className="font-semibold text-sm">
+          {eloScore !== undefined ? Math.round(eloScore) : "—"}
         </div>
-      ) : (
-        <div className="w-14 text-right shrink-0 text-sm text-muted-foreground">
-          —
-        </div>
-      )}
+      </div>
     </Link>
   );
 }
@@ -166,11 +162,11 @@ export function PredictionList({
     if (sortMode === "predicted") {
       return a.predictedPosition - b.predictedPosition;
     } else if (sortMode === "elo") {
-      const aElo = a.eloScore ?? 0;
-      const bElo = b.eloScore ?? 0;
-      // Riders with ELO first, then by ELO desc
-      if (aElo > 0 !== bElo > 0) return aElo > 0 ? -1 : 1;
-      if (aElo !== bElo) return bElo - aElo;
+      // Riders with ELO data first, then by ELO desc
+      const aHasElo = a.eloScore !== undefined;
+      const bHasElo = b.eloScore !== undefined;
+      if (aHasElo !== bHasElo) return aHasElo ? -1 : 1;
+      if (aHasElo && bHasElo && a.eloScore !== b.eloScore) return b.eloScore! - a.eloScore!;
       // Tiebreak: UCI points
       return (b.uciPoints ?? 0) - (a.uciPoints ?? 0);
     } else if (sortMode === "uci") {

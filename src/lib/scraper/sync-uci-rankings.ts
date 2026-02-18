@@ -29,8 +29,7 @@ export async function syncUciRankingsForRace(
     throw new Error("Race not found");
   }
 
-  // Check for both old format (mtb_xco) and new format (mtb)
-  if (!race.discipline.startsWith("mtb")) {
+  if (race.discipline !== "mtb") {
     return { synced: 0, notFound: 0, skipped: 0, cleaned: 0 };
   }
 
@@ -92,20 +91,30 @@ export async function syncUciRankingsForRace(
       const eloStr = String(Math.min(2500, Math.max(1000, eloFromPoints)));
 
       if (existingStats) {
-        // Update existing stats
+        // Update existing stats — only touch ELO fields if rider has no race data
+        const eloVariance = match.rank <= 50 ? "80" : match.rank <= 200 ? "120" : "180";
+        const updates: Record<string, unknown> = {
+          uciPoints: match.uciPoints,
+          uciRank: match.rank,
+          updatedAt: new Date(),
+        };
+        if ((existingStats.racesTotal ?? 0) === 0) {
+          updates.eloMean = eloStr;
+          updates.eloVariance = eloVariance;
+          const mean = parseFloat(eloStr);
+          const variance = parseFloat(eloVariance);
+          updates.currentElo = String(Math.max(0, Math.round((mean - 3 * variance) * 100) / 100));
+        }
         await db
           .update(riderDisciplineStats)
-          .set({
-            uciPoints: match.uciPoints,
-            uciRank: match.rank,
-            eloMean: eloStr,
-            currentElo: eloStr,
-            eloVariance: match.rank <= 50 ? "80" : match.rank <= 200 ? "120" : "180",
-            updatedAt: new Date(),
-          })
+          .set(updates)
           .where(eq(riderDisciplineStats.id, existingStats.id));
       } else {
-        // Create new stats
+        // Create new stats with conservative currentElo
+        const eloVariance = match.rank <= 50 ? "80" : match.rank <= 200 ? "120" : "180";
+        const mean = parseFloat(eloStr);
+        const variance = parseFloat(eloVariance);
+        const conservativeElo = String(Math.max(0, Math.round((mean - 3 * variance) * 100) / 100));
         await db.insert(riderDisciplineStats).values({
           riderId: rider.id,
           discipline: race.discipline,
@@ -113,8 +122,8 @@ export async function syncUciRankingsForRace(
           uciPoints: match.uciPoints,
           uciRank: match.rank,
           eloMean: eloStr,
-          currentElo: eloStr,
-          eloVariance: match.rank <= 50 ? "80" : match.rank <= 200 ? "120" : "180",
+          currentElo: conservativeElo,
+          eloVariance,
         });
       }
 
@@ -151,14 +160,15 @@ export async function syncUciRankingsForRace(
         .limit(1);
 
       if (!existingStats) {
+        // Conservative currentElo for unranked: 1000 - 3*350 = -50 → clamped to 0
         await db.insert(riderDisciplineStats).values({
           riderId: rider.id,
           discipline: race.discipline,
           ageCategory,
           uciPoints: 0,
-          eloMean: "1000", // Base Elo for unranked
-          currentElo: "1000",
-          eloVariance: "350", // Higher uncertainty for unranked
+          eloMean: "1000",
+          currentElo: "0",
+          eloVariance: "350",
         });
       }
     }
@@ -286,17 +296,29 @@ export async function syncUciRankingsForCategory(
     const eloStr = String(Math.min(2500, Math.max(1000, eloFromPoints)));
 
     if (existingStats) {
+      // Only touch ELO fields if rider has no race data
+      const updates: Record<string, unknown> = {
+        uciPoints: ranking.uciPoints,
+        uciRank: ranking.rank,
+        updatedAt: new Date(),
+      };
+      if ((existingStats.racesTotal ?? 0) === 0) {
+        const eloVariance = ranking.rank <= 50 ? "80" : "150";
+        updates.eloMean = eloStr;
+        updates.eloVariance = eloVariance;
+        const mean = parseFloat(eloStr);
+        const variance = parseFloat(eloVariance);
+        updates.currentElo = String(Math.max(0, Math.round((mean - 3 * variance) * 100) / 100));
+      }
       await db
         .update(riderDisciplineStats)
-        .set({
-          uciPoints: ranking.uciPoints,
-          uciRank: ranking.rank,
-          eloMean: eloStr,
-          currentElo: eloStr,
-          updatedAt: new Date(),
-        })
+        .set(updates)
         .where(eq(riderDisciplineStats.id, existingStats.id));
     } else {
+      const eloVariance = ranking.rank <= 50 ? "80" : "150";
+      const mean = parseFloat(eloStr);
+      const variance = parseFloat(eloVariance);
+      const conservativeElo = String(Math.max(0, Math.round((mean - 3 * variance) * 100) / 100));
       await db.insert(riderDisciplineStats).values({
         riderId: existingRider.id,
         discipline,
@@ -304,8 +326,8 @@ export async function syncUciRankingsForCategory(
         uciPoints: ranking.uciPoints,
         uciRank: ranking.rank,
         eloMean: eloStr,
-        currentElo: eloStr,
-        eloVariance: ranking.rank <= 50 ? "80" : "150",
+        currentElo: conservativeElo,
+        eloVariance,
       });
     }
 

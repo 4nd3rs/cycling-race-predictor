@@ -479,7 +479,9 @@ export default async function CategoryPage({ params }: PageProps) {
         uciPoints: stats?.uciPoints ? parseInt(String(stats.uciPoints)) : 0,
         uciRank: stats?.uciRank || null,
         supercupPoints: stats?.supercupPoints ? parseInt(String(stats.supercupPoints)) : 0,
-        eloScore: prediction.eloScore ? parseFloat(prediction.eloScore) : undefined,
+        eloScore: stats?.racesTotal
+          ? Math.round(parseFloat(stats.currentElo || "0"))
+          : undefined,
         confidence,
         hasEnoughData,
       };
@@ -797,16 +799,24 @@ export default async function CategoryPage({ params }: PageProps) {
                       {/* UCI points column */}
                       <div className="w-14 text-right shrink-0">
                         <div className="text-xs text-muted-foreground">UCI</div>
-                        <div className="font-semibold text-sm">{stats?.uciPoints || "—"}</div>
+                        <div className="font-semibold text-sm">{stats?.uciPoints ? stats.uciPoints : "—"}</div>
                       </div>
 
                       {/* SC column for SuperCup races only */}
                       {isSuperCup && (
                         <div className="w-14 text-right shrink-0">
                           <div className="text-xs text-muted-foreground">SC</div>
-                          <div className="font-semibold text-sm">{stats?.supercupPoints || "—"}</div>
+                          <div className="font-semibold text-sm">{stats?.supercupPoints ? stats.supercupPoints : "—"}</div>
                         </div>
                       )}
+
+                      {/* ELO column */}
+                      <div className="w-14 text-right shrink-0">
+                        <div className="text-xs text-muted-foreground">ELO</div>
+                        <div className="font-semibold text-sm">
+                          {stats?.racesTotal ? Math.round(parseFloat(stats.currentElo || "0")) : "—"}
+                        </div>
+                      </div>
                     </Link>
                   ));
                 })()}

@@ -89,7 +89,7 @@ export default function NewRacePage() {
       uciCategory: "",
       distanceKm: parsedData.distance?.toString() || "",
       elevationM: parsedData.elevation?.toString() || "",
-      discipline: parsedData.source.discipline === "road" ? "road" : "mtb_xco",
+      discipline: parsedData.source.discipline === "road" ? "road" : "mtb",
     };
 
     let newSelectedCategories: string[] = [];
@@ -842,8 +842,7 @@ export default function NewRacePage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="road">Road</SelectItem>
-                        <SelectItem value="mtb_xco">MTB XCO</SelectItem>
-                        <SelectItem value="mtb_xcc">MTB XCC</SelectItem>
+                        <SelectItem value="mtb">MTB</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

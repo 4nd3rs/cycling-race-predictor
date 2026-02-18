@@ -48,10 +48,10 @@ export function RiderCard({
   };
 
   const getEloTier = (elo: number) => {
-    if (elo >= 1800) return { label: "Elite", color: "bg-purple-500" };
-    if (elo >= 1650) return { label: "Pro", color: "bg-blue-500" };
-    if (elo >= 1500) return { label: "Strong", color: "bg-green-500" };
-    if (elo >= 1350) return { label: "Average", color: "bg-gray-400" };
+    if (elo >= 1500) return { label: "Elite", color: "bg-purple-500" };
+    if (elo >= 1200) return { label: "Pro", color: "bg-blue-500" };
+    if (elo >= 900) return { label: "Strong", color: "bg-green-500" };
+    if (elo >= 600) return { label: "Average", color: "bg-gray-400" };
     return { label: "Developing", color: "bg-gray-300" };
   };
 
@@ -101,11 +101,9 @@ export function RiderCard({
                   <span className="text-xs font-medium uppercase text-muted-foreground">
                     {stat.discipline === "road"
                       ? "Road"
-                      : stat.discipline === "mtb_xco"
-                        ? "MTB XCO"
-                        : stat.discipline === "mtb_xcc"
-                          ? "MTB XCC"
-                          : stat.discipline}
+                      : stat.discipline === "mtb"
+                        ? "MTB"
+                        : stat.discipline}
                   </span>
                   <Badge variant="secondary" className={cn("text-white", eloTier.color)}>
                     {Math.round(stat.currentElo)} ELO

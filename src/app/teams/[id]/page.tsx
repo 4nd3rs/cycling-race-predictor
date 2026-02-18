@@ -98,7 +98,7 @@ export default async function TeamPage({ params }: PageProps) {
           <div className="flex flex-wrap items-center gap-2 mb-3">
             {team.discipline && (
               <Badge variant="secondary">
-                {team.discipline === "mtb_xco" ? "MTB" : team.discipline}
+                {team.discipline === "mtb" ? "MTB" : team.discipline}
               </Badge>
             )}
             {team.country && <Badge variant="outline">{team.country}</Badge>}

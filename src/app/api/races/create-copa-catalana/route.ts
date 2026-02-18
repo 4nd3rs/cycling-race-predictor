@@ -206,7 +206,7 @@ export async function POST(request: NextRequest) {
             // Insert the team
             await db.insert(teams).values({
               name: result.team,
-              discipline: "mtb_xco",
+              discipline: "mtb",
             }).onConflictDoNothing();
             // Fetch it back (in case of race condition)
             team = await db.query.teams.findFirst({

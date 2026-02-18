@@ -96,10 +96,10 @@ async function getRiderRumours(riderId: string) {
 }
 
 function getEloTier(elo: number) {
-  if (elo >= 1800) return { label: "Elite", color: "bg-purple-500" };
-  if (elo >= 1650) return { label: "Pro", color: "bg-blue-500" };
-  if (elo >= 1500) return { label: "Strong", color: "bg-green-500" };
-  if (elo >= 1350) return { label: "Average", color: "bg-gray-400" };
+  if (elo >= 1500) return { label: "Elite", color: "bg-purple-500" };
+  if (elo >= 1200) return { label: "Pro", color: "bg-blue-500" };
+  if (elo >= 900) return { label: "Strong", color: "bg-green-500" };
+  if (elo >= 600) return { label: "Average", color: "bg-gray-400" };
   return { label: "Developing", color: "bg-gray-300" };
 }
 
@@ -131,20 +131,49 @@ export default async function RiderDetailPage({ params }: PageProps) {
     getRiderRumours(id),
   ]);
 
-  // Merge duplicate MTB stats (mtb + mtb_xco) — keep the one with more data
+  // Merge duplicate MTB stats (mtb + mtb_xco) — combine ELO/race data with rankings
   const statsData = (() => {
     const mtbEntries = rawStatsData.filter(({ stats }) => stats.discipline.startsWith("mtb"));
     const otherEntries = rawStatsData.filter(({ stats }) => !stats.discipline.startsWith("mtb"));
     if (mtbEntries.length <= 1) return rawStatsData;
 
-    // Group by ageCategory, keep entry with highest UCI points (or most races)
+    // Group by ageCategory, merge all MTB entries into one
     const byCategory = new Map<string, (typeof mtbEntries)[0]>();
     for (const entry of mtbEntries) {
       const key = entry.stats.ageCategory;
       const existing = byCategory.get(key);
-      if (!existing || (entry.stats.uciPoints ?? 0) > (existing.stats.uciPoints ?? 0)) {
-        // Normalize discipline label to "mtb"
+      if (!existing) {
         byCategory.set(key, { ...entry, stats: { ...entry.stats, discipline: "mtb" } });
+      } else {
+        // Merge: take ELO/race stats from the entry with actual races,
+        // and rankings from the entry with ranking data
+        const merged = { ...existing.stats };
+        const s = entry.stats;
+        // Use the entry with more races for ELO data
+        if ((s.racesTotal ?? 0) > (merged.racesTotal ?? 0)) {
+          merged.currentElo = s.currentElo;
+          merged.eloMean = s.eloMean;
+          merged.eloVariance = s.eloVariance;
+          merged.racesTotal = s.racesTotal;
+          merged.winsTotal = s.winsTotal;
+          merged.podiumsTotal = s.podiumsTotal;
+        }
+        // Take highest ranking data from either entry
+        if ((s.uciPoints ?? 0) > (merged.uciPoints ?? 0)) {
+          merged.uciPoints = s.uciPoints;
+          merged.uciRank = s.uciRank;
+        }
+        if ((s.supercupPoints ?? 0) > (merged.supercupPoints ?? 0)) {
+          merged.supercupPoints = s.supercupPoints;
+          merged.supercupRank = s.supercupRank;
+        }
+        if ((s.worldCupPoints ?? 0) > (merged.worldCupPoints ?? 0)) {
+          merged.worldCupPoints = s.worldCupPoints;
+          merged.worldCupRank = s.worldCupRank;
+        }
+        // Use team from either if available
+        const team = entry.team || existing.team;
+        byCategory.set(key, { stats: { ...merged, discipline: "mtb" }, team });
       }
     }
     return [...otherEntries, ...byCategory.values()];
@@ -218,7 +247,7 @@ export default async function RiderDetailPage({ params }: PageProps) {
             {/* Stats Cards */}
             {statsData.length > 0 ? (
               statsData.map(({ stats, team }) => {
-                const elo = parseFloat(stats.currentElo || "1500");
+                const elo = parseFloat(stats.currentElo || "0");
                 const tier = getEloTier(elo);
                 const affinities = (stats.profileAffinities as Record<string, number>) || {};
 
@@ -229,11 +258,7 @@ export default async function RiderDetailPage({ params }: PageProps) {
                         <CardTitle>
                           {stats.discipline === "road"
                             ? "Road Cycling"
-                            : stats.discipline === "mtb_xco"
-                              ? "MTB XCO"
-                              : stats.discipline === "mtb_xcc"
-                                ? "MTB XCC"
-                                : stats.discipline === "mtb"
+                            : stats.discipline === "mtb"
                                   ? "MTB"
                                   : stats.discipline}
                         </CardTitle>
@@ -257,11 +282,11 @@ export default async function RiderDetailPage({ params }: PageProps) {
                           </span>
                         </div>
                         <Progress
-                          value={((elo - 1000) / 1000) * 100}
+                          value={(elo / 2000) * 100}
                           className="h-2"
                         />
                         <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                          <span>1000</span>
+                          <span>0</span>
                           <span>2000</span>
                         </div>
                       </div>

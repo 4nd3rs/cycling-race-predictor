@@ -88,8 +88,9 @@ function calculateFinalScore(input: RiderPredictionInput): {
   profileMult: number;
   rumourMod: number;
 } {
-  // Base ELO score
-  const eloScore = calculateElo(input.eloMean, input.eloVariance);
+  // Use conservative estimate (μ-3σ) as the base score, floored at 1 to prevent
+  // multiplication issues in finalScore. Unknown riders with high variance get low scores.
+  const eloScore = Math.max(calculateElo(input.eloMean, input.eloVariance), 1);
 
   // Form multiplier (0.8 to 1.2)
   const formMult = formMultiplier(input.formScore.overall);

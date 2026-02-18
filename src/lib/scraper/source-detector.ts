@@ -23,7 +23,7 @@ export interface SourceCapabilities {
   hasCategories: boolean;
   hasPdfs: boolean;
   requiresPdfUpload?: boolean; // Source needs manual PDF startlist upload
-  discipline: "road" | "mtb_xco" | "mtb_xcc" | "mixed";
+  discipline: "road" | "mtb" | "mixed";
   defaultCountry?: string;
 }
 
@@ -56,7 +56,7 @@ const SOURCES: SourcePattern[] = [
       dataTypes: ["startlist"],
       hasCategories: true,
       hasPdfs: false,
-      discipline: "mtb_xco",
+      discipline: "mtb",
       defaultCountry: "ESP",
     },
   },
@@ -69,7 +69,7 @@ const SOURCES: SourcePattern[] = [
       hasCategories: true,
       hasPdfs: false,
       requiresPdfUpload: true,
-      discipline: "mtb_xco",
+      discipline: "mtb",
       defaultCountry: "ESP",
     },
   },
@@ -81,7 +81,7 @@ const SOURCES: SourcePattern[] = [
       dataTypes: ["results"],
       hasCategories: true,
       hasPdfs: true,
-      discipline: "mtb_xco",
+      discipline: "mtb",
       defaultCountry: "ESP",
     },
   },
@@ -104,7 +104,7 @@ const SOURCES: SourcePattern[] = [
       dataTypes: ["rankings"],
       hasCategories: true,
       hasPdfs: false,
-      discipline: "mtb_xco",
+      discipline: "mtb",
     },
   },
 ];
