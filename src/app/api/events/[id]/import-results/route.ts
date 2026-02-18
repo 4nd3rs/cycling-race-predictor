@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, raceEvents, races, riders, raceResults, teams } from "@/lib/db";
-import { eq, ilike } from "drizzle-orm";
+import { db, raceEvents, races, riders, raceResults } from "@/lib/db";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 import {
   parseCopaCatalanaPdfUrl,
@@ -8,9 +8,16 @@ import {
   normalizeName,
   parseTime,
 } from "@/lib/scraper/copa-catalana";
+import { parseUciResultsPdfUrl } from "@/lib/scraper/pdf-results-parser";
+import { scrapeResultsPageUrls } from "@/lib/scraper/scrape-results-page";
+import { processRaceElo } from "@/lib/prediction/process-race-elo";
+import { findOrCreateRider, findOrCreateTeam } from "@/lib/riders/find-or-create";
 
 const importResultsSchema = z.object({
-  pdfUrls: z.array(z.string().url()).min(1),
+  pdfUrls: z.array(z.string().url()).min(1).optional(),
+  resultsPageUrl: z.string().url().optional(),
+}).refine((data) => data.pdfUrls || data.resultsPageUrl, {
+  message: "Either pdfUrls or resultsPageUrl must be provided",
 });
 
 export async function POST(
@@ -58,7 +65,7 @@ export async function POST(
     }
 
     // Parse all PDFs
-    const { pdfUrls } = validation.data;
+    const { pdfUrls, resultsPageUrl } = validation.data;
     const allParsedResults: Array<{
       ageCategory: string;
       gender: string;
@@ -67,39 +74,100 @@ export async function POST(
       position: number;
       time: string;
       timeGapSeconds: number | null;
+      timeSeconds: number | null;
       dnf: boolean;
       dns: boolean;
     }> = [];
 
-    for (const url of pdfUrls) {
-      console.log(`Parsing PDF: ${url}`);
-      const parsed = await parseCopaCatalanaPdfUrl(url);
+    if (resultsPageUrl) {
+      // UCI results page flow: discover PDFs from page, parse each with UCI parser
+      console.log(`Discovering result PDFs from: ${resultsPageUrl}`);
+      const discoveredPdfs = await scrapeResultsPageUrls(resultsPageUrl);
 
-      if (!parsed || parsed.results.length === 0) {
-        console.log(`No results found in PDF: ${url}`);
-        continue;
+      if (discoveredPdfs.length === 0) {
+        return NextResponse.json(
+          { error: "No result PDFs found on the provided page" },
+          { status: 400 }
+        );
       }
 
-      console.log(`Found ${parsed.results.length} results in PDF from categories: ${parsed.categories.join(", ")}`);
+      for (const pdf of discoveredPdfs) {
+        console.log(`Parsing UCI PDF: ${pdf.filename} (${pdf.ageCategory}/${pdf.gender})`);
+        const parsed = await parseUciResultsPdfUrl(pdf.pdfUrl);
 
-      for (const result of parsed.results) {
-        const mapped = mapCopaCatalanaCategory(result.category);
-        if (!mapped) {
-          // Skip unmapped categories (master, cadet, etc.)
+        if (!parsed || parsed.results.length === 0) {
+          console.log(`No results found in PDF: ${pdf.filename}`);
           continue;
         }
 
-        allParsedResults.push({
-          ageCategory: mapped.ageCategory,
-          gender: mapped.gender,
-          name: normalizeName(result.name),
-          team: result.team,
-          position: result.position,
-          time: result.time,
-          timeGapSeconds: result.timeGapSeconds,
-          dnf: result.dnf,
-          dns: result.dns,
-        });
+        for (const result of parsed.results) {
+          const name = normalizeName(`${result.lastName} ${result.firstName}`);
+          allParsedResults.push({
+            ageCategory: pdf.ageCategory,
+            gender: pdf.gender,
+            name,
+            team: result.team,
+            position: result.position,
+            time: "",
+            timeGapSeconds: null,
+            timeSeconds: result.timeSeconds,
+            dnf: result.dnf,
+            dns: result.dns,
+          });
+        }
+      }
+    } else if (pdfUrls) {
+      // Direct PDF URLs flow: try UCI parser first, fall back to Copa Catalana
+      for (const url of pdfUrls) {
+        console.log(`Parsing PDF: ${url}`);
+
+        // Try UCI parser first
+        const uciParsed = await parseUciResultsPdfUrl(url);
+        if (uciParsed && uciParsed.results.length > 0) {
+          console.log(`Parsed as UCI format: ${uciParsed.results.length} results (${uciParsed.ageCategory}/${uciParsed.gender})`);
+          for (const result of uciParsed.results) {
+            const name = normalizeName(`${result.lastName} ${result.firstName}`);
+            allParsedResults.push({
+              ageCategory: uciParsed.ageCategory,
+              gender: uciParsed.gender,
+              name,
+              team: result.team,
+              position: result.position,
+              time: "",
+              timeGapSeconds: null,
+              timeSeconds: result.timeSeconds,
+              dnf: result.dnf,
+              dns: result.dns,
+            });
+          }
+          continue;
+        }
+
+        // Fall back to Copa Catalana parser
+        const parsed = await parseCopaCatalanaPdfUrl(url);
+        if (!parsed || parsed.results.length === 0) {
+          console.log(`No results found in PDF: ${url}`);
+          continue;
+        }
+
+        console.log(`Found ${parsed.results.length} results in PDF from categories: ${parsed.categories.join(", ")}`);
+        for (const result of parsed.results) {
+          const mapped = mapCopaCatalanaCategory(result.category);
+          if (!mapped) continue;
+
+          allParsedResults.push({
+            ageCategory: mapped.ageCategory,
+            gender: mapped.gender,
+            name: normalizeName(result.name),
+            team: result.team,
+            position: result.position,
+            time: result.time,
+            timeGapSeconds: result.timeGapSeconds,
+            timeSeconds: null,
+            dnf: result.dnf,
+            dns: result.dns,
+          });
+        }
       }
     }
 
@@ -146,49 +214,21 @@ export async function POST(
       let teamsCreated = 0;
 
       for (const result of categoryResults) {
-        // Find rider by name (case-insensitive)
-        let rider = await db.query.riders.findFirst({
-          where: ilike(riders.name, result.name),
+        const riderBefore = await db.query.riders.findFirst({
+          where: eq(riders.name, result.name),
         });
 
-        // Fallback: try accent-stripped name
-        if (!rider) {
-          const strippedName = result.name
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "");
-          rider = await db.query.riders.findFirst({
-            where: ilike(riders.name, strippedName),
-          });
-        }
+        const rider = await findOrCreateRider({ name: result.name });
 
-        // Create rider if not found
-        if (!rider) {
-          const [newRider] = await db
-            .insert(riders)
-            .values({ name: result.name })
-            .returning();
-          rider = newRider;
+        if (!riderBefore) {
           ridersCreated++;
         }
 
         // Find or create team
         let teamId: string | null = null;
         if (result.team) {
-          let team = await db.query.teams.findFirst({
-            where: ilike(teams.name, result.team),
-          });
-
-          if (!team) {
-            await db
-              .insert(teams)
-              .values({ name: result.team, discipline: "mtb_xco" })
-              .onConflictDoNothing();
-            team = await db.query.teams.findFirst({
-              where: ilike(teams.name, result.team),
-            });
-            if (team) teamsCreated++;
-          }
-          teamId = team?.id || null;
+          const team = await findOrCreateTeam(result.team, "mtb");
+          teamId = team.id;
 
           // Update rider's current team
           if (teamId && rider.teamId !== teamId) {
@@ -200,13 +240,18 @@ export async function POST(
         }
 
         // Insert result
-        const timeMs = parseTime(result.time);
+        // UCI parser provides timeSeconds directly; Copa Catalana uses parseTime (ms)
+        let timeSeconds = result.timeSeconds;
+        if (timeSeconds == null && result.time) {
+          const timeMs = parseTime(result.time);
+          timeSeconds = timeMs ? Math.round(timeMs / 1000) : null;
+        }
         await db.insert(raceResults).values({
           raceId: race.id,
           riderId: rider.id,
           teamId,
           position: result.position,
-          timeSeconds: timeMs ? Math.round(timeMs / 1000) : null,
+          timeSeconds,
           timeGapSeconds: result.timeGapSeconds,
           dnf: result.dnf,
           dns: result.dns,
@@ -231,11 +276,24 @@ export async function POST(
 
     const totalImported = summary.reduce((sum, s) => sum + s.imported, 0);
 
+    // Process ELO updates for imported races
+    const eloResults: Array<{ raceId: string; updates: number | null }> = [];
+    for (const s of summary) {
+      try {
+        const updates = await processRaceElo(s.raceId);
+        eloResults.push({ raceId: s.raceId, updates });
+      } catch (error) {
+        console.error(`Error processing ELO for race ${s.raceId}:`, error);
+        eloResults.push({ raceId: s.raceId, updates: null });
+      }
+    }
+
     return NextResponse.json({
       success: true,
       eventId: id,
       totalImported,
       racesUpdated: summary.length,
+      eloUpdated: eloResults.filter((r) => r.updates !== null).length,
       summary,
     });
   } catch (error) {

@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, races, riders, raceResults, raceStartlist, teams, raceEvents } from "@/lib/db";
-import { eq, and, ilike } from "drizzle-orm";
+import { db, races, raceResults } from "@/lib/db";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
+import { processRaceElo } from "@/lib/prediction/process-race-elo";
 import {
   parseCopaCatalanaPdfUrl,
   normalizeName,
   mapCopaCatalanaCategory,
   parseTime,
-  type CopaCatalanaResult,
 } from "@/lib/scraper/copa-catalana";
+import { findOrCreateRider, findOrCreateTeam } from "@/lib/riders/find-or-create";
 
 const importResultsSchema = z.object({
   pdfUrl: z.string().url(),
@@ -82,53 +83,11 @@ export async function POST(
     for (const result of relevantResults) {
       const normalizedName = normalizeName(result.name);
 
-      // Find or create rider
-      let rider = await db.query.riders.findFirst({
-        where: ilike(riders.name, normalizedName),
-      });
+      const rider = await findOrCreateRider({ name: normalizedName });
 
-      if (!rider) {
-        // Try matching without accents
-        const simpleName = normalizedName
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "");
-        rider = await db.query.riders.findFirst({
-          where: ilike(riders.name, simpleName),
-        });
-      }
-
-      if (!rider) {
-        // Create new rider
-        const [newRider] = await db
-          .insert(riders)
-          .values({
-            name: normalizedName,
-            // Try to extract nationality from team or other info
-          })
-          .returning();
-        rider = newRider;
-        console.log(`Created new rider: ${normalizedName}`);
-      }
-
-      // Find or create team
       let teamId: string | null = null;
       if (result.team) {
-        let team = await db.query.teams.findFirst({
-          where: ilike(teams.name, result.team),
-        });
-
-        if (!team) {
-          const [newTeam] = await db
-            .insert(teams)
-            .values({
-              name: result.team,
-              discipline: race.discipline,
-            })
-            .returning();
-          team = newTeam;
-          console.log(`Created new team: ${result.team}`);
-        }
-
+        const team = await findOrCreateTeam(result.team, race.discipline);
         teamId = team.id;
       }
 
@@ -173,11 +132,19 @@ export async function POST(
       .set({ status: "completed" })
       .where(eq(races.id, raceId));
 
+    // Process ELO updates
+    let eloUpdates: number | null = null;
+    try {
+      eloUpdates = await processRaceElo(raceId);
+    } catch (error) {
+      console.error(`Error processing ELO for race ${raceId}:`, error);
+    }
+
     return NextResponse.json({
       success: true,
       eventName: parsed.eventName,
       resultsImported: processedResults.length,
-      ridersCreated: processedResults.filter((r) => true).length, // Could track this better
+      eloUpdated: eloUpdates !== null,
       results: processedResults.slice(0, 10).map((r) => ({
         position: r.position,
         name: r.riderName,

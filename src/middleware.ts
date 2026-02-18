@@ -43,14 +43,8 @@ export default clerkMiddleware(async (auth, req) => {
     return NextResponse.redirect(signInUrl);
   }
 
-  // Admin routes require admin role
-  if (isAdminRoute(req)) {
-    const metadata = sessionClaims?.publicMetadata as Record<string, unknown> | undefined;
-    const role = metadata?.role as string | undefined;
-    if (role !== "admin") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-  }
+  // Admin page auth is handled by the page/API themselves via requireAdmin()/isAdmin()
+  // (Clerk's default JWT doesn't include publicMetadata in session claims)
 
   // Premium routes require premium tier
   if (isPremiumRoute(req)) {

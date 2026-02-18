@@ -12,6 +12,10 @@
     {
       "path": "/api/cron/update-elo",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/sync-mtb-rankings",
+      "schedule": "0 10 * * 2"
     }
   ]
 }

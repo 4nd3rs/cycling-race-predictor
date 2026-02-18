@@ -55,7 +55,7 @@ export const riderDisciplineStats = pgTable(
     riderId: uuid("rider_id")
       .references(() => riders.id, { onDelete: "cascade" })
       .notNull(),
-    discipline: varchar("discipline", { length: 20 }).notNull(), // 'road' | 'mtb_xco' | 'mtb_xcc'
+    discipline: varchar("discipline", { length: 20 }).notNull(), // 'road' | 'mtb'
     ageCategory: varchar("age_category", { length: 20 }).notNull(), // 'elite' | 'u23' | 'junior' | 'masters'
     teamId: uuid("team_id").references(() => teams.id),
     specialty: text("specialty").array(), // ['climber', 'sprinter', 'gc', 'tt'] or ['technical', 'power']
@@ -379,6 +379,31 @@ export const aiChatSessions = pgTable("ai_chat_sessions", {
 });
 
 // ============================================================================
+// UCI SYNC TRACKING
+// ============================================================================
+
+export const uciSyncRuns = pgTable("uci_sync_runs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  discipline: varchar("discipline", { length: 20 }).notNull(), // 'mtb' | 'road' | 'cyclocross'
+  source: varchar("source", { length: 50 }).notNull(), // 'xcodata' | 'uci_dataride'
+  status: varchar("status", { length: 20 }).notNull().default("running"), // 'running' | 'completed' | 'failed'
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+  durationMs: integer("duration_ms"),
+  totalEntries: integer("total_entries").default(0),
+  ridersCreated: integer("riders_created").default(0),
+  ridersUpdated: integer("riders_updated").default(0),
+  teamsCreated: integer("teams_created").default(0),
+  errors: jsonb("errors").$type<string[]>().default([]),
+  categoryDetails: jsonb("category_details").$type<Array<{
+    category: string;
+    entries: number;
+    ridersCreated: number;
+    ridersUpdated: number;
+  }>>().default([]),
+});
+
+// ============================================================================
 // ELO HISTORY (for tracking rating changes)
 // ============================================================================
 
@@ -624,3 +649,5 @@ export type AiChatSession = typeof aiChatSessions.$inferSelect;
 export type NewAiChatSession = typeof aiChatSessions.$inferInsert;
 export type EloHistory = typeof eloHistory.$inferSelect;
 export type NewEloHistory = typeof eloHistory.$inferInsert;
+export type UciSyncRun = typeof uciSyncRuns.$inferSelect;
+export type NewUciSyncRun = typeof uciSyncRuns.$inferInsert;

@@ -18,7 +18,8 @@ const authNavigation = [
 
 export function Header() {
   const pathname = usePathname();
-  const { isSignedIn, isLoaded } = useUser();
+  const { isSignedIn, isLoaded, user } = useUser();
+  const isAdmin = user?.publicMetadata?.role === "admin";
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -60,6 +61,19 @@ export function Header() {
                   {item.name}
                 </Link>
               ))}
+            {isAdmin && (
+              <Link
+                href="/admin"
+                className={cn(
+                  "transition-colors hover:text-foreground/80",
+                  pathname.startsWith("/admin")
+                    ? "text-foreground"
+                    : "text-foreground/60"
+                )}
+              >
+                Admin
+              </Link>
+            )}
           </nav>
         </div>
         <div className="flex flex-1 items-center justify-end space-x-2">

@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, races, raceResults, riders, teams } from "@/lib/db";
-import { eq, ilike } from "drizzle-orm";
+import { db, races, raceResults, riders } from "@/lib/db";
+import { eq } from "drizzle-orm";
 import {
   parseCopaCatalanaPdfUrl,
   normalizeName,
   parseTime,
   mapCopaCatalanaCategory,
 } from "@/lib/scraper/copa-catalana";
+import { findOrCreateRider, findOrCreateTeam } from "@/lib/riders/find-or-create";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -66,48 +67,12 @@ export async function POST(request: NextRequest, { params }: PageProps) {
     for (const result of categoryResults) {
       const normalizedName = normalizeName(result.name);
 
-      // Find or create rider
-      let rider = await db.query.riders.findFirst({
-        where: ilike(riders.name, normalizedName),
-      });
+      const rider = await findOrCreateRider({ name: normalizedName });
 
-      if (!rider) {
-        const simpleName = normalizedName
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "");
-        rider = await db.query.riders.findFirst({
-          where: ilike(riders.name, simpleName),
-        });
-      }
-
-      if (!rider) {
-        const [newRider] = await db
-          .insert(riders)
-          .values({ name: normalizedName })
-          .returning();
-        rider = newRider;
-      }
-
-      // Find or create team
       let teamId: string | null = null;
       if (result.team) {
-        let team = await db.query.teams.findFirst({
-          where: ilike(teams.name, result.team),
-        });
-
-        if (!team) {
-          await db
-            .insert(teams)
-            .values({
-              name: result.team,
-              discipline: "mtb_xco",
-            })
-            .onConflictDoNothing();
-          team = await db.query.teams.findFirst({
-            where: ilike(teams.name, result.team),
-          });
-        }
-        teamId = team?.id || null;
+        const team = await findOrCreateTeam(result.team, "mtb");
+        teamId = team.id;
 
         // Update rider's team
         if (teamId && rider.teamId !== teamId) {
