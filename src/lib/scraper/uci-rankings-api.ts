@@ -235,7 +235,8 @@ async function fetchRankingsPage(
  * first word being all uppercase and rearrange to "Christopher Blevins".
  */
 function reorderName(raw: string): string {
-  const trimmed = raw.trim();
+  // Strip leading asterisk — UCI marks U23 riders in elite rankings with "*"
+  const trimmed = raw.trim().replace(/^\*\s*/, "");
   if (!trimmed) return trimmed;
 
   const parts = trimmed.split(/\s+/);
