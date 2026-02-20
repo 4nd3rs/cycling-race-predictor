@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { db, races, predictions, riders, raceStartlist, riderDisciplineStats, raceResults, riderRumours, teams, raceEvents } from "@/lib/db";
-import { eq, desc, and, gte, ne } from "drizzle-orm";
+import { eq, desc, and, gte, ne, inArray } from "drizzle-orm";
 import { format } from "date-fns";
 import { generateRacePredictions, calculateForm, type RiderPredictionInput, type RecentResult, RACE_CATEGORY_WEIGHTS, type ProfileType } from "@/lib/prediction";
 import { formatCategoryDisplay } from "@/lib/category-utils";
@@ -91,6 +91,10 @@ async function getRacePredictions(raceId: string, race: typeof races.$inferSelec
   try {
     const isMtbRace = race.discipline === "mtb";
 
+    // For U23 races, also match elite stats since UCI ranks U23 within elite
+    const ageCategory = race.ageCategory || "elite";
+    const ageCategories = ageCategory === "u23" ? ["u23", "elite"] : [ageCategory];
+
     // Get predictions with rider and stats
     const results = await db
       .select({
@@ -106,7 +110,7 @@ async function getRacePredictions(raceId: string, race: typeof races.$inferSelec
           ? and(
               eq(riderDisciplineStats.riderId, riders.id),
               eq(riderDisciplineStats.discipline, "mtb"),
-              eq(riderDisciplineStats.ageCategory, race.ageCategory || "elite")
+              inArray(riderDisciplineStats.ageCategory, ageCategories)
             )
           : and(
               eq(riderDisciplineStats.riderId, riders.id),
@@ -151,6 +155,10 @@ async function getRacePredictions(raceId: string, race: typeof races.$inferSelec
 async function getRaceStartlist(raceId: string, race?: typeof races.$inferSelect) {
   try {
     const isMtb = race?.discipline === "mtb";
+    // For U23 races, also match elite stats since UCI ranks U23 within elite
+    const ageCategory = race?.ageCategory || "elite";
+    const ageCategories = ageCategory === "u23" ? ["u23", "elite"] : [ageCategory];
+
     const results = await db
       .select({
         entry: raceStartlist,
@@ -167,7 +175,7 @@ async function getRaceStartlist(raceId: string, race?: typeof races.$inferSelect
           ? and(
               eq(riderDisciplineStats.riderId, riders.id),
               eq(riderDisciplineStats.discipline, "mtb"),
-              eq(riderDisciplineStats.ageCategory, race?.ageCategory || "elite")
+              inArray(riderDisciplineStats.ageCategory, ageCategories)
             )
           : and(
               eq(riderDisciplineStats.riderId, riders.id),
@@ -177,7 +185,17 @@ async function getRaceStartlist(raceId: string, race?: typeof races.$inferSelect
       .where(eq(raceStartlist.raceId, raceId))
       .orderBy(raceStartlist.bibNumber);
 
-    return results;
+    // Deduplicate: for U23 with elite fallback, prefer the row with UCI points
+    const uniqueByEntry = new Map<string, (typeof results)[number]>();
+    for (const row of results) {
+      const key = row.entry.id;
+      const existing = uniqueByEntry.get(key);
+      if (!existing || (row.stats?.uciPoints && !existing.stats?.uciPoints)) {
+        uniqueByEntry.set(key, row);
+      }
+    }
+
+    return Array.from(uniqueByEntry.values());
   } catch {
     return [];
   }
