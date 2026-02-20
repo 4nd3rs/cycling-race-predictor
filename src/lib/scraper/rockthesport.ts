@@ -306,9 +306,6 @@ function extractEntriesFromMarkdown(markdown: string): RockthesportEntry[] {
       }
     }
 
-    // Skip rows without valid category
-    if (!category) continue;
-
     const teamName = teamIdx >= 0 ? cells[teamIdx]?.trim() || null : null;
     const clubName = clubIdx >= 0 ? cells[clubIdx]?.trim() || null : null;
     const nationality = nationalityIdx >= 0 ? cells[nationalityIdx]?.trim() || null : null;
@@ -704,8 +701,6 @@ function extractEntriesFromHtml($: CheerioAPI): RockthesportEntry[] {
         break;
       }
     }
-
-    if (!category) return;
 
     const teamName = cells.eq(5).text().trim() || null;
     const clubName = cells.eq(6).text().trim() || null;

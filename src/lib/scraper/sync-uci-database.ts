@@ -146,6 +146,7 @@ export async function syncUciDatabase(options: {
                 uciPoints: ranking.uciPoints,
                 uciRank: ranking.rank,
                 teamId,
+                gender,
                 updatedAt: new Date(),
               };
 
@@ -169,6 +170,7 @@ export async function syncUciDatabase(options: {
                 riderId: rider.id,
                 discipline,
                 ageCategory,
+                gender,
                 uciPoints: ranking.uciPoints,
                 uciRank: ranking.rank,
                 teamId,

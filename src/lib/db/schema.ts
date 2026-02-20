@@ -57,6 +57,7 @@ export const riderDisciplineStats = pgTable(
       .notNull(),
     discipline: varchar("discipline", { length: 20 }).notNull(), // 'road' | 'mtb'
     ageCategory: varchar("age_category", { length: 20 }).notNull(), // 'elite' | 'u23' | 'junior' | 'masters'
+    gender: varchar("gender", { length: 10 }).default("men"), // 'men' | 'women'
     teamId: uuid("team_id").references(() => teams.id),
     specialty: text("specialty").array(), // ['climber', 'sprinter', 'gc', 'tt'] or ['technical', 'power']
     currentElo: decimal("current_elo", { precision: 10, scale: 2 }).default("1500"),

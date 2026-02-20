@@ -1,0 +1,1 @@
+ALTER TABLE "rider_discipline_stats" ADD COLUMN "gender" varchar(10) DEFAULT 'men';

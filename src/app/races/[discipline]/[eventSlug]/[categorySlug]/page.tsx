@@ -581,7 +581,9 @@ export default async function CategoryPage({ params }: PageProps) {
                 {discipline === "mtb" && (
                   <AddInfoButton raceId={race.id} raceName={`${event.name} - ${categoryDisplay}`} />
                 )}
-                {!isCompleted && <RefreshStartlistButton raceId={race.id} />}
+                {!isCompleted && event.sourceType !== "cronomancha" && event.sourceType !== "copa_catalana" && (
+                  <RefreshStartlistButton raceId={race.id} />
+                )}
                 {isCompleted && event.sourceType === "copa_catalana" && (
                   <ReimportResultsButton raceId={race.id} />
                 )}

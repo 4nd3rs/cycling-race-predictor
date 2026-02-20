@@ -26,8 +26,10 @@ export function RefreshStartlistButton({ raceId }: RefreshStartlistButtonProps) 
       }
 
       const data = await response.json();
+      const skipped = data.skippedUnknownCategory ? `, ${data.skippedUnknownCategory} skipped` : "";
+      const racesInfo = data.racesUpdated > 1 ? ` across ${data.racesUpdated} races` : "";
       toast.success(
-        `Startlist updated! ${data.totalRiders} riders total (${data.addedToStartlist} new)`
+        `Startlist updated! ${data.addedToStartlist} riders added${racesInfo}${skipped}`
       );
       router.refresh();
     } catch (error) {

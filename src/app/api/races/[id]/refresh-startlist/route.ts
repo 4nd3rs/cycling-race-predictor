@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db, races, raceStartlist, riders, predictions, teams, raceEvents } from "@/lib/db";
+import { db, races, raceStartlist, riders, predictions, teams, raceEvents, riderDisciplineStats } from "@/lib/db";
 import { getAuthUser } from "@/lib/auth";
 import { withRateLimit } from "@/lib/rate-limit";
 import { scrapeRacePage } from "@/lib/scraper/pcs";
@@ -68,6 +68,14 @@ export async function POST(request: Request, context: RouteContext) {
     // Handle different source types
     if (sourceType === "rockthesport") {
       return await refreshFromRockthesport(id, race, sourceUrl);
+    }
+
+    // Only PCS and rockthesport support automatic scraping
+    if (sourceType !== "pcs" && sourceType !== "procyclingstats") {
+      return NextResponse.json(
+        { error: `Source type "${sourceType}" does not support automatic startlist refresh. Use manual upload instead.` },
+        { status: 400 }
+      );
     }
 
     // Default: PCS
@@ -218,52 +226,109 @@ export async function POST(request: Request, context: RouteContext) {
 }
 
 /**
- * Refresh startlist from Rockthesport
+ * Refresh startlists from Rockthesport for ALL races in the same event.
+ * Scrapes once, then distributes entries across all category races.
  */
 async function refreshFromRockthesport(
   raceId: string,
   race: typeof races.$inferSelect,
   sourceUrl: string
 ) {
-  const event = await scrapeRockthesportEvent(sourceUrl);
+  const scrapedEvent = await scrapeRockthesportEvent(sourceUrl);
 
-  if (!event || event.entries.length === 0) {
+  if (!scrapedEvent || scrapedEvent.entries.length === 0) {
     return NextResponse.json(
       { error: "Could not fetch startlist from Rockthesport" },
       { status: 400 }
     );
   }
 
-  // Filter entries for this race's category
-  const matchingEntries = event.entries.filter((entry) => {
-    const mapped = mapCategory(entry.category || "");
-    if (!mapped) return false;
-    return mapped.ageCategory === race.ageCategory && mapped.gender === race.gender;
-  });
+  // Get all sibling races in the same event
+  let eventRaces: (typeof races.$inferSelect)[];
+  if (race.raceEventId) {
+    eventRaces = await db
+      .select()
+      .from(races)
+      .where(eq(races.raceEventId, race.raceEventId));
+  } else {
+    eventRaces = [race];
+  }
 
-  if (matchingEntries.length === 0) {
-    return NextResponse.json(
-      { error: `No entries found for ${race.ageCategory} ${race.gender}` },
-      { status: 400 }
-    );
+  // Check if entries have categories
+  const hasCategories = scrapedEvent.entries.some((e) => e.category);
+
+  // Build a map of raceId -> { ageCategory, gender } for quick lookup
+  const racesByCategory = new Map<string, typeof races.$inferSelect>();
+  for (const r of eventRaces) {
+    const key = `${r.ageCategory}_${r.gender}`;
+    racesByCategory.set(key, r);
   }
 
   let newRiders = 0;
-  let updatedRiders = 0;
+  let addedToStartlist = 0;
+  let skippedNoCategory = 0;
+  const updatedRaceIds = new Set<string>();
 
-  for (const entry of matchingEntries) {
+  for (const entry of scrapedEvent.entries) {
     const fullName = `${entry.firstName} ${entry.lastName}`.trim();
     const normalizedName = normalizeRiderName(fullName);
-
     if (!normalizedName) continue;
 
-    // Find or create rider
+    // Find existing rider by name
     let [existingRider] = await db
       .select()
       .from(riders)
       .where(ilike(riders.name, normalizedName))
       .limit(1);
 
+    // Determine which race(s) this entry belongs to
+    let targetRaces: (typeof races.$inferSelect)[] = [];
+
+    if (hasCategories) {
+      const mapped = mapCategory(entry.category || "");
+      if (!mapped) continue; // unsupported category (cadete, master, etc.)
+      const key = `${mapped.ageCategory}_${mapped.gender}`;
+      const targetRace = racesByCategory.get(key);
+      if (targetRace) targetRaces = [targetRace];
+    } else {
+      // No categories on source - match against UCI rankings
+      if (!existingRider) {
+        skippedNoCategory++;
+        continue;
+      }
+
+      // Find all matching discipline stats for this rider
+      const statsRows = await db
+        .select()
+        .from(riderDisciplineStats)
+        .where(
+          and(
+            eq(riderDisciplineStats.riderId, existingRider.id),
+            eq(riderDisciplineStats.discipline, race.discipline)
+          )
+        );
+
+      if (statsRows.length === 0) {
+        skippedNoCategory++;
+        continue;
+      }
+
+      // Add to each matching race (match both ageCategory and gender)
+      for (const stat of statsRows) {
+        for (const [, r] of racesByCategory) {
+          if (r.ageCategory === stat.ageCategory && r.gender === (stat.gender || "men")) {
+            targetRaces.push(r);
+          }
+        }
+      }
+
+      if (targetRaces.length === 0) {
+        skippedNoCategory++;
+        continue;
+      }
+    }
+
+    // Create rider if not found
     if (!existingRider) {
       [existingRider] = await db
         .insert(riders)
@@ -274,7 +339,6 @@ async function refreshFromRockthesport(
         .returning();
       newRiders++;
     } else if (entry.nationality && !existingRider.nationality) {
-      // Update nationality if missing
       await db
         .update(riders)
         .set({ nationality: entry.nationality })
@@ -303,58 +367,99 @@ async function refreshFromRockthesport(
       teamId = existingTeam.id;
     }
 
-    // Check if already in startlist
-    const [existingEntry] = await db
-      .select()
-      .from(raceStartlist)
-      .where(
-        and(
-          eq(raceStartlist.raceId, raceId),
-          eq(raceStartlist.riderId, existingRider.id)
+    // Add to each target race's startlist
+    for (const targetRace of targetRaces) {
+      const [existingEntry] = await db
+        .select()
+        .from(raceStartlist)
+        .where(
+          and(
+            eq(raceStartlist.raceId, targetRace.id),
+            eq(raceStartlist.riderId, existingRider.id)
+          )
         )
-      )
-      .limit(1);
+        .limit(1);
 
-    if (!existingEntry) {
-      await db.insert(raceStartlist).values({
-        raceId,
-        riderId: existingRider.id,
-        bibNumber: entry.bibNumber || null,
-        teamId,
-        status: "confirmed",
-      });
-      updatedRiders++;
-    } else {
-      // Update bib number and team if changed
-      const updates: { bibNumber?: number | null; teamId?: string | null } = {};
-      if (entry.bibNumber && existingEntry.bibNumber !== entry.bibNumber) {
-        updates.bibNumber = entry.bibNumber;
+      if (!existingEntry) {
+        await db.insert(raceStartlist).values({
+          raceId: targetRace.id,
+          riderId: existingRider.id,
+          bibNumber: entry.bibNumber || null,
+          teamId,
+          status: "confirmed",
+        });
+        addedToStartlist++;
+      } else {
+        const updates: { bibNumber?: number | null; teamId?: string | null } = {};
+        if (entry.bibNumber && existingEntry.bibNumber !== entry.bibNumber) {
+          updates.bibNumber = entry.bibNumber;
+        }
+        if (teamId && existingEntry.teamId !== teamId) {
+          updates.teamId = teamId;
+        }
+        if (Object.keys(updates).length > 0) {
+          await db
+            .update(raceStartlist)
+            .set(updates)
+            .where(eq(raceStartlist.id, existingEntry.id));
+        }
       }
-      if (teamId && existingEntry.teamId !== teamId) {
-        updates.teamId = teamId;
+
+      // Ensure rider has riderDisciplineStats for this race's discipline + ageCategory
+      const [existingStats] = await db
+        .select()
+        .from(riderDisciplineStats)
+        .where(
+          and(
+            eq(riderDisciplineStats.riderId, existingRider.id),
+            eq(riderDisciplineStats.discipline, targetRace.discipline),
+            eq(riderDisciplineStats.ageCategory, targetRace.ageCategory || "elite")
+          )
+        )
+        .limit(1);
+
+      if (!existingStats) {
+        await db.insert(riderDisciplineStats).values({
+          riderId: existingRider.id,
+          discipline: targetRace.discipline,
+          ageCategory: targetRace.ageCategory || "elite",
+          gender: targetRace.gender || "men",
+          teamId,
+        });
       }
-      if (Object.keys(updates).length > 0) {
-        await db
-          .update(raceStartlist)
-          .set(updates)
-          .where(eq(raceStartlist.id, existingEntry.id));
-      }
+
+      updatedRaceIds.add(targetRace.id);
     }
   }
 
-  // Delete old predictions so they get regenerated
-  await db.delete(predictions).where(eq(predictions.raceId, raceId));
+  // Delete old predictions for all updated races so they get regenerated
+  for (const updatedRaceId of updatedRaceIds) {
+    await db.delete(predictions).where(eq(predictions.raceId, updatedRaceId));
+  }
 
-  // Get final startlist count
-  const startlistCount = await db
-    .select({ id: raceStartlist.id })
-    .from(raceStartlist)
-    .where(eq(raceStartlist.raceId, raceId));
+  // Get per-race startlist counts
+  const raceSummaries: Array<{ name: string; riders: number }> = [];
+  for (const r of eventRaces) {
+    const count = await db
+      .select({ id: raceStartlist.id })
+      .from(raceStartlist)
+      .where(eq(raceStartlist.raceId, r.id));
+    raceSummaries.push({ name: r.name, riders: count.length });
+  }
 
-  return NextResponse.json({
-    message: "Startlist updated from Rockthesport",
-    totalRiders: startlistCount.length,
+  const response: Record<string, unknown> = {
+    message: hasCategories
+      ? "Startlists updated from Rockthesport"
+      : "Startlists updated from Rockthesport (matched against UCI rankings - categories not yet assigned on source)",
+    racesUpdated: updatedRaceIds.size,
+    races: raceSummaries,
     newRiders,
-    addedToStartlist: updatedRiders,
-  });
+    addedToStartlist,
+  };
+
+  if (!hasCategories) {
+    response.skippedUnknownCategory = skippedNoCategory;
+  }
+
+  return NextResponse.json(response);
 }

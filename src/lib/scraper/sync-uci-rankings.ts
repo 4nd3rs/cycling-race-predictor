@@ -119,6 +119,7 @@ export async function syncUciRankingsForRace(
           riderId: rider.id,
           discipline: race.discipline,
           ageCategory,
+          gender,
           uciPoints: match.uciPoints,
           uciRank: match.rank,
           eloMean: eloStr,
@@ -165,6 +166,7 @@ export async function syncUciRankingsForRace(
           riderId: rider.id,
           discipline: race.discipline,
           ageCategory,
+          gender,
           uciPoints: 0,
           eloMean: "1000",
           currentElo: "0",
@@ -300,6 +302,7 @@ export async function syncUciRankingsForCategory(
       const updates: Record<string, unknown> = {
         uciPoints: ranking.uciPoints,
         uciRank: ranking.rank,
+        gender,
         updatedAt: new Date(),
       };
       if ((existingStats.racesTotal ?? 0) === 0) {
@@ -323,6 +326,7 @@ export async function syncUciRankingsForCategory(
         riderId: existingRider.id,
         discipline,
         ageCategory,
+        gender,
         uciPoints: ranking.uciPoints,
         uciRank: ranking.rank,
         eloMean: eloStr,
