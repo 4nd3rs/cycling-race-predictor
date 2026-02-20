@@ -1,25 +1,20 @@
 import { config } from "dotenv";
 config({ path: ".env.local" });
 
-import { scrapeXCOdataRankings, mapToXCOdataCategory } from "../src/lib/scraper/xcodata";
+import { fetchAllUCIRankings } from "../src/lib/scraper/uci-rankings-api";
 
 async function test() {
   console.log("Testing women elite rankings...\n");
 
-  // Check category mapping
-  const code = mapToXCOdataCategory("elite", "women");
-  console.log(`Category code for elite women: ${code}`);
-
-  // Fetch rankings (just 2 pages for quick test)
-  console.log("\nFetching rankings...");
-  const rankings = await scrapeXCOdataRankings("elite", "women", 2);
+  console.log("Fetching rankings from UCI DataRide API...");
+  const rankings = await fetchAllUCIRankings("women_elite");
 
   console.log(`\nFound ${rankings.length} riders`);
 
   if (rankings.length > 0) {
     console.log("\nTop 10:");
     rankings.slice(0, 10).forEach((r, i) => {
-      console.log(`${i + 1}. ${r.name} (${r.nationality}) - ${r.uciPoints} pts`);
+      console.log(`${i + 1}. ${r.name} (${r.nationality}) - ${r.points} pts [UCI ID: ${r.uciId}]`);
     });
   }
 }

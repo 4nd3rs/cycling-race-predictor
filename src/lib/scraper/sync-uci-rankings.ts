@@ -1,23 +1,54 @@
 /**
- * Sync UCI Rankings from XCOdata
+ * Sync UCI Rankings for a Race
  *
- * Fetches complete UCI rankings from xcodata.com and matches them to riders in the database.
- * XCOdata provides full rankings (500+ riders) unlike UCI DataRide (only top 40).
- * Used for MTB race predictions.
+ * Fetches complete UCI rankings from the DataRide API and matches them
+ * to riders in the database. Used for MTB race predictions.
  */
 
 import { db, riders, riderDisciplineStats, raceStartlist } from "@/lib/db";
 import { eq, and, inArray } from "drizzle-orm";
-import { scrapeXCOdataRankings, findRiderInXCOdataRankings, type XCOdataRider } from "./xcodata";
-import { scrapeUCIRankings, findRiderInUCIRankings } from "./uci-dataride";
+import {
+  fetchAllUCIRankings,
+  findRiderByUciId,
+  findRiderByName,
+  type UCIRankingCategory,
+  type UCIRankingRider,
+} from "./uci-rankings-api";
 
 /**
- * Sync UCI rankings for all riders in a specific race
- * Uses XCOdata for complete rankings (not just top 40)
+ * Map gender + ageCategory to UCIRankingCategory.
+ */
+function toUCICategory(gender: string, ageCategory: string): UCIRankingCategory | null {
+  const key = `${gender}_${ageCategory}`;
+  if (key === "men_elite" || key === "women_elite" || key === "men_junior" || key === "women_junior") {
+    return key as UCIRankingCategory;
+  }
+  // U23 riders use Elite rankings
+  if (ageCategory === "u23") {
+    return `${gender}_elite` as UCIRankingCategory;
+  }
+  return null;
+}
+
+/**
+ * Find a matching rider in rankings, preferring UCI ID match over name match.
+ */
+function findRiderInRankings(
+  rider: { name: string; uciId: string | null },
+  rankings: UCIRankingRider[]
+): UCIRankingRider | null {
+  if (rider.uciId) {
+    const match = findRiderByUciId(rider.uciId, rankings);
+    if (match) return match;
+  }
+  return findRiderByName(rider.name, rankings);
+}
+
+/**
+ * Sync UCI rankings for all riders in a specific race.
  */
 export async function syncUciRankingsForRace(
-  raceId: string,
-  maxPages: number = 25 // Fetch up to 25 pages (~625 riders)
+  raceId: string
 ): Promise<{ synced: number; notFound: number; skipped: number; cleaned: number }> {
   // Get race details
   const [race] = await db.query.races.findMany({
@@ -35,13 +66,19 @@ export async function syncUciRankingsForRace(
 
   const ageCategory = race.ageCategory || "elite";
   const gender = race.gender || "men";
+  const category = toUCICategory(gender, ageCategory);
+
+  if (!category) {
+    console.log(`No UCI ranking category for ${ageCategory} ${gender}`);
+    return { synced: 0, notFound: 0, skipped: 0, cleaned: 0 };
+  }
 
   console.log(`Fetching UCI ${ageCategory} ${gender} rankings for race ${race.name}...`);
 
-  // Fetch UCI rankings from XCOdata (complete rankings)
-  const uciRankings = await scrapeXCOdataRankings(ageCategory, gender, maxPages);
+  // Fetch UCI rankings from DataRide API
+  const uciRankings = await fetchAllUCIRankings(category);
   if (uciRankings.length === 0) {
-    console.log("No rankings fetched from XCOdata");
+    console.log("No rankings fetched from UCI DataRide");
     return { synced: 0, notFound: 0, skipped: 0, cleaned: 0 };
   }
 
@@ -68,8 +105,7 @@ export async function syncUciRankingsForRace(
       continue;
     }
 
-    // Try to find match in UCI rankings
-    const match = findRiderInXCOdataRankings(rider.name, uciRankings);
+    const match = findRiderInRankings(rider, uciRankings);
 
     if (match) {
       // Find or create discipline stats
@@ -85,16 +121,14 @@ export async function syncUciRankingsForRace(
         )
         .limit(1);
 
-      // Calculate Elo from UCI points (rough conversion)
-      // Top riders (2000+ pts) → ~2000 Elo, lower-ranked → scaled down
-      const eloFromPoints = Math.round(1000 + match.uciPoints / 2);
+      // Calculate Elo from UCI points
+      const eloFromPoints = Math.round(1000 + match.points / 2);
       const eloStr = String(Math.min(2500, Math.max(1000, eloFromPoints)));
 
       if (existingStats) {
-        // Update existing stats — only touch ELO fields if rider has no race data
         const eloVariance = match.rank <= 50 ? "80" : match.rank <= 200 ? "120" : "180";
         const updates: Record<string, unknown> = {
-          uciPoints: match.uciPoints,
+          uciPoints: match.points,
           uciRank: match.rank,
           updatedAt: new Date(),
         };
@@ -110,7 +144,6 @@ export async function syncUciRankingsForRace(
           .set(updates)
           .where(eq(riderDisciplineStats.id, existingStats.id));
       } else {
-        // Create new stats with conservative currentElo
         const eloVariance = match.rank <= 50 ? "80" : match.rank <= 200 ? "120" : "180";
         const mean = parseFloat(eloStr);
         const variance = parseFloat(eloVariance);
@@ -120,7 +153,7 @@ export async function syncUciRankingsForRace(
           discipline: race.discipline,
           ageCategory,
           gender,
-          uciPoints: match.uciPoints,
+          uciPoints: match.points,
           uciRank: match.rank,
           eloMean: eloStr,
           currentElo: conservativeElo,
@@ -128,13 +161,14 @@ export async function syncUciRankingsForRace(
         });
       }
 
-      // Update XCO ID and nationality on rider if found
-      const riderUpdates: { xcoId?: string; nationality?: string } = {};
-      if (match.xcoId && !rider.xcoId) {
-        riderUpdates.xcoId = match.xcoId;
-      }
-      if (match.nationality && !rider.nationality) {
-        riderUpdates.nationality = match.nationality;
+      // Update UCI ID, birthDate, and nationality on rider if found
+      const riderUpdates: Record<string, string> = {};
+      if (match.uciId && !rider.uciId) riderUpdates.uciId = match.uciId;
+      if (match.birthDate && !rider.birthDate) riderUpdates.birthDate = match.birthDate;
+      if (match.countryIso2 && !rider.nationality) {
+        const { normalizeNationality } = await import("@/lib/nationality-codes");
+        const nat = normalizeNationality(match.countryIso2);
+        if (nat) riderUpdates.nationality = nat;
       }
       if (Object.keys(riderUpdates).length > 0) {
         await db
@@ -144,10 +178,10 @@ export async function syncUciRankingsForRace(
       }
 
       synced++;
-      console.log(`  ✓ ${rider.name} → UCI #${match.rank} (${match.uciPoints} pts)`);
+      console.log(`  ✓ ${rider.name} → UCI #${match.rank} (${match.points} pts)`);
     } else {
       notFound++;
-      // Still create basic stats for unranked riders
+      // Create basic stats for unranked riders
       const [existingStats] = await db
         .select()
         .from(riderDisciplineStats)
@@ -161,7 +195,6 @@ export async function syncUciRankingsForRace(
         .limit(1);
 
       if (!existingStats) {
-        // Conservative currentElo for unranked: 1000 - 3*350 = -50 → clamped to 0
         await db.insert(riderDisciplineStats).values({
           riderId: rider.id,
           discipline: race.discipline,
@@ -176,68 +209,41 @@ export async function syncUciRankingsForRace(
     }
   }
 
-  // Fetch age data from UCI DataRide (optional, requires FIRECRAWL_API_KEY)
-  let agesUpdated = 0;
-  if (process.env.FIRECRAWL_API_KEY) {
-    try {
-      console.log(`\nFetching age data from UCI DataRide...`);
-      const uciRankings = await scrapeUCIRankings(ageCategory, gender);
-      if (uciRankings.length > 0) {
-        for (const entry of startlist) {
-          const rider = entry.rider;
-          if (!rider || rider.birthDate) continue;
-
-          const uciMatch = findRiderInUCIRankings(rider.name, uciRankings);
-          if (uciMatch?.age) {
-            const birthYear = new Date().getFullYear() - uciMatch.age;
-            const riderUpdates: Record<string, string> = {};
-            riderUpdates.birthDate = `${birthYear}-01-01`;
-            if (uciMatch.uciId && !rider.uciId) riderUpdates.uciId = uciMatch.uciId;
-
-            await db.update(riders).set(riderUpdates).where(eq(riders.id, rider.id));
-            agesUpdated++;
-          }
-        }
-        console.log(`  Updated age for ${agesUpdated} riders`);
-      }
-    } catch (error) {
-      console.error("Error fetching UCI DataRide ages:", error);
-    }
-  }
-
   // Clean misclassified riders by checking opposite gender rankings
   let cleaned = 0;
   const oppositeGender = gender === "men" ? "women" : "men";
+  const oppositeCategory = toUCICategory(oppositeGender, ageCategory);
 
-  console.log(`\nChecking for misclassified riders (checking ${oppositeGender} rankings)...`);
-  const oppositeRankings = await scrapeXCOdataRankings(ageCategory, oppositeGender, 15);
+  if (oppositeCategory) {
+    console.log(`\nChecking for misclassified riders (checking ${oppositeGender} rankings)...`);
+    const oppositeRankings = await fetchAllUCIRankings(oppositeCategory);
 
-  if (oppositeRankings.length > 0) {
-    // Re-fetch startlist to get current state
-    const currentStartlist = await db.query.raceStartlist.findMany({
-      where: (raceStartlist, { eq }) => eq(raceStartlist.raceId, raceId),
-      with: {
-        rider: true,
-      },
-    });
+    if (oppositeRankings.length > 0) {
+      const currentStartlist = await db.query.raceStartlist.findMany({
+        where: (raceStartlist, { eq }) => eq(raceStartlist.raceId, raceId),
+        with: {
+          rider: true,
+        },
+      });
 
-    const idsToRemove: string[] = [];
-    for (const entry of currentStartlist) {
-      const rider = entry.rider;
-      if (!rider) continue;
+      const idsToRemove: string[] = [];
+      for (const entry of currentStartlist) {
+        const rider = entry.rider;
+        if (!rider) continue;
 
-      const wrongGenderMatch = findRiderInXCOdataRankings(rider.name, oppositeRankings);
-      if (wrongGenderMatch) {
-        idsToRemove.push(entry.id);
-        console.log(`  ✗ Removing ${rider.name} (found in ${oppositeGender} rankings #${wrongGenderMatch.rank})`);
+        const wrongGenderMatch = findRiderInRankings(rider, oppositeRankings);
+        if (wrongGenderMatch) {
+          idsToRemove.push(entry.id);
+          console.log(`  ✗ Removing ${rider.name} (found in ${oppositeGender} rankings #${wrongGenderMatch.rank})`);
+        }
       }
-    }
 
-    if (idsToRemove.length > 0) {
-      await db
-        .delete(raceStartlist)
-        .where(inArray(raceStartlist.id, idsToRemove));
-      cleaned = idsToRemove.length;
+      if (idsToRemove.length > 0) {
+        await db
+          .delete(raceStartlist)
+          .where(inArray(raceStartlist.id, idsToRemove));
+        cleaned = idsToRemove.length;
+      }
     }
   }
 
@@ -246,17 +252,20 @@ export async function syncUciRankingsForRace(
 }
 
 /**
- * Sync UCI rankings for all races in a category
- * Useful for bulk updates
+ * Sync UCI rankings for all riders in a category.
  */
 export async function syncUciRankingsForCategory(
   ageCategory: string,
-  gender: string,
-  maxPages: number = 30
+  gender: string
 ): Promise<{ total: number; synced: number }> {
+  const category = toUCICategory(gender, ageCategory);
+  if (!category) {
+    return { total: 0, synced: 0 };
+  }
+
   console.log(`Fetching complete ${ageCategory} ${gender} rankings...`);
 
-  const rankings = await scrapeXCOdataRankings(ageCategory, gender, maxPages);
+  const rankings = await fetchAllUCIRankings(category);
   if (rankings.length === 0) {
     return { total: 0, synced: 0 };
   }
@@ -266,22 +275,27 @@ export async function syncUciRankingsForCategory(
   let synced = 0;
 
   for (const ranking of rankings) {
-    // Find rider by name in database
-    const [existingRider] = await db
-      .select()
-      .from(riders)
-      .where(eq(riders.name, ranking.name))
-      .limit(1);
-
+    // Find rider by UCI ID or name
+    let existingRider;
+    if (ranking.uciId) {
+      [existingRider] = await db
+        .select()
+        .from(riders)
+        .where(eq(riders.uciId, ranking.uciId))
+        .limit(1);
+    }
     if (!existingRider) {
-      // Could create new rider here if desired
-      continue;
+      [existingRider] = await db
+        .select()
+        .from(riders)
+        .where(eq(riders.name, ranking.name))
+        .limit(1);
     }
 
-    // Use "mtb" as the canonical discipline
+    if (!existingRider) continue;
+
     const discipline = "mtb";
 
-    // Find or create discipline stats
     const [existingStats] = await db
       .select()
       .from(riderDisciplineStats)
@@ -294,13 +308,12 @@ export async function syncUciRankingsForCategory(
       )
       .limit(1);
 
-    const eloFromPoints = Math.round(1000 + ranking.uciPoints / 2);
+    const eloFromPoints = Math.round(1000 + ranking.points / 2);
     const eloStr = String(Math.min(2500, Math.max(1000, eloFromPoints)));
 
     if (existingStats) {
-      // Only touch ELO fields if rider has no race data
       const updates: Record<string, unknown> = {
-        uciPoints: ranking.uciPoints,
+        uciPoints: ranking.points,
         uciRank: ranking.rank,
         gender,
         updatedAt: new Date(),
@@ -327,7 +340,7 @@ export async function syncUciRankingsForCategory(
         discipline,
         ageCategory,
         gender,
-        uciPoints: ranking.uciPoints,
+        uciPoints: ranking.points,
         uciRank: ranking.rank,
         eloMean: eloStr,
         currentElo: conservativeElo,
@@ -335,11 +348,14 @@ export async function syncUciRankingsForCategory(
       });
     }
 
-    // Update XCO ID
-    if (ranking.xcoId && !existingRider.xcoId) {
+    // Update UCI ID and birthDate on rider
+    const riderUpdates: Record<string, string> = {};
+    if (ranking.uciId && !existingRider.uciId) riderUpdates.uciId = ranking.uciId;
+    if (ranking.birthDate && !existingRider.birthDate) riderUpdates.birthDate = ranking.birthDate;
+    if (Object.keys(riderUpdates).length > 0) {
       await db
         .update(riders)
-        .set({ xcoId: ranking.xcoId })
+        .set(riderUpdates)
         .where(eq(riders.id, existingRider.id));
     }
 

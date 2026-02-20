@@ -3,13 +3,12 @@
  *
  * Mirrors the complete UCI rankings database into our system.
  * Creates riders it discovers, stores all available data, and prevents duplicates.
- * Designed for MTB now, extensible to road/cyclocross later.
+ * Uses the UCI DataRide JSON API directly — no HTML scraping needed.
  */
 
 import { db, riderDisciplineStats, uciSyncRuns } from "@/lib/db";
-import { eq, and } from "drizzle-orm";
-import { scrapeXCOdataRankings, type XCOdataCategory } from "./xcodata";
-import { scrapeUCIRankings, findRiderInUCIRankings } from "./uci-dataride";
+import { eq, and, lt } from "drizzle-orm";
+import { fetchAllUCIRankings, type UCIRankingCategory } from "./uci-rankings-api";
 import { findOrCreateRider, findOrCreateTeam } from "@/lib/riders/find-or-create";
 import { normalizeNationality } from "@/lib/nationality-codes";
 
@@ -30,7 +29,7 @@ export interface SyncResult {
   }>;
 }
 
-const CATEGORIES: XCOdataCategory[] = [
+const CATEGORIES: UCIRankingCategory[] = [
   "men_elite",
   "women_elite",
   "men_junior",
@@ -44,7 +43,7 @@ export async function syncUciDatabase(options: {
   discipline: "mtb";
   maxPagesPerCategory?: number;
 }): Promise<SyncResult> {
-  const { discipline, maxPagesPerCategory = 50 } = options;
+  const { discipline } = options;
   const startTime = Date.now();
 
   // Create sync run record
@@ -52,7 +51,7 @@ export async function syncUciDatabase(options: {
     .insert(uciSyncRuns)
     .values({
       discipline,
-      source: "xcodata",
+      source: "uci_dataride",
       status: "running",
     })
     .returning();
@@ -69,6 +68,8 @@ export async function syncUciDatabase(options: {
     categoryDetails: [],
   };
 
+  const syncStartedAt = new Date();
+
   try {
     for (const category of CATEGORIES) {
       const [gender, ageCategory] = category.split("_");
@@ -77,12 +78,8 @@ export async function syncUciDatabase(options: {
       let categoryRidersUpdated = 0;
 
       try {
-        console.log(`[sync] Fetching ${category} rankings...`);
-        const rankings = await scrapeXCOdataRankings(
-          ageCategory,
-          gender,
-          maxPagesPerCategory
-        );
+        console.log(`[sync] Fetching ${category} rankings from UCI DataRide...`);
+        const rankings = await fetchAllUCIRankings(category);
 
         if (rankings.length === 0) {
           result.errors.push(`No rankings found for ${category}`);
@@ -93,27 +90,26 @@ export async function syncUciDatabase(options: {
 
         for (const ranking of rankings) {
           try {
-            const nat = normalizeNationality(ranking.nationality);
+            const nat = normalizeNationality(ranking.countryIso2) || normalizeNationality(ranking.nationality);
 
             // Find or create team
             let teamId: string | null = null;
             if (ranking.teamName) {
               const team = await findOrCreateTeam(ranking.teamName, discipline);
               teamId = team.id;
-              // Count only newly created teams (no updatedAt check needed,
-              // findOrCreateTeam returns existing or new)
             }
 
-            // Find or create rider
+            // Find or create rider — pass uciId and birthDate directly from the API
             const riderBefore = await db.query.riders.findFirst({
               where: (riders, { eq }) =>
-                ranking.xcoId ? eq(riders.xcoId, ranking.xcoId) : eq(riders.name, "__impossible__"),
+                ranking.uciId ? eq(riders.uciId, ranking.uciId) : eq(riders.name, "__impossible__"),
             });
 
             const rider = await findOrCreateRider({
               name: ranking.name,
-              xcoId: ranking.xcoId || null,
+              uciId: ranking.uciId || null,
               nationality: nat,
+              birthDate: ranking.birthDate || null,
               teamId,
             });
 
@@ -137,13 +133,13 @@ export async function syncUciDatabase(options: {
               .limit(1);
 
             // ELO from UCI points
-            const estimatedElo = 1500 + (ranking.uciPoints / 3000) * 500;
+            const estimatedElo = 1500 + (ranking.points / 3000) * 500;
             const eloVariance = 350;
 
             if (existingStats) {
               // Always update UCI points and rank
               const updates: Record<string, unknown> = {
-                uciPoints: ranking.uciPoints,
+                uciPoints: ranking.points,
                 uciRank: ranking.rank,
                 teamId,
                 gender,
@@ -171,7 +167,7 @@ export async function syncUciDatabase(options: {
                 discipline,
                 ageCategory,
                 gender,
-                uciPoints: ranking.uciPoints,
+                uciPoints: ranking.points,
                 uciRank: ranking.rank,
                 teamId,
                 eloMean: estimatedElo.toFixed(4),
@@ -182,7 +178,6 @@ export async function syncUciDatabase(options: {
           } catch (riderError) {
             const msg = `Error processing rider ${ranking.name}: ${riderError instanceof Error ? riderError.message : String(riderError)}`;
             console.error(`[sync] ${msg}`);
-            // Don't add individual rider errors to the main errors array to avoid noise
           }
         }
 
@@ -208,39 +203,18 @@ export async function syncUciDatabase(options: {
       }
     }
 
-    // Optionally supplement with UCI DataRide for age/uciId
-    if (process.env.FIRECRAWL_API_KEY) {
-      try {
-        console.log("[sync] Supplementing with UCI DataRide for age/uciId...");
-        for (const category of CATEGORIES) {
-          const [gender, ageCategory] = category.split("_");
-          const uciRankings = await scrapeUCIRankings(ageCategory, gender);
-
-          if (uciRankings.length === 0) continue;
-
-          for (const uciRider of uciRankings) {
-            if (!uciRider.age && !uciRider.uciId) continue;
-
-            try {
-              const birthDate = uciRider.age
-                ? `${new Date().getFullYear() - uciRider.age}-01-01`
-                : undefined;
-
-              await findOrCreateRider({
-                name: uciRider.name,
-                uciId: uciRider.uciId || undefined,
-                nationality: uciRider.nationality || undefined,
-                birthDate: birthDate || undefined,
-              });
-            } catch {
-              // Silently skip individual failures
-            }
-          }
-        }
-      } catch (error) {
-        console.error("[sync] Error supplementing with UCI DataRide:", error);
-      }
-    }
+    // Zero out UCI points/rank for stats NOT touched during this sync.
+    // This ensures riders no longer in the rankings get 0 points.
+    const zeroResult = await db
+      .update(riderDisciplineStats)
+      .set({ uciPoints: 0, uciRank: null })
+      .where(
+        and(
+          eq(riderDisciplineStats.discipline, discipline),
+          lt(riderDisciplineStats.updatedAt, syncStartedAt)
+        )
+      );
+    console.log(`[sync] Zeroed UCI points for stats not updated during this sync`);
 
     result.status = "completed";
   } catch (error) {
