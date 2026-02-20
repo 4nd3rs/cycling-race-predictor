@@ -627,21 +627,21 @@ export default async function CategoryPage({ params }: PageProps) {
           )}
         </div>
 
-        <Tabs defaultValue={isCompleted ? "results" : "predictions"} className="space-y-6">
+        <Tabs defaultValue={isCompleted ? "results" : "startlist"} className="space-y-6">
           <TabsList>
             {isCompleted && (
               <TabsTrigger value="results">
                 Results ({results.length})
               </TabsTrigger>
             )}
+            <TabsTrigger value="startlist">
+              Startlist ({startlist.length})
+            </TabsTrigger>
             {!isCompleted && (
               <TabsTrigger value="predictions">
                 Predictions ({formattedPredictions.length})
               </TabsTrigger>
             )}
-            <TabsTrigger value="startlist">
-              Startlist ({startlist.length})
-            </TabsTrigger>
           </TabsList>
 
           {/* Results Tab */}
@@ -714,25 +714,6 @@ export default async function CategoryPage({ params }: PageProps) {
                 <Card>
                   <CardContent className="py-12 text-center">
                     <p className="text-muted-foreground">No results available yet.</p>
-                  </CardContent>
-                </Card>
-              )}
-            </TabsContent>
-          )}
-
-          {/* Predictions Tab */}
-          {!isCompleted && (
-            <TabsContent value="predictions">
-              {formattedPredictions.length > 0 ? (
-                <PredictionList predictions={formattedPredictions} isSuperCup={isSuperCup} />
-              ) : (
-                <Card>
-                  <CardContent className="py-12 text-center">
-                    <p className="text-muted-foreground">
-                      {startlist.length === 0
-                        ? "No predictions available yet. Add riders to the startlist to generate predictions."
-                        : "Predictions are being generated. Refresh the page to see them."}
-                    </p>
                   </CardContent>
                 </Card>
               )}
@@ -829,6 +810,25 @@ export default async function CategoryPage({ params }: PageProps) {
               </Card>
             )}
           </TabsContent>
+
+          {/* Predictions Tab */}
+          {!isCompleted && (
+            <TabsContent value="predictions">
+              {formattedPredictions.length > 0 ? (
+                <PredictionList predictions={formattedPredictions} isSuperCup={isSuperCup} />
+              ) : (
+                <Card>
+                  <CardContent className="py-12 text-center">
+                    <p className="text-muted-foreground">
+                      {startlist.length === 0
+                        ? "No predictions available yet. Add riders to the startlist to generate predictions."
+                        : "Predictions are being generated. Refresh the page to see them."}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+          )}
         </Tabs>
       </main>
     </div>
