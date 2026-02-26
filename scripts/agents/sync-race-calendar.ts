@@ -405,16 +405,54 @@ async function scrapeMtbCalendar(): Promise<ScrapedRace[]> {
     await page.waitForSelector("table", { timeout: 10000 }).catch(() => {});
 
     // XCOdata table: [date, race name (with link), ..., class]
+    // Note: XCOdata wraps the full card (name + date + location + "Winner") in one <a> tag.
+    // We extract just the race name by:
+    //   1. Trying a heading element inside the link (h1-h5, strong, .name, .title)
+    //   2. Taking the first text node directly under the link
+    //   3. Falling back to the text before the first date pattern (DD Mon YYYY)
     const rows = await page.$$eval("table tbody tr", (trs) =>
       trs.map((tr) => {
         const cells = Array.from(tr.querySelectorAll("td")).map(td => td.textContent?.replace(/\s+/g, " ").trim() ?? "");
         const link = tr.querySelector("a");
-        // cells[1] may contain full text with location — get just the link text as race name
-        const nameFromLink = link?.textContent?.replace(/\s+/g, " ").trim() ?? "";
-        const nameFromCell = cells[1]?.split(/\d{2}\s+\w+\s+\d{4}/)?.[0]?.trim() ?? cells[1];
+
+        let raceName = "";
+
+        if (link) {
+          // Strategy 1: heading or named element inside the link
+          const heading = link.querySelector("h1,h2,h3,h4,h5,strong,.name,.title,[class*='name'],[class*='title']");
+          if (heading) {
+            raceName = heading.textContent?.replace(/\s+/g, " ").trim() ?? "";
+          }
+
+          // Strategy 2: first direct text node (not nested elements)
+          if (!raceName) {
+            for (const node of Array.from(link.childNodes)) {
+              if (node.nodeType === 3 /* TEXT_NODE */) {
+                const t = node.textContent?.replace(/\s+/g, " ").trim() ?? "";
+                if (t.length > 2) { raceName = t; break; }
+              }
+            }
+          }
+
+          // Strategy 3: full textContent truncated before first date pattern
+          if (!raceName) {
+            const full = link.textContent?.replace(/[\t\r\n]+/g, " ").replace(/\s{2,}/g, " ").trim() ?? "";
+            const dateMatch = full.match(/\d{1,2}\s*(?:-\s*\d{1,2})?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i);
+            raceName = dateMatch ? full.substring(0, dateMatch.index).trim() : full;
+          }
+        }
+
+        // Fallback to first cell if still empty
+        if (!raceName) {
+          raceName = cells[1]?.split(/\d{2}\s+\w+\s+\d{4}/)?.[0]?.trim() ?? cells[1] ?? "";
+        }
+
+        // Final strip: remove " - Winner", "Winner" suffix if leaked through
+        raceName = raceName.replace(/\s+Winner.*$/i, "").trim();
+
         return {
           date: cells[0] ?? "",
-          name: nameFromLink || nameFromCell,
+          name: raceName,
           raceClass: cells[cells.length - 1] ?? "",
           url: link?.getAttribute("href") ?? "",
         };
