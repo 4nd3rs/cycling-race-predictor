@@ -29,7 +29,8 @@ const db = drizzle(sqlClient, { schema });
 const args = process.argv.slice(2);
 const DAYS_AHEAD = parseInt(args.find(a => a.startsWith("--days"))?.split("=")[1] || "3", 10);
 const FORCE = args.includes("--force");
-const SINGLE_RACE_ID = args[args.indexOf("--race-id") + 1] || null;
+const raceIdIdx = args.indexOf("--race-id");
+const SINGLE_RACE_ID = raceIdIdx !== -1 ? args[raceIdIdx + 1] || null : null;
 
 // Minimum hype for auto-predictions (skip very low-profile C2 races)
 function getHypeScore(uciCategory: string | null | undefined): number {

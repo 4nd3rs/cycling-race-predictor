@@ -462,9 +462,9 @@ export default async function EventPage({ params }: PageProps) {
                       </div>
 
                       <div className="p-4 flex flex-col gap-4 flex-1">
-                        {/* Top Picks */}
+                        {/* Top Contenders */}
                         <div>
-                          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">🏆 Top Picks</h3>
+                          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">🏆 Top Contenders</h3>
                           {topPicks.length > 0 ? (
                             <div className="space-y-1.5">
                               {topPicks.map(({ prediction, rider }, i) => (
@@ -475,8 +475,8 @@ export default async function EventPage({ params }: PageProps) {
                                     {rider.name}
                                   </Link>
                                   {prediction.winProbability != null && Number(prediction.winProbability) > 0 && (
-                                    <span className="text-xs text-muted-foreground shrink-0 font-mono">
-                                      {(Number(prediction.winProbability) * 100).toFixed(1)}%
+                                    <span className="text-xs shrink-0 font-semibold text-amber-600 dark:text-amber-400">
+                                      ★ {(Number(prediction.winProbability) * 100).toFixed(1)}% win
                                     </span>
                                   )}
                                 </div>
@@ -486,6 +486,47 @@ export default async function EventPage({ params }: PageProps) {
                             <p className="text-xs text-muted-foreground italic">Predictions loading...</p>
                           )}
                         </div>
+
+                        {/* Media Coverage — rider mentions in news */}
+                        {(() => {
+                          const mentionMap = new Map<string, { rider: typeof topPicks[0]["rider"]; count: number }>();
+                          const contenderNames = topPicks.slice(0, 5).map(({ rider }) => ({
+                            rider,
+                            parts: rider.name.split(/\s+/).filter(p => p.length > 2),
+                          }));
+                          for (const article of raceNews) {
+                            const title = (article.title || "").toLowerCase();
+                            for (const { rider, parts } of contenderNames) {
+                              if (parts.some(p => title.includes(p.toLowerCase()))) {
+                                const existing = mentionMap.get(rider.id);
+                                if (existing) existing.count++;
+                                else mentionMap.set(rider.id, { rider, count: 1 });
+                              }
+                            }
+                          }
+                          const mentions = Array.from(mentionMap.values())
+                            .sort((a, b) => b.count - a.count)
+                            .slice(0, 3);
+                          if (mentions.length === 0) return null;
+                          return (
+                            <div>
+                              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">📰 Media Coverage</h3>
+                              <div className="space-y-1.5">
+                                {mentions.map(({ rider, count }) => (
+                                  <div key={rider.id} className="flex items-center gap-2 text-sm">
+                                    <span className="shrink-0">{countryToFlag(rider.nationality)}</span>
+                                    <Link href={`/riders/${rider.id}`} className="font-medium truncate hover:text-primary transition-colors flex-1">
+                                      {rider.name}
+                                    </Link>
+                                    <span className="text-xs shrink-0 text-muted-foreground">
+                                      📰 {count} {count === 1 ? "article" : "articles"}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
 
                         {/* Rider Intel (per-race filtered) */}
                         {intel.length > 0 && (

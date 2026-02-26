@@ -937,7 +937,7 @@ export default async function CategoryPage({ params }: PageProps) {
           </section>
         )}
 
-        {/* ── Tabs: Results / Startlist / Predictions ─────────────────── */}
+        {/* ── Tabs: Results / Startlist / Top Contenders ────────────── */}
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-8">
         <Tabs defaultValue={isCompleted ? "results" : "startlist"} className="space-y-6">
           <TabsList>
@@ -951,7 +951,7 @@ export default async function CategoryPage({ params }: PageProps) {
             </TabsTrigger>
             {!isCompleted && (
               <TabsTrigger value="predictions">
-                Predictions ({formattedPredictions.length})
+                Top Contenders ({formattedPredictions.length})
               </TabsTrigger>
             )}
           </TabsList>
@@ -1182,18 +1182,21 @@ export default async function CategoryPage({ params }: PageProps) {
             )}
           </TabsContent>
 
-          {/* Predictions Tab */}
+          {/* Top Contenders Tab */}
           {!isCompleted && (
             <TabsContent value="predictions">
               {formattedPredictions.length > 0 ? (
-                <PredictionList predictions={formattedPredictions} isSuperCup={isSuperCup} />
+                <div>
+                  <p className="text-sm text-muted-foreground mb-4">Top contenders ranked by predicted race performance.</p>
+                  <PredictionList predictions={formattedPredictions} isSuperCup={isSuperCup} />
+                </div>
               ) : (
                 <Card>
                   <CardContent className="py-12 text-center">
                     <p className="text-muted-foreground">
                       {startlist.length === 0
-                        ? "No predictions available yet. Add riders to the startlist to generate predictions."
-                        : "Predictions are being generated. Refresh the page to see them."}
+                        ? "No contenders available yet. Add riders to the startlist to generate predictions."
+                        : "Contenders are being calculated. Refresh the page to see them."}
                     </p>
                   </CardContent>
                 </Card>
