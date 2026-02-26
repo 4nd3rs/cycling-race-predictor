@@ -23,6 +23,24 @@ const nextConfig: NextConfig = {
     },
   },
 
+  // Redirect procyclingpredictions.com → procyclingpredictor.com
+  async redirects() {
+    return [
+      {
+        source: "/:path*",
+        has: [{ type: "host" as const, value: "procyclingpredictions.com" }],
+        destination: "https://procyclingpredictor.com/:path*",
+        permanent: true,
+      },
+      {
+        source: "/:path*",
+        has: [{ type: "host" as const, value: "www.procyclingpredictions.com" }],
+        destination: "https://procyclingpredictor.com/:path*",
+        permanent: true,
+      },
+    ];
+  },
+
   // Headers for security
   async headers() {
     return [
