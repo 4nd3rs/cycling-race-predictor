@@ -524,14 +524,23 @@ export default async function EventPage({ params }: PageProps) {
                                 <div className="space-y-1.5">
                                   {topPicks.map(({ prediction, rider }, i) => (
                                     <div key={rider.id} className="flex items-center gap-2 text-sm">
-                                      {i < 3 && rider.photoUrl ? (
-                                        <div className={`relative h-7 w-7 shrink-0 rounded-full overflow-hidden ring-2 ${PODIUM_RING[i]}`}>
-                                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                                          <img src={rider.photoUrl} alt={rider.name} className="h-full w-full object-cover" />
-                                          <span className={`absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full text-[8px] font-black ${PODIUM_BADGE[i]}`}>
-                                            {i + 1}
-                                          </span>
-                                        </div>
+                                      {i < 3 ? (
+                                        rider.photoUrl ? (
+                                          <div className={`relative h-7 w-7 shrink-0 rounded-full overflow-hidden ring-2 ${PODIUM_RING[i]}`}>
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img src={rider.photoUrl} alt={rider.name} className="h-full w-full object-cover" />
+                                            <span className={`absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full text-[8px] font-black ${PODIUM_BADGE[i]}`}>
+                                              {i + 1}
+                                            </span>
+                                          </div>
+                                        ) : (
+                                          <div className={`relative h-7 w-7 shrink-0 rounded-full flex items-center justify-center text-[10px] font-black ring-2 ${PODIUM_RING[i]} ${PODIUM_BADGE[i]}`}>
+                                            {rider.name.split(" ").filter(Boolean).slice(0, 2).map((w: string) => w[0]).join("").toUpperCase()}
+                                            <span className={`absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full text-[8px] font-black ${PODIUM_BADGE[i]}`}>
+                                              {i + 1}
+                                            </span>
+                                          </div>
+                                        )
                                       ) : (
                                         <span className="text-base w-6 shrink-0 text-center">{MEDALS[i]}</span>
                                       )}

@@ -75,22 +75,34 @@ function PredictionRow({
       className="flex items-center gap-3 py-2 px-3 hover:bg-muted/50 rounded-lg transition-colors"
     >
       {/* Position / Photo */}
-      {isPodium && photoUrl ? (
-        <div className={cn("relative h-9 w-9 shrink-0 rounded-full overflow-hidden", PODIUM_RINGS[position])}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={photoUrl} alt={riderName} className="h-full w-full object-cover" />
-          <span className={cn(
-            "absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-black",
-            PODIUM_LABELS[position]
-          )}>
-            {position}
-          </span>
-        </div>
+      {isPodium ? (
+        photoUrl ? (
+          <div className={cn("relative h-9 w-9 shrink-0 rounded-full overflow-hidden", PODIUM_RINGS[position])}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={photoUrl} alt={riderName} className="h-full w-full object-cover" />
+            <span className={cn(
+              "absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-black",
+              PODIUM_LABELS[position]
+            )}>
+              {position}
+            </span>
+          </div>
+        ) : (
+          <div className={cn("relative h-9 w-9 shrink-0 rounded-full flex items-center justify-center text-xs font-black", PODIUM_RINGS[position], PODIUM_LABELS[position])}>
+            {riderName.split(" ").filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase()}
+            <span className={cn(
+              "absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-black",
+              PODIUM_LABELS[position]
+            )}>
+              {position}
+            </span>
+          </div>
+        )
       ) : (
         <div
           className={cn(
             "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold",
-            isPodium ? PODIUM_LABELS[position] : "bg-muted text-muted-foreground"
+            "bg-muted text-muted-foreground"
           )}
         >
           {position}
