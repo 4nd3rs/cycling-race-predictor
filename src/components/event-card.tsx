@@ -237,3 +237,129 @@ export function EventList({
     </div>
   );
 }
+
+// ─── List row variant ────────────────────────────────────────────────────────
+
+function catAbbr(ageCategory: string, gender: string): string {
+  const age = { elite: "E", u23: "U23", junior: "J", masters: "M" }[ageCategory] ?? ageCategory.toUpperCase().slice(0, 2);
+  const g = gender === "men" ? "M" : "W";
+  return `${age}${g}`;
+}
+
+const DISC_COLORS: Record<string, string> = {
+  road:       "bg-red-500/20 text-red-400 border border-red-500/30",
+  mtb:        "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30",
+  gravel:     "bg-amber-500/20 text-amber-400 border border-amber-500/30",
+  cyclocross: "bg-purple-500/20 text-purple-400 border border-purple-500/30",
+};
+
+export function EventListRow({
+  id, name, slug, date, endDate, country, discipline, subDiscipline, categories,
+}: EventCardProps) {
+  const startDate = new Date(date + "T12:00:00");
+  const isEventToday = isToday(startDate);
+  const isCompleted = isPast(new Date((endDate ?? date) + "T23:59:59"));
+
+  const eventUrl = slug ? buildEventUrl(discipline, slug) : `/races/${id}`;
+
+  const dateStr = format(startDate, "MMM d");
+  const discColor = DISC_COLORS[discipline] ?? "bg-zinc-500/20 text-zinc-400";
+  const discLabel = { road: "Road", mtb: "MTB", gravel: "Gravel", cyclocross: "CX" }[discipline] ?? discipline;
+
+  const sortedCats = [...categories].sort((a, b) => {
+    const o = { elite: 0, u23: 1, junior: 2, masters: 3 };
+    const ao = o[a.ageCategory as keyof typeof o] ?? 4;
+    const bo = o[b.ageCategory as keyof typeof o] ?? 4;
+    return ao !== bo ? ao - bo : (a.gender === "men" ? -1 : 1);
+  });
+
+  const statusEl = isEventToday ? (
+    <span className="rounded px-1.5 py-0.5 text-xs font-bold bg-red-500 text-white animate-pulse">LIVE</span>
+  ) : isCompleted ? (
+    <span className="rounded px-1.5 py-0.5 text-xs text-muted-foreground bg-muted/40">Done</span>
+  ) : (
+    <span className="rounded px-1.5 py-0.5 text-xs text-green-400 bg-green-500/10 border border-green-500/20 whitespace-nowrap">
+      {formatDistanceToNow(startDate, { addSuffix: true })}
+    </span>
+  );
+
+  return (
+    <div className={cn(
+      "flex items-center gap-3 py-2.5 px-3 border-b border-border/30 hover:bg-muted/20 transition-colors group",
+      isEventToday && "bg-red-500/5 border-l-2 border-l-red-500"
+    )}>
+      {/* Date */}
+      <span className="w-12 shrink-0 text-xs font-mono text-muted-foreground tabular-nums">{dateStr}</span>
+
+      {/* Discipline badge */}
+      <span className={cn("hidden sm:inline-block shrink-0 rounded px-1.5 py-0.5 text-xs font-medium", discColor)}>
+        {subDiscipline ? getSubDisciplineShortLabel(subDiscipline) : discLabel}
+      </span>
+
+      {/* Name */}
+      <Link href={eventUrl} className="flex-1 min-w-0 font-medium text-sm hover:text-primary transition-colors truncate">
+        {name}
+      </Link>
+
+      {/* Country */}
+      {country && (
+        <span className="hidden md:block text-xs text-muted-foreground shrink-0 w-8">{country}</span>
+      )}
+
+      {/* Category pills */}
+      <div className="hidden sm:flex items-center gap-1 shrink-0">
+        {sortedCats.slice(0, 6).map((c) => (
+          <span key={c.id} className="rounded px-1 py-0.5 text-[10px] bg-muted/50 text-muted-foreground font-mono">
+            {catAbbr(c.ageCategory, c.gender)}
+          </span>
+        ))}
+        {sortedCats.length > 6 && (
+          <span className="text-[10px] text-muted-foreground">+{sortedCats.length - 6}</span>
+        )}
+      </div>
+
+      {/* Status */}
+      <div className="shrink-0">{statusEl}</div>
+    </div>
+  );
+}
+
+export function EventListView({
+  events,
+  emptyMessage = "No events found",
+}: EventListProps) {
+  if (events.length === 0) {
+    return (
+      <div className="text-center py-12 text-muted-foreground">{emptyMessage}</div>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-border/50 overflow-hidden">
+      {/* Header row */}
+      <div className="flex items-center gap-3 py-2 px-3 bg-muted/30 border-b border-border/50 text-xs font-medium text-muted-foreground">
+        <span className="w-12 shrink-0">Date</span>
+        <span className="hidden sm:block w-12 shrink-0">Type</span>
+        <span className="flex-1">Event</span>
+        <span className="hidden md:block w-8">Ctry</span>
+        <span className="hidden sm:block">Categories</span>
+        <span className="w-20 text-right">Status</span>
+      </div>
+      {events.map((event) => (
+        <EventListRow
+          key={event.id}
+          id={event.id}
+          name={event.name}
+          slug={event.slug}
+          date={event.date}
+          endDate={event.endDate}
+          country={event.country}
+          discipline={event.discipline}
+          subDiscipline={event.subDiscipline}
+          series={event.series}
+          categories={event.categories}
+        />
+      ))}
+    </div>
+  );
+}
