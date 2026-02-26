@@ -185,15 +185,19 @@ async function getEventNews(eventId: string) {
   } catch { return []; }
 }
 
-async function getRaceSpecificNews(eventId: string, raceId: string) {
+async function getRaceSpecificNews(eventId: string, raceId: string, gender?: string | null) {
   try {
-    // Returns articles linked to this specific race, OR neutral articles (race_id IS NULL = applies to all)
+    // For women's races: only show articles explicitly tagged to this race (avoid men's general news leaking in)
+    // For men's races: also include neutral articles (race_id IS NULL)
+    const isWomen = gender === "women";
     return await db
       .select()
       .from(raceNews)
       .where(and(
         eq(raceNews.raceEventId, eventId),
-        or(eq(raceNews.raceId, raceId), isNull(raceNews.raceId))
+        isWomen
+          ? eq(raceNews.raceId, raceId)
+          : or(eq(raceNews.raceId, raceId), isNull(raceNews.raceId))
       ))
       .orderBy(desc(raceNews.publishedAt))
       .limit(3);
@@ -255,7 +259,7 @@ export default async function EventPage({ params }: PageProps) {
     Promise.all(eliteRaces.map(c => getTopPredictions(c.race.id, 5))),
     Promise.all(eliteRaces.map(c => getTopResults(c.race.id, 5))),
     Promise.all(eliteRaces.map(c => getRaceIntel(c.race.id))),
-    Promise.all(eliteRaces.map(c => getRaceSpecificNews(event.id, c.race.id))),
+    Promise.all(eliteRaces.map(c => getRaceSpecificNews(event.id, c.race.id, c.race.gender))),
   ]);
 
   const wx = weather ? wmoToEmoji(weather.weatherCode) : null;
