@@ -220,7 +220,7 @@ function countryToFlag(code?: string | null) {
   return String.fromCodePoint(...[...a2].map(ch => 0x1F1E6 + ch.charCodeAt(0) - 65));
 }
 
-const MEDALS = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"];
+
 const PODIUM_BADGE = ["bg-yellow-500 text-yellow-950", "bg-gray-300 text-gray-800", "bg-amber-600 text-amber-50"];
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -472,7 +472,22 @@ export default async function EventPage({ params }: PageProps) {
                                 <div className="space-y-1.5">
                                   {topResults.map(({ result, rider }, i) => (
                                     <div key={rider.id} className="flex items-center gap-2 text-sm">
-                                      <span className="text-base w-6 shrink-0 text-center">{MEDALS[i] ?? `${result.position}.`}</span>
+                                      {i < 3 ? (
+                                        rider.photoUrl ? (
+                                          <div className="h-9 w-9 shrink-0 rounded-full overflow-hidden">
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img src={rider.photoUrl} alt={rider.name} className="h-full w-full object-cover" />
+                                          </div>
+                                        ) : (
+                                          <div className={`h-9 w-9 shrink-0 rounded-full flex items-center justify-center text-xs font-black ${PODIUM_BADGE[i]}`}>
+                                            {rider.name.split(" ").filter(Boolean).slice(0, 2).map((w: string) => w[0]).join("").toUpperCase()}
+                                          </div>
+                                        )
+                                      ) : (
+                                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold bg-muted text-muted-foreground">
+                                          {i + 1}
+                                        </div>
+                                      )}
                                       <span className="shrink-0">{countryToFlag(rider.nationality)}</span>
                                       <Link href={`/riders/${rider.id}`} className="font-medium truncate hover:text-primary transition-colors flex-1">
                                         {rider.name}
