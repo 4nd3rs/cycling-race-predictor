@@ -29,6 +29,9 @@ export const riders = pgTable("riders", {
   birthDate: date("birth_date"),
   teamId: uuid("team_id").references(() => teams.id), // Current team
   photoUrl: varchar("photo_url", { length: 500 }),
+  bio: text("bio"),
+  wikiSlug: varchar("wiki_slug", { length: 255 }),
+  pcsUrl: varchar("pcs_url", { length: 500 }),
   instagramHandle: varchar("instagram_handle", { length: 100 }),
   stravaId: varchar("strava_id", { length: 100 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
