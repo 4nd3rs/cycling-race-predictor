@@ -300,8 +300,10 @@ function normalizePcsCategory(raw: string): string | null {
   for (const [key, value] of Object.entries(UCI_ROAD_CATS)) {
     if (lower.includes(key)) return value;
   }
-  // WT shorthand
-  if (lower.includes("wt") || lower.includes("worldtour")) return "WorldTour";
+  // WT / UWT shorthand
+  if (lower.includes("uwt") || lower.includes("wt") || lower.includes("worldtour")) return "WorldTour";
+  // Pro series
+  if (lower.includes("pro")) return lower.startsWith("2") ? "2.Pro" : "1.Pro";
   return null;
 }
 
@@ -320,68 +322,32 @@ async function scrapePcsCalendar(): Promise<ScrapedRace[]> {
 
     console.log("  Loading PCS race calendar...");
     await page.goto("https://www.procyclingstats.com/races.php", {
-      waitUntil: "domcontentloaded",
+      waitUntil: "networkidle",
       timeout: 30000,
     });
+    await page.waitForSelector("table", { timeout: 10000 }).catch(() => {});
 
-    // Wait for race table to load
-    await page
-      .waitForSelector("table.tablesorter, table.basic, .racelisttable, table.sortTabl", {
-        timeout: 15000,
-      })
-      .catch(() => {});
-
-    // Try extracting from the table
-    const pcsRaces = await page.$$eval(
-      "table tbody tr, ul.raceList li",
-      (rows) => {
-        return rows
-          .map((row) => {
-            const cells = row.querySelectorAll("td, .race-item");
-            const link = row.querySelector('a[href*="/race/"]');
-            return {
-              name: link?.textContent?.trim() || "",
-              url: link?.getAttribute("href") || "",
-              date: cells[0]?.textContent?.trim() || "",
-              country: cells[1]?.textContent?.trim() || "",
-              category: cells[2]?.textContent?.trim() || "",
-            };
-          })
-          .filter((r) => r.name && r.url);
-      }
+    // PCS table structure: [date_range, start_date, race_name, winner, class]
+    // class=" basic" (note leading space)
+    const rowsToParse = await page.$$eval("table tbody tr", (rows) =>
+      rows.map((row) => {
+        const cells = Array.from(row.querySelectorAll("td")).map(td => td.textContent?.trim() ?? "");
+        const link = row.querySelector("a[href*='/race/']");
+        return {
+          name: cells[2] ?? "",
+          url: link?.getAttribute("href") ?? "",
+          dateRange: cells[0] ?? "",
+          startDate: cells[1] ?? "",
+          category: cells[4] ?? "",
+        };
+      }).filter(r => r.name.length > 2)
     );
-
-    let rowsToParse = pcsRaces;
-
-    // Fallback: get page HTML and parse with cheerio
-    if (rowsToParse.length === 0) {
-      console.log("  PCS table empty, trying cheerio fallback...");
-      const html = await page.content();
-      const $ = cheerio.load(html);
-      const cheerioRaces: typeof pcsRaces = [];
-
-      $("table tbody tr").each((_, tr) => {
-        const cells = $(tr).find("td");
-        const link = $(tr).find('a[href*="/race/"]').first();
-        if (link.length) {
-          cheerioRaces.push({
-            name: link.text().trim(),
-            url: link.attr("href") || "",
-            date: cells.eq(0).text().trim(),
-            country: cells.eq(1).text().trim(),
-            category: cells.eq(2).text().trim(),
-          });
-        }
-      });
-
-      rowsToParse = cheerioRaces;
-    }
 
     console.log(`  PCS: ${rowsToParse.length} raw rows parsed`);
 
     for (const row of rowsToParse) {
       try {
-        const dateStr = parsePcsDate(row.date);
+        const dateStr = parsePcsDate(row.startDate || row.dateRange);
         if (!dateStr || !isInDateRange(dateStr)) continue;
 
         const category = normalizePcsCategory(row.category || "");
@@ -424,27 +390,77 @@ async function scrapePcsCalendar(): Promise<ScrapedRace[]> {
 
 async function scrapeMtbCalendar(): Promise<ScrapedRace[]> {
   const races: ScrapedRace[] = [];
+  let browser: Browser | null = null;
 
   try {
-    const currentYear = today.getFullYear();
-    // Fetch upcoming races (no results required — we want future races)
-    const xcoRaces = await scrapeXCOdataRacesList(currentYear, ["WC", "WCH", "C1"], false);
+    browser = await chromium.launch({ headless: true });
+    const page = await browser.newPage();
+    await page.setExtraHTTPHeaders({
+      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
+      "Accept-Language": "en-US,en;q=0.9",
+    });
 
-    for (const xco of xcoRaces) {
-      if (!isInDateRange(xco.date)) continue;
+    await page.goto("https://www.xcodata.com/races", { waitUntil: "networkidle", timeout: 30000 });
+    await page.waitForSelector("table", { timeout: 10000 }).catch(() => {});
 
-      // Map XCOdata race class to a series name
+    // XCOdata table: [date, race name (with link), ..., class]
+    const rows = await page.$$eval("table tbody tr", (trs) =>
+      trs.map((tr) => {
+        const cells = Array.from(tr.querySelectorAll("td")).map(td => td.textContent?.replace(/\s+/g, " ").trim() ?? "");
+        const link = tr.querySelector("a");
+        // cells[1] may contain full text with location — get just the link text as race name
+        const nameFromLink = link?.textContent?.replace(/\s+/g, " ").trim() ?? "";
+        const nameFromCell = cells[1]?.split(/\d{2}\s+\w+\s+\d{4}/)?.[0]?.trim() ?? cells[1];
+        return {
+          date: cells[0] ?? "",
+          name: nameFromLink || nameFromCell,
+          raceClass: cells[cells.length - 1] ?? "",
+          url: link?.getAttribute("href") ?? "",
+        };
+      }).filter(r => r.name.length > 3 && r.name.length < 200)
+    );
+
+    // Parse XCOdata dates like "24 Jan 2026" or "28 - 30 Jan 2026"
+    const monthMap: Record<string, string> = {
+      jan:"01",feb:"02",mar:"03",apr:"04",may:"05",jun:"06",
+      jul:"07",aug:"08",sep:"09",oct:"10",nov:"11",dec:"12",
+    };
+    function parseXcoDate(raw: string): string | null {
+      // "28 - 30 Jan 2026" or "24 Jan 2026"
+      const parts = raw.replace(/\s*-\s*\d+/, "").trim().split(/\s+/);
+      if (parts.length < 3) return null;
+      const day = parts[0].padStart(2, "0");
+      const month = monthMap[parts[1].toLowerCase().substring(0,3)];
+      const year = parts[2] || parts[parts.length - 1];
+      if (!month || !year) return null;
+      return `${year}-${month}-${day}`;
+    }
+
+    const TARGET_CLASSES = new Set(["WC", "WCH", "C1", "C2"]);
+
+    for (const row of rows) {
+      const dateStr = parseXcoDate(row.date);
+      if (!dateStr || !isInDateRange(dateStr)) continue;
+
+      const classCode = row.raceClass.toUpperCase().trim();
+      if (!TARGET_CLASSES.has(classCode)) continue;
+
+      // Clean name: remove XCO suffix etc.
+      const name = row.name.replace(/\s*[-–]\s*XCO\s*$/, "").trim();
+
       let series: string | undefined;
-      const classUpper = xco.raceClass.toUpperCase();
-      if (classUpper === "WC") series = "world-cup";
-      else if (classUpper === "WCH") series = "world-championships";
+      if (classCode === "WC") series = "world-cup";
+      else if (classCode === "WCH") series = "world-championships";
+
+      const sourceUrl = row.url
+        ? (row.url.startsWith("http") ? row.url : `https://www.xcodata.com${row.url}`)
+        : undefined;
 
       races.push({
-        name: xco.name,
-        date: xco.date,
-        country: xco.country || undefined,
-        uciCategory: classUpper === "WC" ? "WC" : classUpper === "WCH" ? "WCH" : "C1",
-        sourceUrl: xco.url,
+        name,
+        date: dateStr,
+        uciCategory: classCode,
+        sourceUrl,
         discipline: "mtb",
         subDiscipline: "xco",
         series,
@@ -452,6 +468,8 @@ async function scrapeMtbCalendar(): Promise<ScrapedRace[]> {
     }
   } catch (err) {
     console.error(`  XCOdata scrape error: ${err}`);
+  } finally {
+    if (browser) await browser.close();
   }
 
   return races;
