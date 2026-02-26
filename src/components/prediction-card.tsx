@@ -71,25 +71,13 @@ function PredictionRow({
       {/* Position / Photo */}
       {isPodium ? (
         photoUrl ? (
-          <div className="relative h-10 w-10 shrink-0 rounded-full overflow-hidden">
+          <div className="h-10 w-10 shrink-0 rounded-full overflow-hidden">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={photoUrl} alt={riderName} className="h-full w-full object-cover" />
-            <span className={cn(
-              "absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-black",
-              PODIUM_LABELS[position]
-            )}>
-              {position}
-            </span>
           </div>
         ) : (
-          <div className={cn("relative h-10 w-10 shrink-0 rounded-full flex items-center justify-center text-sm font-black", PODIUM_LABELS[position])}>
+          <div className={cn("h-10 w-10 shrink-0 rounded-full flex items-center justify-center text-sm font-black", PODIUM_LABELS[position])}>
             {riderName.split(" ").filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase()}
-            <span className={cn(
-              "absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-black",
-              PODIUM_LABELS[position]
-            )}>
-              {position}
-            </span>
           </div>
         )
       ) : (

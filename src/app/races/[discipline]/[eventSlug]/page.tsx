@@ -525,19 +525,13 @@ export default async function EventPage({ params }: PageProps) {
                                     <div key={rider.id} className="flex items-center gap-2 text-sm">
                                       {i < 3 ? (
                                         rider.photoUrl ? (
-                                          <div className="relative h-9 w-9 shrink-0 rounded-full overflow-hidden">
+                                          <div className="h-9 w-9 shrink-0 rounded-full overflow-hidden">
                                             {/* eslint-disable-next-line @next/next/no-img-element */}
                                             <img src={rider.photoUrl} alt={rider.name} className="h-full w-full object-cover" />
-                                            <span className={`absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full text-[8px] font-black ${PODIUM_BADGE[i]}`}>
-                                              {i + 1}
-                                            </span>
                                           </div>
                                         ) : (
-                                          <div className={`relative h-9 w-9 shrink-0 rounded-full flex items-center justify-center text-xs font-black ${PODIUM_BADGE[i]}`}>
+                                          <div className={`h-9 w-9 shrink-0 rounded-full flex items-center justify-center text-xs font-black ${PODIUM_BADGE[i]}`}>
                                             {rider.name.split(" ").filter(Boolean).slice(0, 2).map((w: string) => w[0]).join("").toUpperCase()}
-                                            <span className={`absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full text-[8px] font-black ${PODIUM_BADGE[i]}`}>
-                                              {i + 1}
-                                            </span>
                                           </div>
                                         )
                                       ) : (
