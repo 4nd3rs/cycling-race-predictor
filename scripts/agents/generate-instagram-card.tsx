@@ -181,9 +181,9 @@ function PreviewCard({ event, race, preds }: any) {
 
         {/* Race name */}
         <span style={{
-          fontSize: event.name.length > 28 ? 104 : 126,
+          fontSize: event.name.length > 35 ? 88 : event.name.length > 24 ? 104 : 126,
           fontWeight: 800, color: WHITE, textTransform: "uppercase",
-          lineHeight: 0.88, letterSpacing: "-0.01em", marginBottom: 28,
+          lineHeight: 0.9, letterSpacing: "-0.01em", marginBottom: 48,
         }}>
           {event.name.toUpperCase()}
         </span>
@@ -192,7 +192,7 @@ function PreviewCard({ event, race, preds }: any) {
         <span style={{ fontSize: 24, fontWeight: 700, color: RED, letterSpacing: "0.1em", fontFamily: "Inter", marginBottom: 12 }}>
           {metaParts}
         </span>
-        <span style={{ fontSize: 22, fontWeight: 400, color: RED, fontFamily: "Inter", marginBottom: 52, opacity: 0.7 }}>
+        <span style={{ fontSize: 22, fontWeight: 400, color: RED, fontFamily: "Inter", marginBottom: 48, opacity: 0.7 }}>
           {race?.date ? fmtDate(race.date) : ""}
         </span>
 
@@ -265,7 +265,7 @@ function ResultsCard({ event, race, results }: any) {
       <div style={{ display: "flex", flexDirection: "column", padding: "72px 72px 0 88px", flex: 1 }}>
         <span style={{ fontSize: 20, fontWeight: 700, color: RED, letterSpacing: "0.18em", fontFamily: "Inter", marginBottom: 24 }}>RESULTS</span>
 
-        <span style={{ fontSize: event.name.length > 28 ? 104 : 126, fontWeight: 800, color: WHITE, textTransform: "uppercase", lineHeight: 0.88, letterSpacing: "-0.01em", marginBottom: 28 }}>
+        <span style={{ fontSize: event.name.length > 35 ? 88 : event.name.length > 24 ? 104 : 126, fontWeight: 800, color: WHITE, textTransform: "uppercase", lineHeight: 0.9, letterSpacing: "-0.01em", marginBottom: 48 }}>
           {event.name.toUpperCase()}
         </span>
 
