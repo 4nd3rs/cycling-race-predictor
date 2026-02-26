@@ -81,8 +81,27 @@ function truncate(text: string, max: number): string {
 
 // ─── PCS scraper (Instagram + photo fallback) ─────────────────────────────────
 
+/** Score how well an Instagram handle matches a rider name (higher = better personal match) */
+function instagramMatchScore(handle: string, riderName: string): number {
+  const h = handle.toLowerCase().replace(/[^a-z0-9]/g, "");
+  // Normalise rider name: "thomas-pidcock" → ["thomas","pidcock"], "Pidcock Thomas" → same
+  const words = riderName.toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, " ")
+    .split(/[\s-]+/)
+    .filter(w => w.length > 2);
+  let score = 0;
+  for (const word of words) {
+    if (h.includes(word)) score += word.length; // longer word matches count more
+  }
+  // Penalise obvious team/sponsor handles
+  const teamKeywords = ["team","cycling","pro","racing","procycling","velodrome","sport","club"];
+  if (teamKeywords.some(k => h.includes(k))) score -= 10;
+  return score;
+}
+
 async function scrapePcsRiderPage(
   pcsId: string,
+  riderName: string,
   browser: import("playwright").Browser
 ): Promise<{ instagram: string | null; photoUrl: string | null; nationality: string | null }> {
   const url = `https://www.procyclingstats.com/rider/${pcsId}`;
@@ -96,28 +115,28 @@ async function scrapePcsRiderPage(
     await page.waitForTimeout(1000);
 
     const data = await page.evaluate(() => {
-      let instagram: string | null = null;
+      const instagrams: string[] = [];
       let photoUrl: string | null = null;
       let nationality: string | null = null;
 
-      // Instagram: look for instagram.com links
+      // Collect ALL instagram.com links on page
       document.querySelectorAll("a[href*='instagram.com']").forEach(el => {
         const href = el.getAttribute("href") ?? "";
         const m = href.match(/instagram\.com\/([^/?#]+)/);
-        if (m && m[1] && m[1] !== "p" && !instagram) instagram = m[1];
+        if (m && m[1] && m[1] !== "p" && m[1] !== "explore") {
+          instagrams.push(m[1]);
+        }
       });
 
-      // Also check for icon links (some PCS pages use <i class="instagram-icon"> inside <a>)
-      if (!instagram) {
-        document.querySelectorAll("a").forEach(el => {
-          const icon = el.querySelector("[class*='instagram'], [class*='ig']");
-          if (icon) {
-            const href = el.getAttribute("href") ?? "";
-            const m = href.match(/instagram\.com\/([^/?#]+)/) || href.match(/^@?([a-zA-Z0-9._]+)$/);
-            if (m && m[1] && !instagram) instagram = m[1];
-          }
-        });
-      }
+      // Also check icon-based links
+      document.querySelectorAll("a").forEach(el => {
+        const icon = el.querySelector("[class*='instagram'], [class*='ig-icon']");
+        if (icon) {
+          const href = el.getAttribute("href") ?? "";
+          const m = href.match(/instagram\.com\/([^/?#]+)/);
+          if (m && m[1]) instagrams.push(m[1]);
+        }
+      });
 
       // Photo: rider profile image on PCS
       const img = document.querySelector(".rdr-img img, img.rdrphoto, .rider-info img, img[src*='rider']") as HTMLImageElement | null;
@@ -128,16 +147,29 @@ async function scrapePcsRiderPage(
         }
       }
 
-      // Nationality: from the flag icon or breadcrumb
+      // Nationality
       const natFlag = document.querySelector(".rdr-country img, .info-body img[title], .rdrflag");
       if (natFlag) {
         nationality = natFlag.getAttribute("title") ?? natFlag.getAttribute("alt") ?? null;
       }
 
-      return { instagram, photoUrl, nationality };
+      return { instagrams: [...new Set(instagrams)], photoUrl, nationality };
     });
 
-    return data;
+    // Pick the best-matching Instagram handle for this rider
+    let instagram: string | null = null;
+    if (data.instagrams.length === 1) {
+      instagram = data.instagrams[0];
+    } else if (data.instagrams.length > 1) {
+      // Score each handle — pick highest, but only if score > 0 (some name match)
+      const scored = data.instagrams.map(h => ({ h, score: instagramMatchScore(h, riderName + " " + pcsId) }));
+      scored.sort((a, b) => b.score - a.score);
+      console.log(`     🔎 ${data.instagrams.length} Instagram candidates: ${scored.map(s => `${s.h}(${s.score})`).join(", ")}`);
+      if (scored[0].score > 0) instagram = scored[0].h;
+      // If best score is 0 (no name match at all), skip — likely all team handles
+    }
+
+    return { instagram, photoUrl: data.photoUrl, nationality: data.nationality };
   } catch (err: any) {
     console.log(`     ⚠️ PCS scrape failed: ${err.message?.substring(0, 60)}`);
     return { instagram: null, photoUrl: null, nationality: null };
@@ -204,7 +236,7 @@ async function enrichRider(
 
   // Step 2: PCS scrape for Instagram handle (+ photo fallback)
   if (browser && rider.pcsId && !rider.instagramHandle) {
-    const pcs = await scrapePcsRiderPage(rider.pcsId, browser);
+    const pcs = await scrapePcsRiderPage(rider.pcsId, rider.name, browser);
     if (pcs.instagram) {
       updates.instagramHandle = pcs.instagram;
       steps.push(`instagram:@${pcs.instagram}`);
