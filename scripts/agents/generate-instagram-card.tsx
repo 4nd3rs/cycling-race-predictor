@@ -18,10 +18,11 @@ import React from "react";
 const args = process.argv.slice(2);
 const eventSlug = args[args.indexOf("--event") + 1] ?? null;
 const cardType: "preview" | "results" = (args[args.indexOf("--type") + 1] as any) ?? "preview";
-const outPath = args[args.indexOf("--out") + 1] ?? `/tmp/pcp-instagram-${cardType}-${Date.now()}.png`;
+const gender: "men" | "women" = (args[args.indexOf("--gender") + 1] as any) ?? "men";
+const outPath = args[args.indexOf("--out") + 1] ?? `/tmp/pcp-instagram-${cardType}-${gender}-${Date.now()}.png`;
 
 if (!eventSlug) {
-  console.error("Usage: tsx generate-instagram-card.tsx --event <slug> --type preview|results");
+  console.error("Usage: tsx generate-instagram-card.tsx --event <slug> --type preview|results [--gender men|women]");
   process.exit(1);
 }
 
@@ -75,7 +76,7 @@ async function fetchData(sql: ReturnType<typeof neon>) {
     SELECT id, name, date, uci_category, gender, age_category
     FROM races
     WHERE race_event_id = ${event.id} AND status = 'active'
-      AND gender = 'men' AND age_category = 'elite'
+      AND gender = ${gender} AND age_category = 'elite'
     ORDER BY date ASC LIMIT 1
   `;
 
@@ -176,7 +177,7 @@ function PreviewCard({ event, race, preds }: any) {
 
         {/* Eyebrow */}
         <span style={{ fontSize: 20, fontWeight: 700, color: RED, letterSpacing: "0.18em", fontFamily: "Inter", marginBottom: 24 }}>
-          RACE PREVIEW
+          {gender === "women" ? "WOMEN  ·  RACE PREVIEW" : "RACE PREVIEW"}
         </span>
 
         {/* Race name */}
@@ -263,7 +264,9 @@ function ResultsCard({ event, race, results }: any) {
       <div style={{ position: "absolute", left: 0, top: 8, bottom: 0, width: 8, background: RED }} />
 
       <div style={{ display: "flex", flexDirection: "column", padding: "72px 72px 0 88px", flex: 1 }}>
-        <span style={{ fontSize: 20, fontWeight: 700, color: RED, letterSpacing: "0.18em", fontFamily: "Inter", marginBottom: 24 }}>RESULTS</span>
+        <span style={{ fontSize: 20, fontWeight: 700, color: RED, letterSpacing: "0.18em", fontFamily: "Inter", marginBottom: 24 }}>
+          {gender === "women" ? "WOMEN  ·  RESULTS" : "RESULTS"}
+        </span>
 
         <span style={{ fontSize: event.name.length > 35 ? 88 : event.name.length > 24 ? 104 : 126, fontWeight: 800, color: WHITE, textTransform: "uppercase", lineHeight: 0.9, letterSpacing: "-0.01em", marginBottom: 48 }}>
           {event.name.toUpperCase()}
@@ -312,7 +315,7 @@ function ResultsCard({ event, race, results }: any) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
-  console.log(`Generating ${cardType} card for: ${eventSlug}`);
+  console.log(`Generating ${cardType} card for: ${eventSlug} (${gender})`);
 
   const [barlowBold, barlowSemibold, interRegular] = await Promise.all([
     loadGoogleFont("Barlow Condensed", 800),
