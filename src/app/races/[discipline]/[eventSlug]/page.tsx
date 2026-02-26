@@ -19,7 +19,7 @@ import {
   raceEvents,
   raceNews,
 } from "@/lib/db";
-import { eq, and, or, inArray, desc, isNotNull, isNull, asc, sql as sqlFn } from "drizzle-orm";
+import { eq, and, or, desc, isNotNull, isNull, asc, sql as sqlFn } from "drizzle-orm";
 import { format, formatDistanceToNow } from "date-fns";
 import {
   isValidDiscipline,
@@ -146,24 +146,23 @@ async function getTopPredictions(raceId: string, limit = 5) {
   } catch { return []; }
 }
 
-async function getRaceIntelForRaces(raceIds: string[]) {
-  if (!raceIds.length) return [];
+async function getRaceIntel(raceId: string) {
   try {
     const rows = await db
       .select({ rumour: riderRumours, rider: riders })
       .from(riderRumours)
       .innerJoin(riders, eq(riderRumours.riderId, riders.id))
       .innerJoin(raceStartlist, eq(raceStartlist.riderId, riders.id))
-      .where(and(inArray(raceStartlist.raceId, raceIds), isNotNull(riderRumours.summary)))
+      .where(and(eq(raceStartlist.raceId, raceId), isNotNull(riderRumours.summary)))
       .orderBy(desc(riderRumours.lastUpdated))
-      .limit(20);
+      .limit(10);
     // Deduplicate by rider
     const seen = new Set<string>();
     return rows.filter(({ rider }) => {
       if (seen.has(rider.id)) return false;
       seen.add(rider.id);
       return true;
-    }).slice(0, 8);
+    }).slice(0, 3);
   } catch { return []; }
 }
 
@@ -243,12 +242,10 @@ export default async function EventPage({ params }: PageProps) {
 
   const eliteRaces = sorted.filter(c => c.race.ageCategory === "elite");
   const otherRaces = sorted.filter(c => c.race.ageCategory !== "elite");
-  const eliteRaceIds = eliteRaces.map(c => c.race.id);
-
-  // Fetch predictions + intel + per-race news for elite races
-  const [predictionsPerRace, raceIntel, newsPerRace] = await Promise.all([
+  // Fetch predictions + intel + per-race news for elite races (all per-race, no cross-contamination)
+  const [predictionsPerRace, intelPerRace, newsPerRace] = await Promise.all([
     Promise.all(eliteRaces.map(c => getTopPredictions(c.race.id, 5))),
-    getRaceIntelForRaces(eliteRaceIds),
+    Promise.all(eliteRaces.map(c => getRaceIntel(c.race.id))),
     Promise.all(eliteRaces.map(c => getRaceSpecificNews(event.id, c.race.id))),
   ]);
 
@@ -443,9 +440,7 @@ export default async function EventPage({ params }: PageProps) {
                 {eliteRaces.map(({ race, riderCount }, idx) => {
                   const topPicks = predictionsPerRace[idx] ?? [];
                   const raceNews = newsPerRace[idx] ?? [];
-                  // Intel filtered to riders in this specific race's predictions
-                  const raceRiderIds = new Set(topPicks.map(p => p.rider.id));
-                  const intel = raceIntel.filter(({ rider }) => raceRiderIds.has(rider.id)).slice(0, 3);
+                  const intel = intelPerRace[idx] ?? [];
                   const categorySlug = race.categorySlug ||
                     (race.ageCategory && race.gender ? generateCategorySlug(race.ageCategory, race.gender) : null);
                   const href = categorySlug ? buildCategoryUrl(discipline, eventSlug, categorySlug) : `/races/${race.id}`;
