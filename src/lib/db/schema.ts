@@ -487,6 +487,7 @@ export const raceNews = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     raceEventId: uuid("race_event_id").notNull(),
+    raceId: uuid("race_id"), // Optional: links to a specific race (e.g. men's or women's)
     title: text("title").notNull(),
     summary: text("summary"),
     url: text("url"),

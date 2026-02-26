@@ -162,8 +162,9 @@ async function syncStartlistForRace(race: { id: string; name: string; pcsUrl: st
       // Note: PCS uses relative hrefs ("rider/slug") — match with href*="rider/" not "/rider/"
       const teamEls = document.querySelectorAll(".startlist_v4 > li");
       teamEls.forEach((teamEl) => {
-        const teamNameEl = teamEl.querySelector("b, .team-name, h3, a[href*='team/']");
-        const teamName = teamNameEl?.textContent?.trim() || null;
+        // PCS team name is in <a class="team" href="team/..."> (second link, first is jersey img)
+        const teamNameEl = teamEl.querySelector("a.team[href*='team/'], b, .team-name, h3");
+        const teamName = teamNameEl?.textContent?.trim()?.replace(/\s*\(WT\)|\s*\(PRT\)|\s*\(CT\)/gi, '').trim() || null;
         teamEl.querySelectorAll(".ridersCont li, ul li").forEach((riderEl) => {
           const link = riderEl.querySelector("a[href*='rider/']") as HTMLAnchorElement | null;
           if (!link) return;
@@ -245,8 +246,10 @@ async function syncStartlistForRace(race: { id: string; name: string; pcsUrl: st
         });
         inserted++;
       } else {
-        // Update bib/team if changed
-        if (entry.bibNumber && existing.bibNumber !== entry.bibNumber) {
+        // Update bib/team if changed or team was previously missing
+        const bibChanged = entry.bibNumber && existing.bibNumber !== entry.bibNumber;
+        const teamMissing = teamId && !existing.teamId;
+        if (bibChanged || teamMissing) {
           await db.update(schema.raceStartlist)
             .set({ teamId: teamId || undefined, bibNumber: entry.bibNumber || undefined })
             .where(eq(schema.raceStartlist.id, existing.id));

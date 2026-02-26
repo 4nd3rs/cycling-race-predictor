@@ -19,7 +19,7 @@ import {
   raceEvents,
   raceNews,
 } from "@/lib/db";
-import { eq, and, inArray, desc, isNotNull, asc, sql as sqlFn } from "drizzle-orm";
+import { eq, and, or, inArray, desc, isNotNull, isNull, asc, sql as sqlFn } from "drizzle-orm";
 import { format, formatDistanceToNow } from "date-fns";
 import {
   isValidDiscipline,
@@ -178,6 +178,21 @@ async function getEventNews(eventId: string) {
   } catch { return []; }
 }
 
+async function getRaceSpecificNews(eventId: string, raceId: string) {
+  try {
+    // Returns articles linked to this specific race, OR neutral articles (race_id IS NULL = applies to all)
+    return await db
+      .select()
+      .from(raceNews)
+      .where(and(
+        eq(raceNews.raceEventId, eventId),
+        or(eq(raceNews.raceId, raceId), isNull(raceNews.raceId))
+      ))
+      .orderBy(desc(raceNews.publishedAt))
+      .limit(3);
+  } catch { return []; }
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function countryToFlag(code?: string | null) {
@@ -230,10 +245,11 @@ export default async function EventPage({ params }: PageProps) {
   const otherRaces = sorted.filter(c => c.race.ageCategory !== "elite");
   const eliteRaceIds = eliteRaces.map(c => c.race.id);
 
-  // Fetch predictions + intel for elite races
-  const [predictionsPerRace, raceIntel] = await Promise.all([
+  // Fetch predictions + intel + per-race news for elite races
+  const [predictionsPerRace, raceIntel, newsPerRace] = await Promise.all([
     Promise.all(eliteRaces.map(c => getTopPredictions(c.race.id, 5))),
     getRaceIntelForRaces(eliteRaceIds),
+    Promise.all(eliteRaces.map(c => getRaceSpecificNews(event.id, c.race.id))),
   ]);
 
   const wx = weather ? wmoToEmoji(weather.weatherCode) : null;
@@ -303,6 +319,27 @@ export default async function EventPage({ params }: PageProps) {
                 )}
 
                 <TelegramSubscribeButton />
+
+                {/* Quick-nav to Men / Women race categories */}
+                {eliteRaces.length > 0 && (
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {eliteRaces.map(({ race }) => {
+                      const categorySlug = race.categorySlug ||
+                        (race.ageCategory && race.gender ? `${race.ageCategory}-${race.gender}` : null);
+                      const href = categorySlug
+                        ? `/races/${discipline}/${eventSlug}/${categorySlug}`
+                        : `/races/${race.id}`;
+                      const label = race.gender === "women" ? "♀ Elite Women" : "♂ Elite Men";
+                      return (
+                        <Link key={race.id} href={href}
+                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors">
+                          {label}
+                          <span className="opacity-70">→</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Right: weather card */}
@@ -405,9 +442,10 @@ export default async function EventPage({ params }: PageProps) {
               <div className={`grid gap-6 ${eliteRaces.length >= 2 ? "lg:grid-cols-2" : ""}`}>
                 {eliteRaces.map(({ race, riderCount }, idx) => {
                   const topPicks = predictionsPerRace[idx] ?? [];
-                  const intel = raceIntel.filter(
-                    ({ rider }) => raceStartlist && true // we'll show all intel shared between races
-                  ).slice(0, 3);
+                  const raceNews = newsPerRace[idx] ?? [];
+                  // Intel filtered to riders in this specific race's predictions
+                  const raceRiderIds = new Set(topPicks.map(p => p.rider.id));
+                  const intel = raceIntel.filter(({ rider }) => raceRiderIds.has(rider.id)).slice(0, 3);
                   const categorySlug = race.categorySlug ||
                     (race.ageCategory && race.gender ? generateCategorySlug(race.ageCategory, race.gender) : null);
                   const href = categorySlug ? buildCategoryUrl(discipline, eventSlug, categorySlug) : `/races/${race.id}`;
@@ -460,12 +498,12 @@ export default async function EventPage({ params }: PageProps) {
                           )}
                         </div>
 
-                        {/* Rider Intel */}
-                        {raceIntel.length > 0 && (
+                        {/* Rider Intel (per-race filtered) */}
+                        {intel.length > 0 && (
                           <div>
                             <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">🔍 Rider Intel</h3>
                             <div className="space-y-2">
-                              {raceIntel.slice(0, 3).map(({ rider, rumour }) => {
+                              {intel.map(({ rider, rumour }) => {
                                 const score = parseFloat(rumour.aggregateScore || "0");
                                 const sentiment = score > 0.3
                                   ? { label: "FORM ✓", cls: "bg-green-500/15 text-green-400" }
@@ -489,6 +527,27 @@ export default async function EventPage({ params }: PageProps) {
                                   </div>
                                 );
                               })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Latest News (gender-specific) */}
+                        {raceNews.length > 0 && (
+                          <div>
+                            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">📰 Latest News</h3>
+                            <div className="space-y-2">
+                              {raceNews.slice(0, 2).map((article) => (
+                                <a key={article.id} href={article.url || "#"} target="_blank" rel="noopener noreferrer"
+                                  className="flex gap-2.5 items-start hover:bg-muted/30 rounded-lg p-1.5 -m-1.5 transition-colors group">
+                                  {article.imageUrl && (
+                                    <div className="w-14 h-10 rounded overflow-hidden shrink-0 bg-muted/30">
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                                      <img src={article.imageUrl} alt="" className="w-full h-full object-cover" />
+                                    </div>
+                                  )}
+                                  <p className="text-[11px] leading-snug line-clamp-2 group-hover:text-primary transition-colors">{article.title}</p>
+                                </a>
+                              ))}
                             </div>
                           </div>
                         )}

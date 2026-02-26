@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { db, races, predictions, riders, raceStartlist, riderDisciplineStats, raceResults, riderRumours, teams, raceEvents, raceNews } from "@/lib/db";
-import { eq, desc, and, gte, ne, inArray } from "drizzle-orm";
+import { eq, desc, and, or, gte, ne, inArray, isNull } from "drizzle-orm";
 import { format, formatDistanceToNow } from "date-fns";
 import { generateRacePredictions, calculateForm, type RiderPredictionInput, type RecentResult, RACE_CATEGORY_WEIGHTS, type ProfileType } from "@/lib/prediction";
 import { formatCategoryDisplay } from "@/lib/category-utils";
@@ -489,12 +489,16 @@ async function getRaceIntel(raceId: string) {
   }
 }
 
-async function getRaceNews(eventId: string) {
+async function getRaceNews(eventId: string, raceId?: string) {
   try {
+    // If raceId is provided, filter to articles for this specific race OR neutral articles (race_id IS NULL)
+    const whereClause = raceId
+      ? and(eq(raceNews.raceEventId, eventId), or(eq(raceNews.raceId, raceId), isNull(raceNews.raceId)))
+      : eq(raceNews.raceEventId, eventId);
     return await db
       .select()
       .from(raceNews)
-      .where(eq(raceNews.raceEventId, eventId))
+      .where(whereClause)
       .orderBy(desc(raceNews.publishedAt))
       .limit(6);
   } catch {
@@ -576,7 +580,7 @@ export default async function CategoryPage({ params }: PageProps) {
   const [raceIntel, weather, latestNews] = await Promise.all([
     getRaceIntel(race.id),
     getRaceWeather(event.country, race.date),
-    getRaceNews(event.id),
+    getRaceNews(event.id, race.id),
   ]);
 
   // Get predictions
@@ -1052,8 +1056,9 @@ export default async function CategoryPage({ params }: PageProps) {
             {startlist.length > 0 ? (
               <div className="border rounded-lg divide-y">
                 {(() => {
-                  // ── ROAD: group by team ────────────────────────────────
-                  if (discipline === "road" && !isSuperCup) {
+                  // ── ROAD: group by team (only if team data exists) ─────
+                  const hasTeamData = startlist.some(row => row.team?.name);
+                  if (discipline === "road" && !isSuperCup && hasTeamData) {
                     const byTeam = startlist.reduce<Record<string, typeof startlist>>((acc, row) => {
                       const key = row.team?.name || "Unknown Team";
                       if (!acc[key]) acc[key] = [];
