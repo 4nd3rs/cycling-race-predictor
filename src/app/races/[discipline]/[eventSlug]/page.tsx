@@ -476,7 +476,7 @@ export default async function EventPage({ params }: PageProps) {
                                   </Link>
                                   {prediction.winProbability != null && Number(prediction.winProbability) > 0 && (
                                     <span className="text-xs text-muted-foreground shrink-0 font-mono">
-                                      {Number(prediction.winProbability).toFixed(1)}%
+                                      {(Number(prediction.winProbability) * 100).toFixed(1)}%
                                     </span>
                                   )}
                                 </div>
