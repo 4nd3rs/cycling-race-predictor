@@ -1,6 +1,16 @@
 # SCRAPE_STATUS.md — Pipeline Status
 
-_Last updated: 2026-02-26 21:28:48 (Stockholm)_
+_Last updated: 2026-02-26 22:05:39 (Stockholm)_
+
+## 📋 Startlists
+- **Last run:** 2026-02-26 22:05:39
+- **Status:** ✅ OK
+- 0 new riders added, 1 updated across 2 race(s)
+
+| Race | Date | Riders | Status | Scraped |
+|------|------|---------|--------|---------|
+| Omloop Het Nieuwsblad 2026 | 2026-02-28 | 175 | ✅ up to date | 2026-02-26 22:05:10 |
+| Omloop Nieuwsblad - Elite Women | 2026-02-28 | 136 | ✅ up to date | 2026-02-26 22:05:39 |
 
 ## 🏁 Results
 - **Last run:** 2026-02-26 21:28:48
@@ -36,6 +46,28 @@ _Last updated: 2026-02-26 21:28:48 (Stockholm)_
       }
     ],
     "updatedAt": "2026-02-26 21:28:48"
+  },
+  "startlists": {
+    "component": "startlists",
+    "status": "ok",
+    "summary": "0 new riders added, 1 updated across 2 race(s)",
+    "raceRows": [
+      {
+        "name": "Omloop Het Nieuwsblad 2026",
+        "date": "2026-02-28",
+        "count": 175,
+        "status": "✅ up to date",
+        "scrapedAt": "2026-02-26 22:05:10"
+      },
+      {
+        "name": "Omloop Nieuwsblad - Elite Women",
+        "date": "2026-02-28",
+        "count": 136,
+        "status": "✅ up to date",
+        "scrapedAt": "2026-02-26 22:05:39"
+      }
+    ],
+    "updatedAt": "2026-02-26 22:05:39"
   }
 }
 STATUS_JSON -->

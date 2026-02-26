@@ -188,11 +188,11 @@ function PreviewCard({ event, race, preds }: any) {
           {event.name.toUpperCase()}
         </span>
 
-        {/* Meta — text only, no emoji */}
-        <span style={{ fontSize: 24, fontWeight: 400, color: MUTED, letterSpacing: "0.06em", fontFamily: "Inter", marginBottom: 20 }}>
+        {/* Meta — red, no emoji */}
+        <span style={{ fontSize: 24, fontWeight: 700, color: RED, letterSpacing: "0.1em", fontFamily: "Inter", marginBottom: 12 }}>
           {metaParts}
         </span>
-        <span style={{ fontSize: 22, fontWeight: 400, color: MUTED, fontFamily: "Inter", marginBottom: 52 }}>
+        <span style={{ fontSize: 22, fontWeight: 400, color: RED, fontFamily: "Inter", marginBottom: 52, opacity: 0.7 }}>
           {race?.date ? fmtDate(race.date) : ""}
         </span>
 
@@ -269,10 +269,10 @@ function ResultsCard({ event, race, results }: any) {
           {event.name.toUpperCase()}
         </span>
 
-        <span style={{ fontSize: 24, fontWeight: 400, color: MUTED, letterSpacing: "0.06em", fontFamily: "Inter", marginBottom: 16 }}>
+        <span style={{ fontSize: 24, fontWeight: 700, color: RED, letterSpacing: "0.1em", fontFamily: "Inter", marginBottom: 12 }}>
           {[country, discipline].filter(Boolean).join("  ·  ")}
         </span>
-        <span style={{ fontSize: 22, fontWeight: 400, color: MUTED, fontFamily: "Inter", marginBottom: 52 }}>
+        <span style={{ fontSize: 22, fontWeight: 400, color: RED, fontFamily: "Inter", marginBottom: 52, opacity: 0.7 }}>
           {race?.date ? fmtDate(race.date) : ""}
         </span>
 
