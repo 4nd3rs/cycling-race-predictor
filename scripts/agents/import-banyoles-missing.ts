@@ -151,7 +151,7 @@ async function findOrCreateRider(name: string): Promise<string> {
   }
 
   const id = randomUUID();
-  await db.insert(riders).values({ id, name, discipline: "mtb", nationality: null });
+  await db.insert(riders).values({ id, name });
   return id;
 }
 
