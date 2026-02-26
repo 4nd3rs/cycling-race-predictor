@@ -19,7 +19,7 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-t-2 border-primary bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/90">
-      <div className="container mx-auto flex h-14 items-center px-4 sm:px-6 lg:px-8 max-w-6xl">
+      <div className="container mx-auto flex h-16 items-center px-4 sm:px-6 lg:px-8 max-w-6xl">
 
         {/* Left: Brand */}
         <div className="mr-6 flex shrink-0">
@@ -28,16 +28,16 @@ export function Header() {
             <Image
               src="/logo-square.png"
               alt="Pro Cycling Predictor"
-              width={32}
-              height={32}
+              width={44}
+              height={44}
               className="rounded-sm"
             />
             {/* Wordmark */}
             <div className="flex flex-col leading-none">
-              <span className="font-display text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              <span className="font-display text-[13px] font-semibold uppercase tracking-[0.12em] text-foreground">
                 Pro Cycling
               </span>
-              <span className="font-display text-[18px] font-extrabold uppercase tracking-tight text-primary leading-none">
+              <span className="font-display text-[22px] font-extrabold uppercase tracking-tight text-primary leading-none">
                 Predictor
               </span>
             </div>
