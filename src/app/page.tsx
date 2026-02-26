@@ -364,7 +364,9 @@ function NextRaceHero({ event: ev }: { event: HomepageEvent }) {
           </div>
 
           <h1 className="text-3xl font-black tracking-tight sm:text-4xl md:text-5xl">
-            {ev.name}
+            <Link href={url} className="hover:text-primary transition-colors">
+              {ev.name}
+            </Link>
           </h1>
 
           <div className="flex flex-wrap items-center gap-3 text-muted-foreground">

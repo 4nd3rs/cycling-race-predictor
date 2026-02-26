@@ -165,34 +165,7 @@ export function RaceLinksSection({ links }: { links: ExternalLinks }) {
         </div>
       )}
 
-      {/* Streaming / TV options */}
-      {links.liveStream && links.liveStream.length > 0 && (
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-            Watch Live
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {links.liveStream.map((s, i) => (
-              <a
-                key={i}
-                href={s.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors border ${
-                  s.free
-                    ? 'bg-green-500/10 border-green-500/30 text-green-400 hover:bg-green-500/20'
-                    : 'bg-muted/50 border-border/60 text-muted-foreground hover:text-foreground hover:border-border'
-                }`}
-              >
-                <TVIcon className="h-3 w-3" />
-                {s.name}
-                {s.regions && <span className="opacity-60">· {s.regions}</span>}
-                {s.free && <span className="text-[10px] font-bold text-green-400">FREE</span>}
-              </a>
-            ))}
-          </div>
-        </div>
-      )}
+
     </div>
   );
 }
