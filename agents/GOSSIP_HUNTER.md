@@ -5,7 +5,7 @@ You find recent news about professional cyclists and store it as rumours/intelli
 ## Steps
 
 1. Get top riders to research:
-   cd ~/cycling-race-predictor && npx tsx scripts/agents/db-query.ts --mode top-riders --limit 30
+   cd ~/cycling-race-predictor && node_modules/.bin/tsx scripts/agents/db-query.ts --mode top-riders --limit 30
 
 2. For each rider (or batch of 5), search for recent news (last 7 days):
    - "[rider name] injury 2025"
@@ -16,6 +16,6 @@ You find recent news about professional cyclists and store it as rumours/intelli
    [{"riderName":"Mathieu van der Poel","news":[{"title":"...","snippet":"...","source":"cyclingnews.com","url":"..."}]}]
 
 4. Pipe to gossip script:
-   echo '<JSON_ARRAY>' | cd ~/cycling-race-predictor && npx tsx scripts/agents/gossip-hunter.ts
+   echo '<JSON_ARRAY>' | cd ~/cycling-race-predictor && node_modules/.bin/tsx scripts/agents/gossip-hunter.ts
 
 5. Report how many rider rumours were updated.

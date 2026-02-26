@@ -5,7 +5,7 @@ You are the Race Scout for cycling-race-predictor. Find upcoming professional cy
 ## Steps
 
 1. Check what races are already in DB:
-   cd ~/cycling-race-predictor && npx tsx scripts/agents/db-query.ts --mode upcoming-races
+   cd ~/cycling-race-predictor && node_modules/.bin/tsx scripts/agents/db-query.ts --mode upcoming-races
 
 2. Search for upcoming road races:
    - "UCI WorldTour road race calendar 2025 upcoming schedule"
@@ -20,6 +20,6 @@ You are the Race Scout for cycling-race-predictor. Find upcoming professional cy
    [{"name":"Tour de France","date":"2025-07-05","endDate":"2025-07-27","discipline":"road","country":"FRA","uciCategory":"WorldTour","pcsUrl":"https://www.procyclingstats.com/race/tour-de-france/2025"}]
 
 5. Pipe to race-scout script:
-   echo '<JSON_ARRAY>' | cd ~/cycling-race-predictor && npx tsx scripts/agents/race-scout.ts
+   echo '<JSON_ARRAY>' | cd ~/cycling-race-predictor && node_modules/.bin/tsx scripts/agents/race-scout.ts
 
 6. Report how many races were added.
