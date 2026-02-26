@@ -10,6 +10,7 @@ import {
   predictions,
   riders,
   raceStartlist,
+  raceResults,
   riderRumours,
   raceEvents,
   raceNews,
@@ -111,18 +112,18 @@ async function getEventCategories(eventId: string) {
 
     return Promise.all(
       eventRaces.map(async (race) => {
-        const [sl] = await db
-          .select({ count: sqlFn<number>`count(*)` })
-          .from(raceStartlist)
-          .where(eq(raceStartlist.raceId, race.id));
-        const [res] = await db
-          .select({ count: sqlFn<number>`count(*)` })
-          .from(raceStartlist) // will still show 0 if no startlist
-          .where(eq(raceStartlist.raceId, race.id));
+        const [[sl], [res]] = await Promise.all([
+          db.select({ count: sqlFn<number>`count(*)` })
+            .from(raceStartlist)
+            .where(eq(raceStartlist.raceId, race.id)),
+          db.select({ count: sqlFn<number>`count(*)` })
+            .from(raceResults)
+            .where(eq(raceResults.raceId, race.id)),
+        ]);
         return {
           race,
           riderCount: Number(sl?.count) || 0,
-          resultCount: 0,
+          resultCount: Number(res?.count) || 0,
         };
       })
     );
@@ -137,6 +138,18 @@ async function getTopPredictions(raceId: string, limit = 5) {
       .innerJoin(riders, eq(predictions.riderId, riders.id))
       .where(eq(predictions.raceId, raceId))
       .orderBy(asc(predictions.predictedPosition))
+      .limit(limit);
+  } catch { return []; }
+}
+
+async function getTopResults(raceId: string, limit = 5) {
+  try {
+    return await db
+      .select({ result: raceResults, rider: riders })
+      .from(raceResults)
+      .innerJoin(riders, eq(raceResults.riderId, riders.id))
+      .where(and(eq(raceResults.raceId, raceId), isNotNull(raceResults.position)))
+      .orderBy(asc(raceResults.position))
       .limit(limit);
   } catch { return []; }
 }
@@ -204,6 +217,8 @@ function countryToFlag(code?: string | null) {
 }
 
 const MEDALS = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"];
+const PODIUM_RING = ["ring-yellow-400", "ring-gray-300", "ring-amber-500"];
+const PODIUM_BADGE = ["bg-yellow-500 text-yellow-950", "bg-gray-300 text-gray-800", "bg-amber-600 text-amber-50"];
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -236,9 +251,10 @@ export default async function EventPage({ params }: PageProps) {
 
   const eliteRaces = sorted.filter(c => c.race.ageCategory === "elite");
   const otherRaces = sorted.filter(c => c.race.ageCategory !== "elite");
-  // Fetch predictions + intel + per-race news for elite races (all per-race, no cross-contamination)
-  const [predictionsPerRace, intelPerRace, newsPerRace] = await Promise.all([
+  // Fetch predictions + results + intel + per-race news for elite races
+  const [predictionsPerRace, resultsPerRace, intelPerRace, newsPerRace] = await Promise.all([
     Promise.all(eliteRaces.map(c => getTopPredictions(c.race.id, 5))),
+    Promise.all(eliteRaces.map(c => getTopResults(c.race.id, 5))),
     Promise.all(eliteRaces.map(c => getRaceIntel(c.race.id))),
     Promise.all(eliteRaces.map(c => getRaceSpecificNews(event.id, c.race.id))),
   ]);
@@ -429,16 +445,25 @@ export default async function EventPage({ params }: PageProps) {
         {eliteRaces.length > 0 && (
           <section className="border-b border-border/50">
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-6">
-              <h2 className="text-lg font-bold mb-4">🏁 Race Preview</h2>
+              {(() => {
+                const anyCompleted = eliteRaces.some(c => c.race.status === "completed" || c.resultCount > 0);
+                const allCompleted = eliteRaces.every(c => c.race.status === "completed" || c.resultCount > 0);
+                return (
+                  <h2 className="text-lg font-bold mb-4">
+                    {allCompleted ? "🏆 Results" : anyCompleted ? "🏁 Results & Preview" : "🏁 Race Preview"}
+                  </h2>
+                );
+              })()}
               <div className={`grid gap-6 ${eliteRaces.length >= 2 ? "lg:grid-cols-2" : ""}`}>
-                {eliteRaces.map(({ race, riderCount }, idx) => {
+                {eliteRaces.map(({ race, riderCount, resultCount }, idx) => {
                   const topPicks = predictionsPerRace[idx] ?? [];
+                  const topResults = resultsPerRace[idx] ?? [];
                   const raceNews = newsPerRace[idx] ?? [];
                   const intel = intelPerRace[idx] ?? [];
                   const categorySlug = race.categorySlug ||
                     (race.ageCategory && race.gender ? generateCategorySlug(race.ageCategory, race.gender) : null);
                   const href = categorySlug ? buildCategoryUrl(discipline, eventSlug, categorySlug) : `/races/${race.id}`;
-                  const hasResults = false; // simplified; would need results query
+                  const hasResults = race.status === "completed" || resultCount > 0;
                   const genderEmoji = race.gender === "women" ? "♀" : "♂";
                   const genderLabel = race.gender === "women" ? "Elite Women" : "Elite Men";
 
@@ -462,28 +487,60 @@ export default async function EventPage({ params }: PageProps) {
                       </div>
 
                       <div className="p-4 flex flex-col gap-4 flex-1">
-                        {/* Top Contenders */}
+                        {/* Top Results (completed) or Top Contenders (upcoming) */}
                         <div>
-                          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">🏆 Top Contenders</h3>
-                          {topPicks.length > 0 ? (
-                            <div className="space-y-1.5">
-                              {topPicks.map(({ prediction, rider }, i) => (
-                                <div key={rider.id} className="flex items-center gap-2 text-sm">
-                                  <span className="text-base w-6 shrink-0 text-center">{MEDALS[i]}</span>
-                                  <span className="shrink-0">{countryToFlag(rider.nationality)}</span>
-                                  <Link href={`/riders/${rider.id}`} className="font-medium truncate hover:text-primary transition-colors flex-1">
-                                    {rider.name}
-                                  </Link>
-                                  {prediction.winProbability != null && Number(prediction.winProbability) > 0 && (
-                                    <span className="text-xs shrink-0 font-semibold text-amber-600 dark:text-amber-400">
-                                      ★ {(Number(prediction.winProbability) * 100).toFixed(1)}% win
-                                    </span>
-                                  )}
+                          {hasResults ? (
+                            <>
+                              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">🏆 Results</h3>
+                              {topResults.length > 0 ? (
+                                <div className="space-y-1.5">
+                                  {topResults.map(({ result, rider }, i) => (
+                                    <div key={rider.id} className="flex items-center gap-2 text-sm">
+                                      <span className="text-base w-6 shrink-0 text-center">{MEDALS[i] ?? `${result.position}.`}</span>
+                                      <span className="shrink-0">{countryToFlag(rider.nationality)}</span>
+                                      <Link href={`/riders/${rider.id}`} className="font-medium truncate hover:text-primary transition-colors flex-1">
+                                        {rider.name}
+                                      </Link>
+                                      {result.timeSeconds != null && result.position === 1 && (
+                                        <span className="text-xs shrink-0 text-muted-foreground font-mono">
+                                          {[
+                                            Math.floor(result.timeSeconds / 3600),
+                                            Math.floor((result.timeSeconds % 3600) / 60),
+                                            result.timeSeconds % 60,
+                                          ].map(n => String(n).padStart(2, "0")).join(":")}
+                                        </span>
+                                      )}
+                                    </div>
+                                  ))}
                                 </div>
-                              ))}
-                            </div>
+                              ) : (
+                                <p className="text-xs text-muted-foreground italic">Results not yet available</p>
+                              )}
+                            </>
                           ) : (
-                            <p className="text-xs text-muted-foreground italic">Predictions loading...</p>
+                            <>
+                              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">🏆 Top Contenders</h3>
+                              {topPicks.length > 0 ? (
+                                <div className="space-y-1.5">
+                                  {topPicks.map(({ prediction, rider }, i) => (
+                                    <div key={rider.id} className="flex items-center gap-2 text-sm">
+                                      <span className="text-base w-6 shrink-0 text-center">{MEDALS[i]}</span>
+                                      <span className="shrink-0">{countryToFlag(rider.nationality)}</span>
+                                      <Link href={`/riders/${rider.id}`} className="font-medium truncate hover:text-primary transition-colors flex-1">
+                                        {rider.name}
+                                      </Link>
+                                      {prediction.winProbability != null && Number(prediction.winProbability) > 0 && (
+                                        <span className="text-xs shrink-0 font-semibold text-amber-600 dark:text-amber-400">
+                                          ★ {(Number(prediction.winProbability) * 100).toFixed(1)}% win
+                                        </span>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-xs text-muted-foreground italic">Predictions loading...</p>
+                              )}
+                            </>
                           )}
                         </div>
 
@@ -586,7 +643,7 @@ export default async function EventPage({ params }: PageProps) {
                       {/* CTA */}
                       <Link href={href}
                         className="flex items-center justify-between px-4 py-3 border-t border-border/30 bg-muted/10 hover:bg-muted/30 transition-colors text-sm font-medium text-primary group">
-                        <span>Full analysis, startlist &amp; predictions</span>
+                        <span>{hasResults ? "Full results & analysis" : "Full analysis, startlist & predictions"}</span>
                         <span className="group-hover:translate-x-0.5 transition-transform">→</span>
                       </Link>
                     </div>
