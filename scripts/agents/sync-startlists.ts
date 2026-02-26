@@ -229,15 +229,40 @@ async function syncStartlistForRace(race: { id: string; name: string; pcsUrl: st
         teamId!
       );
 
-      // Check if already in startlist
-      const existing = await db.query.raceStartlist.findFirst({
+      // Check if already in startlist by rider
+      const existingByRider = await db.query.raceStartlist.findFirst({
         where: and(
           eq(schema.raceStartlist.raceId, race.id),
           eq(schema.raceStartlist.riderId, riderId)
         ),
       });
 
-      if (!existing) {
+      // Guard: null-bib entry when rider already exists → skip entirely
+      // This prevents the cron from re-adding ghost entries
+      if (!entry.bibNumber && existingByRider) {
+        continue;
+      }
+
+      // If incoming bib is set, check if another row already has this bib for the race
+      if (entry.bibNumber) {
+        const existingByBib = await db.query.raceStartlist.findFirst({
+          where: and(
+            eq(schema.raceStartlist.raceId, race.id),
+            eq(schema.raceStartlist.bibNumber, entry.bibNumber)
+          ),
+        });
+        if (existingByBib && existingByBib.riderId !== riderId) {
+          // Bib collision with a different rider — update existing bib row
+          await db.update(schema.raceStartlist)
+            .set({ riderId, teamId: teamId || undefined })
+            .where(eq(schema.raceStartlist.id, existingByBib.id));
+          updated++;
+          await ensureDisciplineStats(riderId, raceDiscipline, raceAgeCategory, raceGender);
+          continue;
+        }
+      }
+
+      if (!existingByRider) {
         await db.insert(schema.raceStartlist).values({
           raceId: race.id,
           riderId,
@@ -247,12 +272,12 @@ async function syncStartlistForRace(race: { id: string; name: string; pcsUrl: st
         inserted++;
       } else {
         // Update bib/team if changed or team was previously missing
-        const bibChanged = entry.bibNumber && existing.bibNumber !== entry.bibNumber;
-        const teamMissing = teamId && !existing.teamId;
+        const bibChanged = entry.bibNumber && existingByRider.bibNumber !== entry.bibNumber;
+        const teamMissing = teamId && !existingByRider.teamId;
         if (bibChanged || teamMissing) {
           await db.update(schema.raceStartlist)
             .set({ teamId: teamId || undefined, bibNumber: entry.bibNumber || undefined })
-            .where(eq(schema.raceStartlist.id, existing.id));
+            .where(eq(schema.raceStartlist.id, existingByRider.id));
           updated++;
         }
       }
