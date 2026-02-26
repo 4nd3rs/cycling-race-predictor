@@ -219,16 +219,18 @@ function TeamTableRow({ team, rank }: { team: TeamRow; rank: number }) {
 
   const badge = divisionBadge(team.divisionCode);
   const href = team.slug ? `/teams/${team.slug}` : `/teams/${team.id}`;
+  const flag = countryFlag(team.country);
 
   return (
     <tr className="border-b border-white/5 hover:bg-white/5 transition-colors group">
-      <td className={`px-4 py-3 text-sm w-10 text-center ${rankStyle}`}>
+      {/* Rank */}
+      <td className={`pl-4 pr-2 py-3 text-sm w-8 text-center shrink-0 ${rankStyle}`}>
         {rank <= 3 ? ["🥇", "🥈", "🥉"][rank - 1] : rank}
       </td>
-      <td className="px-4 py-3">
-        <Link href={href} className="flex items-center gap-3 group-hover:text-white transition-colors">
-          {/* Team initials */}
-          <div className="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 bg-white/10 flex items-center justify-center text-[10px] font-black text-white/70">
+      {/* Team name */}
+      <td className="px-2 py-3 w-full">
+        <Link href={href} className="flex items-center gap-2.5 group-hover:text-white transition-colors min-w-0">
+          <div className="w-7 h-7 rounded-md shrink-0 bg-white/10 flex items-center justify-center text-[9px] font-black text-white/60">
             {team.cleanName
               .split(/[\s\-|]+/)
               .filter(Boolean)
@@ -236,35 +238,24 @@ function TeamTableRow({ team, rank }: { team: TeamRow; rank: number }) {
               .map((w) => w[0]?.toUpperCase() || "")
               .join("")}
           </div>
-          <div className="min-w-0">
-            <span className="font-medium text-sm block truncate max-w-[180px] xl:max-w-[220px]">
-              {team.cleanName}
-            </span>
+          <div className="min-w-0 flex items-center gap-1.5 flex-wrap">
+            <span className="font-medium text-sm truncate">{team.cleanName}</span>
+            {flag && <span className="text-sm shrink-0">{flag}</span>}
             {badge && (
-              <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${badge.cls}`}>
+              <span className={`text-[9px] px-1 py-0.5 rounded font-semibold shrink-0 ${badge.cls}`}>
                 {badge.label}
               </span>
             )}
           </div>
         </Link>
       </td>
-      <td className="px-4 py-3 text-sm text-center">
-        <span>{countryFlag(team.country)}</span>
-      </td>
-      <td className="px-4 py-3 text-sm text-center text-muted-foreground">
+      {/* Riders */}
+      <td className="px-3 py-3 text-sm text-center text-muted-foreground w-14 shrink-0 whitespace-nowrap">
         {team.riderCount || "—"}
       </td>
-      <td className={`px-4 py-3 text-sm text-right font-mono font-semibold ${eloColor(team.avgElo)}`}>
+      {/* Avg ELO */}
+      <td className={`pl-3 pr-4 py-3 text-sm text-right font-mono font-semibold w-20 shrink-0 whitespace-nowrap ${eloColor(team.avgElo)}`}>
         {team.avgElo > 0 ? team.avgElo : "—"}
-      </td>
-      <td className={`px-4 py-3 text-sm text-right font-mono hidden md:table-cell ${eloColor(team.bestElo)}`}>
-        {team.bestElo > 0 ? team.bestElo : "—"}
-      </td>
-      <td className="px-4 py-3 text-sm text-center text-muted-foreground hidden sm:table-cell">
-        {team.totalWins || "—"}
-      </td>
-      <td className="px-4 py-3 text-sm text-center text-muted-foreground hidden sm:table-cell">
-        {team.totalPodiums || "—"}
       </td>
     </tr>
   );
@@ -274,12 +265,10 @@ function TeamTable({
   title,
   icon,
   teams,
-  showDiscipline = false,
 }: {
   title: string;
   icon: string;
   teams: TeamRow[];
-  showDiscipline?: boolean;
 }) {
   if (teams.length === 0) return null;
   return (
@@ -290,17 +279,13 @@ function TeamTable({
         <span className="text-xs text-muted-foreground font-normal ml-1">by avg ELO</span>
       </h2>
       <div className="rounded-xl border border-white/10 overflow-hidden bg-white/2">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm table-fixed">
           <thead>
             <tr className="border-b border-white/10 bg-white/5">
-              <th className="px-4 py-2.5 text-xs font-medium text-muted-foreground text-center w-10">#</th>
-              <th className="px-4 py-2.5 text-xs font-medium text-muted-foreground text-left">Team</th>
-              <th className="px-4 py-2.5 text-xs font-medium text-muted-foreground text-center w-10">🌍</th>
-              <th className="px-4 py-2.5 text-xs font-medium text-muted-foreground text-center w-14">Riders</th>
-              <th className="px-4 py-2.5 text-xs font-medium text-muted-foreground text-right">Avg ELO</th>
-              <th className="px-4 py-2.5 text-xs font-medium text-muted-foreground text-right hidden md:table-cell">Best ELO</th>
-              <th className="px-4 py-2.5 text-xs font-medium text-muted-foreground text-center w-12 hidden sm:table-cell">W</th>
-              <th className="px-4 py-2.5 text-xs font-medium text-muted-foreground text-center w-12 hidden sm:table-cell">Pod</th>
+              <th className="pl-4 pr-2 py-2.5 text-xs font-medium text-muted-foreground text-center w-8">#</th>
+              <th className="px-2 py-2.5 text-xs font-medium text-muted-foreground text-left">Team</th>
+              <th className="px-3 py-2.5 text-xs font-medium text-muted-foreground text-center w-14 whitespace-nowrap">Riders</th>
+              <th className="pl-3 pr-4 py-2.5 text-xs font-medium text-muted-foreground text-right w-20 whitespace-nowrap">ELO</th>
             </tr>
           </thead>
           <tbody>
@@ -336,7 +321,7 @@ export default async function TeamsPage({ searchParams }: PageProps) {
             <Input type="search" name="q" placeholder="Search teams..." defaultValue={q} />
           </form>
 
-          <TeamTable title="Search results" icon="🔍" teams={results} showDiscipline />
+          <TeamTable title="Search results" icon="🔍" teams={results} />
         </main>
       </div>
     );
