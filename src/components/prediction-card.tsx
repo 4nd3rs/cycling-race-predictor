@@ -32,6 +32,7 @@ interface PredictionRowProps {
   riderName: string;
   nationality?: string;
   birthDate?: string;
+  photoUrl?: string;
   teamName?: string;
   uciPoints?: number;
   supercupPoints?: number;
@@ -40,12 +41,25 @@ interface PredictionRowProps {
   showSupercup?: boolean;
 }
 
+const PODIUM_RINGS: Record<number, string> = {
+  1: "ring-2 ring-yellow-400",
+  2: "ring-2 ring-gray-300",
+  3: "ring-2 ring-amber-500",
+};
+
+const PODIUM_LABELS: Record<number, string> = {
+  1: "bg-yellow-500 text-yellow-950",
+  2: "bg-gray-300 text-gray-800",
+  3: "bg-amber-600 text-amber-50",
+};
+
 function PredictionRow({
   riderId,
   position,
   riderName,
   nationality,
   birthDate,
+  photoUrl,
   teamName,
   uciPoints,
   supercupPoints,
@@ -53,27 +67,35 @@ function PredictionRow({
   hasEnoughData,
   showSupercup,
 }: PredictionRowProps) {
-  const getPositionStyle = (pos: number) => {
-    if (pos === 1) return "bg-yellow-500 text-yellow-950";
-    if (pos === 2) return "bg-gray-300 text-gray-800";
-    if (pos === 3) return "bg-amber-600 text-amber-50";
-    return "bg-muted text-muted-foreground";
-  };
+  const isPodium = position <= 3;
 
   return (
     <Link
       href={`/riders/${riderId}`}
       className="flex items-center gap-3 py-2 px-3 hover:bg-muted/50 rounded-lg transition-colors"
     >
-      {/* Position */}
-      <div
-        className={cn(
-          "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold",
-          getPositionStyle(position)
-        )}
-      >
-        {position}
-      </div>
+      {/* Position / Photo */}
+      {isPodium && photoUrl ? (
+        <div className={cn("relative h-9 w-9 shrink-0 rounded-full overflow-hidden", PODIUM_RINGS[position])}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={photoUrl} alt={riderName} className="h-full w-full object-cover" />
+          <span className={cn(
+            "absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-black",
+            PODIUM_LABELS[position]
+          )}>
+            {position}
+          </span>
+        </div>
+      ) : (
+        <div
+          className={cn(
+            "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold",
+            isPodium ? PODIUM_LABELS[position] : "bg-muted text-muted-foreground"
+          )}
+        >
+          {position}
+        </div>
+      )}
 
       {/* Name, Flag & Team */}
       <div className="flex-1 min-w-0">
@@ -127,6 +149,7 @@ interface PredictionListProps {
     teamName?: string;
     nationality?: string;
     birthDate?: string;
+    photoUrl?: string;
     predictedPosition: number;
     winProbability: number;
     podiumProbability: number;
@@ -256,6 +279,7 @@ export function PredictionList({
             riderName={pred.riderName}
             nationality={pred.nationality}
             birthDate={pred.birthDate}
+            photoUrl={pred.photoUrl}
             teamName={pred.teamName}
             uciPoints={pred.uciPoints}
             supercupPoints={pred.supercupPoints}

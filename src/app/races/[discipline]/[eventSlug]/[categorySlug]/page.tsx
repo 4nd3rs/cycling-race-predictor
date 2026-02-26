@@ -592,6 +592,7 @@ export default async function CategoryPage({ params }: PageProps) {
         riderName: rider.name,
         nationality: rider.nationality || undefined,
         birthDate: rider.birthDate || undefined,
+        photoUrl: rider.photoUrl || undefined,
         teamName: teamName || undefined,
         predictedPosition: prediction.predictedPosition || 0,
         winProbability: hasEnoughData ? parseFloat(prediction.winProbability || "0") : 0,
