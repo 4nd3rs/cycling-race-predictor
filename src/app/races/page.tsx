@@ -1,8 +1,8 @@
 import { Suspense } from "react";
-import { isAdmin } from "@/lib/auth";
+
 import { Header } from "@/components/header";
 import { EventListView } from "@/components/event-card";
-import { Button } from "@/components/ui/button";
+
 import { db, races, raceEvents } from "@/lib/db";
 import { desc, eq, gte, lt, and, sql, isNull } from "drizzle-orm";
 import Link from "next/link";
@@ -257,7 +257,6 @@ interface PageProps {
 }
 
 export default async function RacesPage({ searchParams }: PageProps) {
-  const admin = await isAdmin();
   const { d, tab: tabParam } = await searchParams;
 
   const discipline = VALID_DISCIPLINES.includes(d as Discipline) ? (d as string) : "all";
@@ -280,11 +279,7 @@ export default async function RacesPage({ searchParams }: PageProps) {
                 : `${getDisciplineLabel(discipline as Discipline)} events`}
             </p>
           </div>
-          {admin && (
-            <Button asChild size="sm">
-              <Link href="/races/new">+ Add Race</Link>
-            </Button>
-          )}
+
         </div>
 
         {/* ── Discipline filter ── */}

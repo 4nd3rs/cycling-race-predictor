@@ -1,13 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { isAdmin } from "@/lib/auth";
 import { Header } from "@/components/header";
 import { PredictionList } from "@/components/prediction-card";
-import { RefreshStartlistButton } from "@/components/refresh-startlist-button";
-import { ReimportResultsButton } from "@/components/reimport-results-button";
-import { SyncSupercupButton } from "@/components/sync-supercup-button";
-import { AddInfoButton } from "@/components/add-info-button";
-import { DeleteRaceButton } from "@/components/delete-race-button";
 import { TelegramSubscribeButton } from "@/components/telegram-subscribe-button";
 import { RaceLinksSection } from "@/components/race-links";
 import { Badge } from "@/components/ui/badge";
@@ -541,7 +535,6 @@ function getProfileIcon(profile?: string | null) {
 
 export default async function CategoryPage({ params }: PageProps) {
   const { discipline, eventSlug, categorySlug } = await params;
-  const admin = await isAdmin();
 
   // Validate discipline
   if (!isValidDiscipline(discipline)) {
@@ -744,19 +737,6 @@ export default async function CategoryPage({ params }: PageProps) {
                   )}
                   <TelegramSubscribeButton />
                 </div>
-
-                {/* Admin controls */}
-                {admin && (
-                  <div className="flex flex-wrap gap-2 pt-1">
-                    {discipline === "mtb" && isSuperCup && <SyncSupercupButton raceId={race.id} />}
-                    {discipline === "mtb" && <AddInfoButton raceId={race.id} raceName={`${event.name} - ${categoryDisplay}`} />}
-                    {!isCompleted && event.sourceType !== "cronomancha" && event.sourceType !== "copa_catalana" && (
-                      <RefreshStartlistButton raceId={race.id} />
-                    )}
-                    {isCompleted && event.sourceType === "copa_catalana" && <ReimportResultsButton raceId={race.id} />}
-                    <DeleteRaceButton raceId={race.id} raceName={race.name} />
-                  </div>
-                )}
 
               </div>{/* /left */}
 

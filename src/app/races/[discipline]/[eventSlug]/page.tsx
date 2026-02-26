@@ -1,12 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { isAdmin } from "@/lib/auth";
 import { Header } from "@/components/header";
 import { Badge } from "@/components/ui/badge";
-import { DeleteEventButton } from "@/components/delete-event-button";
-import { EventEditDialog } from "@/components/event-edit-dialog";
-import { ImportResultsButton } from "@/components/import-results-button";
-import { UploadStartlistButton } from "@/components/upload-startlist-button";
 import { TelegramSubscribeButton } from "@/components/telegram-subscribe-button";
 import { RaceLinksSection } from "@/components/race-links";
 import {
@@ -214,7 +209,6 @@ const MEDALS = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"];
 
 export default async function EventPage({ params }: PageProps) {
   const { discipline, eventSlug } = await params;
-  const admin = await isAdmin();
 
   if (!isValidDiscipline(discipline)) notFound();
 
@@ -580,21 +574,6 @@ export default async function EventPage({ params }: PageProps) {
                     </Link>
                   );
                 })}
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* ── ADMIN ────────────────────────────────────────────────────── */}
-        {admin && (
-          <section className="border-b border-border/50">
-            <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-4">
-              <div className="flex flex-wrap gap-2">
-                <EventEditDialog eventId={event.id} name={event.name} date={event.date}
-                  endDate={event.endDate} country={event.country} series={event.series} />
-                <UploadStartlistButton eventId={event.id} eventName={event.name} />
-                <ImportResultsButton eventId={event.id} eventName={event.name} />
-                <DeleteEventButton eventId={event.id} eventName={event.name} redirectTo={`/races/${discipline}`} />
               </div>
             </div>
           </section>
