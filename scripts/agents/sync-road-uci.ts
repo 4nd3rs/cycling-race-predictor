@@ -113,10 +113,21 @@ async function syncRankings(
     .from(schema.riders)
     .limit(10000);
 
-  // Build a lookup map by stripped name
+  // Build a lookup map by stripped name — support both "First Last" and "Last First" formats
   const ridersByStrippedName = new Map<string, { id: string; name: string }>();
   for (const rider of allRiders) {
-    ridersByStrippedName.set(stripAccents(rider.name), rider);
+    const stripped = stripAccents(rider.name);
+    ridersByStrippedName.set(stripped, rider);
+
+    // Also index the reversed form (DB uses "Last First"; PCS gives "First Last")
+    // "Van Der Poel Mathieu" → also index as "Mathieu Van Der Poel"
+    const parts = stripped.split(" ");
+    if (parts.length >= 2) {
+      const reversed = parts[parts.length - 1] + " " + parts.slice(0, -1).join(" ");
+      if (!ridersByStrippedName.has(reversed)) {
+        ridersByStrippedName.set(reversed, rider);
+      }
+    }
   }
 
   let updated = 0;
@@ -155,7 +166,8 @@ async function syncRankings(
 
       // If no existing ELO (still at default 1500 with no races), boost based on UCI points
       if ((existingStats.racesTotal ?? 0) === 0) {
-        const eloBoost = Math.min((entry.uciPoints / 2000) * 200, 200);
+        // Spread ELO across full UCI range: #1 (≈4000 pts) → ~1800, avg → ~1600
+        const eloBoost = Math.round((entry.uciPoints / 4000) * 350);
         const newElo = 1500 + eloBoost;
         updates.eloMean = String(newElo.toFixed(4));
         updates.currentElo = String(newElo.toFixed(2));
@@ -167,7 +179,7 @@ async function syncRankings(
         .where(eq(schema.riderDisciplineStats.id, existingStats.id));
     } else {
       // Create new discipline stats with UCI-boosted ELO
-      const eloBoost = Math.min((entry.uciPoints / 2000) * 200, 200);
+      const eloBoost = Math.round((entry.uciPoints / 4000) * 350);
       const newElo = 1500 + eloBoost;
 
       await db

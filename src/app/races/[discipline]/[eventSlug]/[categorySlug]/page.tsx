@@ -524,9 +524,11 @@ export default async function CategoryPage({ params }: PageProps) {
         uciPoints: stats?.uciPoints ? parseInt(String(stats.uciPoints)) : 0,
         uciRank: stats?.uciRank || null,
         supercupPoints: stats?.supercupPoints ? parseInt(String(stats.supercupPoints)) : 0,
-        eloScore: stats?.racesTotal
-          ? Math.round(parseFloat(stats.currentElo || "0"))
+        // Show ELO if the record exists (even if seeded from UCI pts, racesTotal=0)
+        eloScore: stats?.currentElo && parseFloat(stats.currentElo) !== 0
+          ? Math.round(parseFloat(stats.currentElo))
           : undefined,
+        eloIsSeeded: stats?.currentElo && (stats.racesTotal ?? 0) === 0, // UCI-seeded, no real race history
         confidence,
         hasEnoughData,
       };
@@ -842,11 +844,16 @@ export default async function CategoryPage({ params }: PageProps) {
                         </div>
                       )}
 
-                      {/* ELO column */}
-                      <div className="w-14 text-right shrink-0">
+                      {/* ELO column — show if any ELO data exists, tilde if UCI-seeded (no race history) */}
+                      <div className="w-16 text-right shrink-0">
                         <div className="text-xs text-muted-foreground">ELO</div>
                         <div className="font-semibold text-sm">
-                          {stats?.racesTotal ? Math.round(parseFloat(stats.currentElo || "0")) : "—"}
+                          {stats?.currentElo && parseFloat(stats.currentElo) > 0
+                            ? <span title={stats.racesTotal ? `Based on ${stats.racesTotal} races` : "Seeded from UCI points"}>
+                                {(stats.racesTotal ?? 0) === 0 && <span className="text-muted-foreground text-xs">~</span>}
+                                {Math.round(parseFloat(stats.currentElo))}
+                              </span>
+                            : "—"}
                         </div>
                       </div>
                     </Link>
