@@ -86,6 +86,38 @@ async function findOrCreateRider(
   return created.id;
 }
 
+// ─── Discipline Stats Helper ─────────────────────────────────────────────────
+
+async function ensureDisciplineStats(
+  riderId: string,
+  discipline: string,
+  ageCategory: string,
+  gender: string
+) {
+  const existing = await db.query.riderDisciplineStats.findFirst({
+    where: and(
+      eq(schema.riderDisciplineStats.riderId, riderId),
+      eq(schema.riderDisciplineStats.discipline, discipline),
+      eq(schema.riderDisciplineStats.ageCategory, ageCategory)
+    ),
+  });
+  if (!existing) {
+    await db
+      .insert(schema.riderDisciplineStats)
+      .values({
+        riderId,
+        discipline,
+        ageCategory,
+        gender,
+        currentElo: "1500",
+        eloMean: "1500",
+        eloVariance: "350",
+        uciPoints: 0,
+      })
+      .onConflictDoNothing();
+  }
+}
+
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 async function syncStartlistForRace(race: { id: string; name: string; pcsUrl: string | null }) {
@@ -93,6 +125,14 @@ async function syncStartlistForRace(race: { id: string; name: string; pcsUrl: st
     console.log(`⏭️  ${race.name}: no pcsUrl, skipping`);
     return { inserted: 0, updated: 0, skipped: 0 };
   }
+
+  // Load full race details for discipline stats
+  const fullRace = await db.query.races.findFirst({
+    where: eq(schema.races.id, race.id),
+  });
+  const raceDiscipline = fullRace?.discipline || "road";
+  const raceAgeCategory = fullRace?.ageCategory || "elite";
+  const raceGender = fullRace?.gender || "men";
 
   // Build startlist URL from pcs race url
   const startlistUrl = race.pcsUrl.replace(/\/$/, "") + "/startlist";
@@ -208,6 +248,9 @@ async function syncStartlistForRace(race: { id: string; name: string; pcsUrl: st
           updated++;
         }
       }
+
+      // Ensure rider has discipline stats for this race
+      await ensureDisciplineStats(riderId, raceDiscipline, raceAgeCategory, raceGender);
     } catch (err: any) {
       console.error(`   ❌ ${entry.riderName}: ${err.message}`);
       errors++;

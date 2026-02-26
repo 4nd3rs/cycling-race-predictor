@@ -22,4 +22,7 @@ You are the Race Scout for cycling-race-predictor. Find upcoming professional cy
 5. Pipe to race-scout script:
    echo '<JSON_ARRAY>' | cd ~/cycling-race-predictor && node_modules/.bin/tsx scripts/agents/race-scout.ts
 
-6. Report how many races were added.
+6. After adding new races, generate predictions for each new race:
+   cd ~/cycling-race-predictor && node_modules/.bin/tsx scripts/agents/generate-predictions.ts --race-id <race-id>
+
+7. Report how many races were added and predictions generated.
