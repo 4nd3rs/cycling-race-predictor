@@ -16,6 +16,7 @@ const db = drizzle(sql);
 
 const RSS_FEEDS = [
   { name: "cyclingnews", url: "https://www.cyclingnews.com/feeds.xml" },
+  { name: "inrng", url: "https://inrng.com/feed/" },
 ];
 
 interface RSSItem {
@@ -197,6 +198,55 @@ async function scrapeForEvent(eventSlug: string) {
     } catch (e: unknown) {
       console.error(`   Fetch error: ${e instanceof Error ? e.message : String(e)}`);
     }
+  }
+
+  // Google News RSS — dynamic query for this specific event
+  const eventNameClean = event.name.replace(/\s+\d{4}$/, "");
+  const googleQuery = encodeURIComponent(`"${eventNameClean}" cycling ${year}`);
+  const googleNewsUrl = `https://news.google.com/rss/search?q=${googleQuery}&hl=en-US&gl=US&ceid=US:en`;
+  console.log(`\n   Fetching Google News: ${eventNameClean} ${year}`);
+  try {
+    const gnRes = await fetch(googleNewsUrl, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; RSS reader)" },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (gnRes.ok) {
+      const gnXml = await gnRes.text();
+      const gnItems = parseRSSItems(gnXml, "google-news");
+      const gnScored = gnItems
+        .map((item) => ({ item, score: scoreItem(item, keywords, event.name) }))
+        .filter(({ score }) => score >= 10)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 6);
+      console.log(`   Google News relevant: ${gnScored.length}`);
+      for (const { item, score } of gnScored) {
+        console.log(`   [GN:${score}] ${item.title.substring(0, 70)}...`);
+        try {
+          await db
+            .insert(raceNews)
+            .values({
+              raceEventId: event.id,
+              title: item.title,
+              summary: item.description || null,
+              url: item.link,
+              imageUrl: item.imageUrl || null,
+              source: "google-news",
+              category: item.title.toLowerCase().includes("preview") ? "preview" : "news",
+              publishedAt: item.pubDate ? new Date(item.pubDate) : new Date(),
+            })
+            .onConflictDoNothing();
+          totalInserted++;
+        } catch (e: unknown) {
+          if (e instanceof Error && !e.message.includes("duplicate")) {
+            console.error(`   Insert error: ${e.message}`);
+          }
+        }
+      }
+    } else {
+      console.log(`   Google News: HTTP ${gnRes.status}`);
+    }
+  } catch (e) {
+    console.log(`   Google News error: ${e instanceof Error ? e.message : String(e)}`);
   }
 
   // Also scrape the cyclingnews race hub page for more articles

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { SignInButton, SignUpButton, UserButton, useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
@@ -12,24 +13,34 @@ const navigation = [
   { name: "Teams", href: "/teams" },
 ];
 
-
-
 export function Header() {
   const pathname = usePathname();
   const { isSignedIn, isLoaded } = useUser();
 
   return (
-    <header className="sticky top-0 z-50 w-full border-t-2 border-primary bg-secondary text-secondary-foreground backdrop-blur supports-[backdrop-filter]:bg-secondary/95">
+    <header className="sticky top-0 z-50 w-full border-t-2 border-primary bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/90">
       <div className="container mx-auto flex h-14 items-center px-4 sm:px-6 lg:px-8 max-w-6xl">
+
         {/* Left: Brand */}
         <div className="mr-6 flex shrink-0">
-          <Link href="/" className="flex items-center gap-2">
-            <span className="text-lg font-black tracking-tight text-white">
-              ProCycling
-            </span>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-accent">
-              Predictor
-            </span>
+          <Link href="/" className="flex items-center gap-3">
+            {/* Bib icon */}
+            <Image
+              src="/logo-square.png"
+              alt="Pro Cycling Predictor"
+              width={32}
+              height={32}
+              className="rounded-sm"
+            />
+            {/* Wordmark */}
+            <div className="flex flex-col leading-none">
+              <span className="font-display text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                Pro Cycling
+              </span>
+              <span className="font-display text-[18px] font-extrabold uppercase tracking-tight text-primary leading-none">
+                Predictor
+              </span>
+            </div>
           </Link>
         </div>
 
@@ -42,14 +53,13 @@ export function Header() {
               className={cn(
                 "px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
                 pathname === item.href || pathname.startsWith(item.href + "/")
-                  ? "text-white bg-white/10"
-                  : "text-white/60 hover:text-white hover:bg-white/5"
+                  ? "text-foreground bg-white/10"
+                  : "text-muted-foreground hover:text-foreground hover:bg-white/5"
               )}
             >
               {item.name}
             </Link>
           ))}
-
         </nav>
 
         {/* Right: Auth */}
@@ -60,15 +70,13 @@ export function Header() {
                 <UserButton
                   afterSignOutUrl="/"
                   appearance={{
-                    elements: {
-                      avatarBox: "h-8 w-8",
-                    },
+                    elements: { avatarBox: "h-8 w-8" },
                   }}
                 />
               ) : (
                 <div className="flex items-center gap-2">
                   <SignInButton mode="modal">
-                    <Button variant="ghost" size="sm" className="text-white/70 hover:text-white hover:bg-white/10">
+                    <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground hover:bg-white/10">
                       Sign In
                     </Button>
                   </SignInButton>
