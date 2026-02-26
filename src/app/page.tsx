@@ -9,6 +9,7 @@ import { desc, eq, gte, lt, and, sql, isNotNull } from "drizzle-orm";
 import { format, formatDistanceToNow, differenceInDays } from "date-fns";
 import { getFlag } from "@/lib/country-flags";
 import { buildRaceUrl, getDisciplineShortLabel } from "@/lib/url-utils";
+import { RaceLinksCompact, RaceLinksSection } from "@/components/race-links";
 
 // ---------------------------------------------------------------------------
 // HYPE SCORING — only prestigious races on the homepage
@@ -366,6 +367,12 @@ function NextRaceHero({
               {startlistCount} riders confirmed
             </p>
           )}
+
+          {event.externalLinks && Object.keys(event.externalLinks).length > 0 && (
+            <div className="pt-1">
+              <RaceLinksSection links={event.externalLinks} />
+            </div>
+          )}
         </div>
 
         <Button asChild size="lg" className="self-start md:self-end shrink-0">
@@ -427,6 +434,11 @@ function UpcomingRaceCard({
           <span className="ml-auto font-medium text-muted-foreground/70">{race.uciCategory}</span>
         )}
       </div>
+      {event.externalLinks && Object.keys(event.externalLinks).length > 0 && (
+        <div className="pt-1 border-t border-border/30">
+          <RaceLinksCompact links={event.externalLinks} />
+        </div>
+      )}
     </Link>
   );
 }

@@ -1,0 +1,1 @@
+ALTER TABLE "race_events" ADD COLUMN "external_links" jsonb;

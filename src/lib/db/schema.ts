@@ -109,6 +109,15 @@ export const raceEvents = pgTable(
     sourceUrl: varchar("source_url", { length: 500 }),
     sourceType: varchar("source_type", { length: 50 }), // "rockthesport", "pcs", etc.
     series: varchar("series", { length: 50 }), // "supercup", "copa_catalana", etc.
+    externalLinks: jsonb("external_links").$type<{
+      website?: string;
+      twitter?: string;
+      instagram?: string;
+      facebook?: string;
+      youtube?: string;
+      liveStream?: Array<{ name: string; url: string; regions?: string; free?: boolean }>;
+      tracking?: string;
+    }>(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [

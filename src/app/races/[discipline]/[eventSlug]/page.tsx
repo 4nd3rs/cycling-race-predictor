@@ -19,6 +19,7 @@ import {
   generateCategorySlug,
 } from "@/lib/url-utils";
 import { formatCategoryDisplay } from "@/lib/category-utils";
+import { RaceLinksSection } from "@/components/race-links";
 
 interface PageProps {
   params: Promise<{ discipline: string; eventSlug: string }>;
@@ -182,6 +183,13 @@ export default async function EventPage({ params }: PageProps) {
               </span>
             )}
           </div>
+
+          {/* Race links: official site, socials, streaming */}
+          {event.externalLinks && Object.keys(event.externalLinks).length > 0 && (
+            <div className="mt-4">
+              <RaceLinksSection links={event.externalLinks} />
+            </div>
+          )}
 
           {/* Source link */}
           {event.sourceUrl && (
