@@ -1,8 +1,8 @@
 import { config } from "dotenv";
 config({ path: ".env.local" });
 
-import { db, races, raceEvents, raceResults, riders, riderDisciplineStats } from "./lib/db";
-import { eq, and, gte, lte, ilike, desc, sql, isNull } from "drizzle-orm";
+import { db, races, raceEvents, raceResults, riders, riderDisciplineStats, raceStartlist } from "./lib/db";
+import { eq, and, gte, lte, ilike, desc, sql, isNull, count } from "drizzle-orm";
 
 function parseArgs(argv: string[]): Record<string, string> {
   const args: Record<string, string> = {};
@@ -53,12 +53,6 @@ async function recentRacesNoResults() {
   const nowStr = now.toISOString().slice(0, 10);
   const pastStr = past.toISOString().slice(0, 10);
 
-  // Find races in the past 14 days that have no results
-  const racesWithResults = db
-    .select({ raceId: raceResults.raceId })
-    .from(raceResults)
-    .groupBy(raceResults.raceId);
-
   const rows = await db
     .select({
       id: races.id,
@@ -72,6 +66,7 @@ async function recentRacesNoResults() {
       uciCategory: races.uciCategory,
       country: races.country,
       status: races.status,
+      pcsUrl: races.pcsUrl,
     })
     .from(races)
     .where(
@@ -85,6 +80,42 @@ async function recentRacesNoResults() {
     .orderBy(races.date);
 
   return rows;
+}
+
+async function startlistStatus() {
+  const now = new Date();
+  const future = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const nowStr = now.toISOString().slice(0, 10);
+  const futureStr = future.toISOString().slice(0, 10);
+
+  const upcoming = await db
+    .select({
+      id: races.id,
+      name: races.name,
+      date: races.date,
+      discipline: races.discipline,
+      gender: races.gender,
+      uciCategory: races.uciCategory,
+      pcsUrl: races.pcsUrl,
+      status: races.status,
+    })
+    .from(races)
+    .where(and(gte(races.date, nowStr), lte(races.date, futureStr)))
+    .orderBy(races.date);
+
+  // Count startlist entries per race
+  const counts = await db
+    .select({ raceId: raceStartlist.raceId, count: count() })
+    .from(raceStartlist)
+    .groupBy(raceStartlist.raceId);
+
+  const countMap = new Map(counts.map(c => [c.raceId, Number(c.count)]));
+
+  return upcoming.map(r => ({
+    ...r,
+    startlistCount: countMap.get(r.id) ?? 0,
+    hasPcsUrl: !!r.pcsUrl,
+  }));
 }
 
 async function topRiders(limit: number) {
@@ -124,7 +155,7 @@ async function main() {
 
   if (!mode) {
     console.error("Usage: npx tsx scripts/agents/db-query.ts --mode <mode> [options]");
-    console.error("Modes: upcoming-races, recent-races-no-results, top-riders, race-exists");
+    console.error("Modes: upcoming-races, recent-races-no-results, startlist-status, top-riders, race-exists");
     process.exit(1);
   }
 
@@ -142,6 +173,9 @@ async function main() {
       result = await topRiders(limit);
       break;
     }
+    case "startlist-status":
+      result = await startlistStatus();
+      break;
     case "race-exists": {
       if (!args.name || !args.date) {
         console.error("--name and --date required for race-exists mode");

@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { SignInButton, SignUpButton, UserButton, useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
@@ -24,14 +23,16 @@ export function Header() {
         {/* Left: Brand */}
         <div className="mr-6 flex shrink-0">
           <Link href="/" className="flex items-center gap-3">
-            {/* Bib icon */}
-            <Image
-              src="/logo-square.png"
-              alt="Pro Cycling Predictor"
-              width={44}
-              height={44}
-              className="rounded-sm"
-            />
+            {/* Bib icon — SVG, scales perfectly */}
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="44" height="44" aria-hidden="true">
+              <rect width="200" height="200" fill="#0D0D0D"/>
+              <rect x="22" y="14" width="156" height="172" rx="7" fill="#FFFFFF"/>
+              <circle cx="38" cy="30" r="5.5" fill="#0D0D0D"/>
+              <circle cx="162" cy="30" r="5.5" fill="#0D0D0D"/>
+              <circle cx="38" cy="170" r="5.5" fill="#0D0D0D"/>
+              <circle cx="162" cy="170" r="5.5" fill="#0D0D0D"/>
+              <text x="100" y="100" fontFamily="'Barlow Condensed', 'Arial Narrow', Impact, sans-serif" fontWeight="800" fontSize="122" fill="#C8102E" textAnchor="middle" dominantBaseline="middle" transform="rotate(180, 100, 100)">13</text>
+            </svg>
             {/* Wordmark */}
             <div className="flex flex-col leading-none">
               <span className="font-display text-[13px] font-semibold uppercase tracking-[0.12em] text-foreground">

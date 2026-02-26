@@ -28,22 +28,38 @@ async function readStdin(): Promise<GossipInput[]> {
   const raw = Buffer.concat(chunks).toString("utf-8").trim();
   if (!raw) return [];
 
+  // Strip non-JSON lines (e.g. dotenvx verbose output) — keep only lines starting with [ or {
+  const jsonLines = raw
+    .split("\n")
+    .filter((line) => line.trimStart().startsWith("[") || line.trimStart().startsWith("{"));
+  const cleaned = jsonLines.join("\n").trim();
+  if (!cleaned) return [];
+
+  // Try parsing the cleaned content as a single JSON value first
   try {
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return parsed;
+    const parsed = JSON.parse(cleaned);
+    if (Array.isArray(parsed)) {
+      // Flatten in case a single line contained an array (from piped scripts)
+      return parsed.flat() as GossipInput[];
+    }
     return [parsed];
   } catch {
-    // NDJSON fallback
+    // NDJSON fallback — each line may be a JSON object or array
   }
 
   const items: GossipInput[] = [];
-  for (const line of raw.split("\n")) {
+  for (const line of cleaned.split("\n")) {
     const trimmed = line.trim();
     if (!trimmed) continue;
     try {
-      items.push(JSON.parse(trimmed));
+      const val = JSON.parse(trimmed);
+      if (Array.isArray(val)) {
+        items.push(...(val as GossipInput[]));
+      } else {
+        items.push(val as GossipInput);
+      }
     } catch {
-      console.error(`Skipping invalid JSON line: ${trimmed}`);
+      console.error(`Skipping invalid JSON line: ${trimmed.substring(0, 80)}`);
     }
   }
   return items;

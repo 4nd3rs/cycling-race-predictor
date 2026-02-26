@@ -16,6 +16,7 @@ import { eq, gte, and, isNotNull, ilike, or } from "drizzle-orm";
 import * as schema from "../../src/lib/db/schema";
 import * as cheerio from "cheerio";
 import { chromium } from "playwright";
+import { writeScrapeStatus, type RaceRow } from "./lib/scrape-status";
 
 const sql = neon(process.env.DATABASE_URL!);
 const db = drizzle(sql, { schema });
@@ -354,14 +355,32 @@ async function main() {
   races.forEach(r => console.log(`  • ${r.name} (${r.date})`));
 
   let totalInserted = 0, totalUpdated = 0;
+  const raceRows: RaceRow[] = [];
 
   for (const race of races) {
     const result = await syncStartlistForRace(race);
     totalInserted += result.inserted;
     totalUpdated += result.updated;
+    const now = new Date().toLocaleString("sv-SE", { timeZone: "Europe/Stockholm" }).replace("T", " ");
+    const total = result.inserted + result.updated + result.skipped;
+    const rowStatus = !race.pcsUrl
+      ? "⏭️ no pcsUrl"
+      : total === 0
+      ? "⚠️ empty"
+      : result.inserted > 0
+      ? `✅ +${result.inserted} new`
+      : "✅ up to date";
+    raceRows.push({ name: race.name, date: race.date ?? "", count: total, status: rowStatus, scrapedAt: now });
   }
 
   console.log(`\n📊 Total: ${totalInserted} new riders, ${totalUpdated} updated across ${races.length} race(s)`);
+
+  writeScrapeStatus({
+    component: "startlists",
+    status: totalInserted > 0 || totalUpdated > 0 ? "ok" : "ok",
+    summary: `${totalInserted} new riders added, ${totalUpdated} updated across ${races.length} race(s)`,
+    raceRows,
+  });
 }
 
 main().catch(err => {

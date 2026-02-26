@@ -26,6 +26,7 @@ import {
 import { scrapeXCOdataRacesList } from "../../src/lib/scraper/xcodata-races";
 import { chromium, type Browser } from "playwright";
 import * as cheerio from "cheerio";
+import { writeScrapeStatus } from "./lib/scrape-status";
 
 const sql = neon(process.env.DATABASE_URL!);
 const db = drizzle(sql, { schema });
@@ -604,10 +605,12 @@ async function main() {
   console.log(`──────────────────────────────`);
   console.log(`Total: ${totalNew} new races added\n`);
 
-  // Print cron setup hint
-  console.log(
-    `Run 'openclaw cron add --name "📅 Race Calendar" --cron "0 6 * * *" --tz "Europe/Stockholm" --session isolated --message "/agents/RACE_CALENDAR.md" --timeout-seconds 300' to schedule`
-  );
+  // Write pipeline status
+  writeScrapeStatus({
+    component: "calendar",
+    status: totalNew > 0 ? "ok" : stats.road.errors + stats.mtb.errors > 0 ? "warn" : "ok",
+    summary: `Road (PCS): ${stats.road.found} found, ${stats.road.inserted} new, ${stats.road.existed} existed. MTB (XCOdata): ${stats.mtb.found} found, ${stats.mtb.inserted} new, ${stats.mtb.existed} existed.`,
+  });
 }
 
 main().catch((err) => {
