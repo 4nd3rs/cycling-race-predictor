@@ -11,10 +11,39 @@ import { getFlag } from "@/lib/country-flags";
 import { buildRaceUrl, getDisciplineShortLabel } from "@/lib/url-utils";
 
 // ---------------------------------------------------------------------------
+// HYPE SCORING — only prestigious races on the homepage
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns a prestige score for a race based on its UCI category.
+ * Used to filter/sort the homepage so low-profile events don't dominate.
+ */
+function getHypeScore(uciCategory: string | null | undefined): number {
+  const cat = (uciCategory || "").toUpperCase().trim();
+  if (cat === "WORLDTOUR" || cat === "1.UWT" || cat === "2.UWT") return 100;
+  if (cat === "WC") return 90;          // MTB World Cup
+  if (cat === "1.PRO" || cat === "2.PRO" || cat === "PROSERIES") return 80;
+  if (cat === "C1") return 70;          // UCI MTB C1
+  if (cat === "1.1" || cat === "2.1") return 50;
+  if (cat === "1.2" || cat === "2.2") return 35;
+  if (cat === "C2") return 20;          // Low-profile regional
+  return 30;
+}
+
+/** Minimum hype score to appear on the homepage */
+const HOMEPAGE_HYPE_MIN = 70;
+
+// ---------------------------------------------------------------------------
 // DATA FETCHING
 // ---------------------------------------------------------------------------
 
-async function getNextRace() {
+/**
+ * Returns { hero, calendar } where:
+ * - hero  = the next high-hype race (WorldTour / WC / 1.Pro / C1)
+ * - calendar = next 11 high-hype races after hero
+ * Falls back to chronological order if no high-hype races exist.
+ */
+async function getHighHypeRaces() {
   const today = new Date().toISOString().split("T")[0];
   try {
     const result = await db
@@ -27,32 +56,21 @@ async function getNextRace() {
       .innerJoin(raceEvents, eq(races.raceEventId, raceEvents.id))
       .where(and(gte(raceEvents.date, today), eq(races.status, "active")))
       .orderBy(raceEvents.date)
-      .limit(1);
+      .limit(60);
 
-    return result[0] || null;
+    const highHype = result.filter(
+      (r) => getHypeScore(r.race.uciCategory) >= HOMEPAGE_HYPE_MIN
+    );
+
+    // Fall back to all upcoming if nothing passes the bar
+    const pool = highHype.length > 0 ? highHype : result;
+
+    return {
+      hero: pool[0] ?? null,
+      calendar: pool.slice(1, 12),
+    };
   } catch {
-    return null;
-  }
-}
-
-async function getUpcomingRaces() {
-  const today = new Date().toISOString().split("T")[0];
-  try {
-    const result = await db
-      .select({
-        race: races,
-        event: raceEvents,
-        startlistCount: sql<number>`(SELECT COUNT(*) FROM race_startlist WHERE race_startlist.race_id = ${races.id})`,
-      })
-      .from(races)
-      .innerJoin(raceEvents, eq(races.raceEventId, raceEvents.id))
-      .where(and(gte(raceEvents.date, today), eq(races.status, "active")))
-      .orderBy(raceEvents.date)
-      .limit(12);
-
-    return result;
-  } catch {
-    return [];
+    return { hero: null, calendar: [] };
   }
 }
 
@@ -140,9 +158,8 @@ function getRaceUrl(race: typeof races.$inferSelect, event: typeof raceEvents.$i
 // ---------------------------------------------------------------------------
 
 export default async function Home() {
-  const [nextRace, upcomingRaces, latestIntel, recentResults] = await Promise.all([
-    getNextRace(),
-    getUpcomingRaces(),
+  const [{ hero: nextRace, calendar: upcomingRaces }, latestIntel, recentResults] = await Promise.all([
+    getHighHypeRaces(),
     getLatestIntel(),
     getRecentResults(),
   ]);
@@ -169,7 +186,7 @@ export default async function Home() {
         </section>
 
         {/* ---- UPCOMING RACES GRID ---- */}
-        {upcomingRaces.length > 1 && (
+        {upcomingRaces.length > 0 && (
           <section className="border-b border-border/50">
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-10">
               <div className="flex items-center justify-between mb-6">
@@ -179,7 +196,7 @@ export default async function Home() {
                 </Link>
               </div>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {upcomingRaces.slice(1).map(({ race, event, startlistCount }) => (
+                {upcomingRaces.map(({ race, event, startlistCount }) => (
                   <UpcomingRaceCard
                     key={race.id}
                     race={race}
@@ -375,16 +392,27 @@ function UpcomingRaceCard({
 }) {
   const raceDate = new Date(race.date);
   const url = getRaceUrl(race, event);
+  const hype = getHypeScore(race.uciCategory);
+  const isFeatured = hype >= 90; // WorldTour or WC
 
   return (
     <Link
       href={url}
-      className="flex flex-col gap-2 p-4 rounded-lg border border-border/50 hover:border-border hover:bg-card transition-colors group"
+      className={`flex flex-col gap-2 p-4 rounded-lg border transition-colors group hover:bg-card ${
+        isFeatured
+          ? "border-yellow-500/40 hover:border-yellow-500/70 bg-yellow-500/5"
+          : "border-border/50 hover:border-border"
+      }`}
     >
       <div className="flex items-center justify-between gap-2">
-        <Badge variant="outline" className={`text-[10px] shrink-0 ${getDisciplineColor(event.discipline)}`}>
-          {getDisciplineLabel(event.discipline)}
-        </Badge>
+        <div className="flex items-center gap-1.5">
+          <Badge variant="outline" className={`text-[10px] shrink-0 ${getDisciplineColor(event.discipline)}`}>
+            {getDisciplineLabel(event.discipline)}
+          </Badge>
+          {isFeatured && (
+            <span className="text-[10px] font-bold text-yellow-500 uppercase tracking-wide">★</span>
+          )}
+        </div>
         <span className="text-xs text-muted-foreground">
           {format(raceDate, "MMM d")}
         </span>
@@ -395,6 +423,9 @@ function UpcomingRaceCard({
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <span>{getFlag(event.country)}</span>
         {startlistCount > 0 && <span>{startlistCount} riders</span>}
+        {race.uciCategory && (
+          <span className="ml-auto font-medium text-muted-foreground/70">{race.uciCategory}</span>
+        )}
       </div>
     </Link>
   );
