@@ -15,7 +15,7 @@ async function loadGoogleFont(family: string, weight: number): Promise<ArrayBuff
   const css = await fetch(url, {
     headers: { "User-Agent": "Mozilla/5.0" },
   }).then((r) => r.text());
-  const match = css.match(/src: url\(([^)]+)\) format\('woff2'\)/);
+  const match = css.match(/src: url\(([^)]+)\) format\('(?:woff2|truetype)'\)/);
   if (!match) throw new Error("Could not parse font URL");
   return fetch(match[1]).then((r) => r.arrayBuffer());
 }
@@ -28,8 +28,10 @@ const COUNTRY_FLAG: Record<string, string> = {
 };
 
 function formatRaceDate(dateStr: string): string {
-  const d = new Date(dateStr + "T12:00:00Z");
-  return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "long", year: "numeric" });
+  const dateOnly = dateStr.includes("T") ? dateStr.split("T")[0] : dateStr;
+  return new Date(dateOnly + "T12:00:00Z").toLocaleDateString("en-GB", {
+    weekday: "short", day: "numeric", month: "long", year: "numeric",
+  });
 }
 
 export default async function Image({ params }: Props) {

@@ -311,15 +311,15 @@ export default async function EventPage({ params }: PageProps) {
 
                 {/* Key facts */}
                 <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                  <span>📋 {eliteRaces.length} elite races</span>
+                  <span>{eliteRaces.length} elite races</span>
                   {sorted.length > eliteRaces.length && (
                     <span>+ {sorted.length - eliteRaces.length} other categories</span>
                   )}
                   {event.externalLinks?.raceStart && (
-                    <span>🕐 Start {event.externalLinks.raceStart}</span>
+                    <span>Start {event.externalLinks.raceStart}</span>
                   )}
                   {event.externalLinks?.raceFinish && (
-                    <span>🏁 ~{event.externalLinks.raceFinish}</span>
+                    <span>Finish ~{event.externalLinks.raceFinish}</span>
                   )}
                 </div>
 
@@ -388,7 +388,7 @@ export default async function EventPage({ params }: PageProps) {
         {latestNews.length > 0 && (
           <section className="border-b border-border/50">
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-6">
-              <h2 className="text-lg font-bold mb-4">📰 Race Pulse</h2>
+              <h2 className="text-lg font-bold mb-4">Race Pulse</h2>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {latestNews.map((article) => (
                   <a key={article.id} href={article.url || "#"} target="_blank" rel="noopener noreferrer"
