@@ -828,41 +828,7 @@ export default async function CategoryPage({ params }: PageProps) {
           </section>
         )}
 
-        {/* ── Watch: TV Schedule ──────────────────────────────────────── */}
-        {event.externalLinks?.tvSchedule && event.externalLinks.tvSchedule.length > 0 && (
-          <section className="border-b border-border/50">
-            <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-6">
-              <h2 className="text-lg font-bold mb-4">📺 How to Watch</h2>
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {event.externalLinks.tvSchedule.map((entry, i) => (
-                  <div key={i} className="flex items-center justify-between gap-3 rounded-lg border border-border/40 bg-card/30 px-3 py-2.5">
-                    <div className="min-w-0">
-                      <p className="text-xs text-muted-foreground truncate">{entry.region}</p>
-                      {entry.url ? (
-                        <a href={entry.url} target="_blank" rel="noopener noreferrer"
-                          className="text-sm font-semibold hover:text-primary transition-colors truncate block">
-                          {entry.channel}
-                        </a>
-                      ) : (
-                        <p className="text-sm font-semibold truncate">{entry.channel}</p>
-                      )}
-                    </div>
-                    {entry.startTime && (
-                      <span className="text-xs font-mono bg-primary/10 text-primary px-2 py-0.5 rounded shrink-0">
-                        {entry.startTime}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-              {(event.externalLinks.raceStart || event.externalLinks.raceFinish) && (
-                <p className="text-xs text-muted-foreground mt-3">
-                  ⏱ Race: {event.externalLinks.raceStart} → {event.externalLinks.raceFinish} (CET)
-                </p>
-              )}
-            </div>
-          </section>
-        )}
+
 
         {/* ── Pre-Race Intel ──────────────────────────────────────────── */}
         {raceIntel.length > 0 && (
@@ -1206,6 +1172,38 @@ export default async function CategoryPage({ params }: PageProps) {
           )}
         </Tabs>
         </div>{/* /tabs container */}
+
+        {/* ── HOW TO WATCH ─────────────────────────────────────────────── */}
+        {event.externalLinks?.tvSchedule && event.externalLinks.tvSchedule.length > 0 && (
+          <section className="border-t border-border/50">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-6">
+              <h2 className="text-lg font-bold mb-4">How to Watch</h2>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {event.externalLinks.tvSchedule.map((entry, i) => (
+                  <div key={i} className="flex items-center justify-between gap-3 rounded-lg border border-border/40 bg-card/30 px-3 py-2.5">
+                    <div className="min-w-0">
+                      <p className="text-xs text-muted-foreground truncate">{entry.region}</p>
+                      {entry.url ? (
+                        <a href={entry.url} target="_blank" rel="noopener noreferrer"
+                          className="text-sm font-semibold hover:text-primary transition-colors truncate block">
+                          {entry.channel}
+                        </a>
+                      ) : (
+                        <p className="text-sm font-semibold truncate">{entry.channel}</p>
+                      )}
+                    </div>
+                    {entry.startTime && (
+                      <span className="text-xs font-mono bg-primary/10 text-primary px-2 py-0.5 rounded shrink-0">
+                        {entry.startTime}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
       </main>
     </div>
   );
