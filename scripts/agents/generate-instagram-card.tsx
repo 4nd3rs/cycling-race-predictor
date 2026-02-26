@@ -212,7 +212,7 @@ function PreviewCard({ event, race, preds }: any) {
                 return (
                   <div key={i} style={{ display: "flex", alignItems: "center", gap: 20 }}>
                     {/* Rank */}
-                    <span style={{ fontSize: 22, fontWeight: 700, color: DIMMED, width: 28, flexShrink: 0, fontFamily: "Inter" }}>
+                    <span style={{ fontSize: 22, fontWeight: 700, color: WHITE, width: 28, flexShrink: 0, fontFamily: "Inter" }}>
                       {i + 1}
                     </span>
                     {/* Photo */}
@@ -283,7 +283,7 @@ function ResultsCard({ event, race, results }: any) {
 
         {results.slice(0, 3).map((r: any, i: number) => (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: 24, marginBottom: 36 }}>
-            <span style={{ fontSize: 44, fontWeight: 800, color: [RED, MUTED, MUTED][i], width: 48, flexShrink: 0 }}>
+            <span style={{ fontSize: 44, fontWeight: 800, color: WHITE, width: 48, flexShrink: 0 }}>
               {i + 1}.
             </span>
             <RiderAvatar photoDataUri={r._photoDataUri ?? null} name={r.rider_name} size={80} />
@@ -348,7 +348,7 @@ async function main() {
     ],
   });
 
-  const png = new Resvg(svg, { fitTo: { mode: "width", value: W } }).render().asPng();
+  const png = new Resvg(svg, { fitTo: { mode: "width", value: W * 2 } }).render().asPng();
   writeFileSync(outPath, png);
   console.log(`Saved: ${outPath}`);
 }
