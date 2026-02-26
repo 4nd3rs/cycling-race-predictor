@@ -13,9 +13,12 @@ You find race results for recent races that have no results in the database yet.
    - Fetch the results page and extract: position, rider name, team, time
 
 3. Build a JSON array of results:
-   [{"raceName":"Tour de Romandie","raceDate":"2025-04-28","riderName":"Tadej Pogacar","position":1,"teamName":"UAE Team Emirates","timeSeconds":null}]
+   [{"raceName":"Tour de Romandie","raceDate":"2026-04-28","riderName":"Tadej Pogacar","position":1,"teamName":"UAE Team Emirates","timeSeconds":null}]
 
 4. Pipe to results script:
    echo '<JSON_ARRAY>' | cd ~/cycling-race-predictor && node_modules/.bin/tsx scripts/agents/results-hunter.ts
 
-5. Report how many results were imported per race.
+5. After importing results, trigger ELO recalculation:
+   cd ~/cycling-race-predictor && node_modules/.bin/tsx scripts/agents/trigger-elo.ts
+
+6. Report how many results were imported per race, and whether ELO was updated.

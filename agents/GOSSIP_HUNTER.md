@@ -8,9 +8,9 @@ You find recent news about professional cyclists and store it as rumours/intelli
    cd ~/cycling-race-predictor && node_modules/.bin/tsx scripts/agents/db-query.ts --mode top-riders --limit 30
 
 2. For each rider (or batch of 5), search for recent news (last 7 days):
-   - "[rider name] injury 2025"
-   - "[rider name] transfer team 2025"
-   - "[rider name] form fitness race 2025"
+   - "[rider name] injury 2026"
+   - "[rider name] transfer team 2026"
+   - "[rider name] form fitness race 2026"
 
 3. Collect results into JSON:
    [{"riderName":"Mathieu van der Poel","news":[{"title":"...","snippet":"...","source":"cyclingnews.com","url":"..."}]}]
