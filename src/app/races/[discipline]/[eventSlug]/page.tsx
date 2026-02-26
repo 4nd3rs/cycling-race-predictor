@@ -591,8 +591,8 @@ export default async function EventPage({ params }: PageProps) {
                           );
                         })()}
 
-                        {/* Rider Intel (per-race filtered) */}
-                        {intel.length > 0 && (
+                        {/* Rider Intel (pre-race only) */}
+                        {intel.length > 0 && !hasResults && (
                           <div>
                             <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Rider Intel</h3>
                             <div className="space-y-2">
