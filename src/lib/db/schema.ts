@@ -43,6 +43,10 @@ export const teams = pgTable("teams", {
   discipline: varchar("discipline", { length: 20 }), // 'road' | 'mtb'
   country: char("country", { length: 3 }),
   logoUrl: varchar("logo_url", { length: 500 }),
+  slug: varchar("slug", { length: 255 }),
+  website: varchar("website", { length: 500 }),
+  twitter: varchar("twitter", { length: 500 }),
+  instagram: varchar("instagram", { length: 500 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

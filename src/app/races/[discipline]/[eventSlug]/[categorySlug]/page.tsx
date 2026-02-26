@@ -1052,7 +1052,60 @@ export default async function CategoryPage({ params }: PageProps) {
             {startlist.length > 0 ? (
               <div className="border rounded-lg divide-y">
                 {(() => {
-                  // For SuperCup races, sort by UCI points desc -> SuperCup points desc
+                  // ── ROAD: group by team ────────────────────────────────
+                  if (discipline === "road" && !isSuperCup) {
+                    const byTeam = startlist.reduce<Record<string, typeof startlist>>((acc, row) => {
+                      const key = row.team?.name || "Unknown Team";
+                      if (!acc[key]) acc[key] = [];
+                      acc[key].push(row);
+                      return acc;
+                    }, {});
+                    const sortedTeams = Object.entries(byTeam).sort(([a], [b]) => a.localeCompare(b));
+
+                    return sortedTeams.map(([teamName, teamRiders]) => (
+                      <div key={teamName}>
+                        {/* Team header */}
+                        <div className="flex items-center gap-2 px-3 py-2 bg-muted/30 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                          <span>🚴</span>
+                          <span className="truncate">{teamName}</span>
+                          <span className="ml-auto shrink-0 font-normal normal-case">{teamRiders.length} riders</span>
+                        </div>
+                        {/* Riders in team */}
+                        {teamRiders.map(({ entry, rider, stats }) => (
+                          <Link key={entry.id} href={`/riders/${rider.id}`}
+                            className="flex items-center gap-3 py-2 px-3 pl-7 hover:bg-muted/50 transition-colors">
+                            <div className="w-6 text-center text-xs text-muted-foreground shrink-0">
+                              {entry.bibNumber || "–"}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                {rider.nationality && (
+                                  <span className="text-sm shrink-0">{countryToFlag(rider.nationality)}</span>
+                                )}
+                                <span className="font-medium truncate text-sm">{rider.name}</span>
+                                {rider.birthDate && (
+                                  <span className="text-xs text-muted-foreground shrink-0">{calculateAge(rider.birthDate)}y</span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="w-16 text-right shrink-0">
+                              <div className="text-xs text-muted-foreground">ELO</div>
+                              <div className="font-semibold text-sm">
+                                {stats?.currentElo && parseFloat(stats.currentElo) > 0
+                                  ? <span>
+                                      {(stats.racesTotal ?? 0) === 0 && <span className="text-muted-foreground text-xs">~</span>}
+                                      {Math.round(parseFloat(stats.currentElo))}
+                                    </span>
+                                  : "—"}
+                              </div>
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                    ));
+                  }
+
+                  // ── FLAT LIST (MTB / SuperCup) ─────────────────────────
                   const sortedStartlist = isSuperCup
                     ? [...startlist].sort((a, b) => {
                         const aUci = a.stats?.uciPoints ?? 0;
