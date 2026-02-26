@@ -221,7 +221,7 @@ async function main() {
   // Women's rankings
   console.log("\nWomen Elite Rankings:");
   const womenEntries = await scrapeRankingsPage(
-    "https://www.procyclingstats.com/rankings/we/uci-individual",
+    "https://www.procyclingstats.com/rankings/we/world-ranking",
     limit
   );
   console.log(`  Scraped ${womenEntries.length} entries from PCS`);

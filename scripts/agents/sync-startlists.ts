@@ -139,8 +139,10 @@ async function syncStartlistForRace(race: { id: string; name: string; pcsUrl: st
   console.log(`\n🔍 ${race.name}`);
   console.log(`   URL: ${startlistUrl}`);
 
-  // Use Playwright to bypass Cloudflare on PCS
-  let html: string;
+  // Use Playwright to bypass Cloudflare on PCS — extract via DOM eval, not raw HTML
+  type RawEntry = { riderName: string; riderPcsId: string; teamName: string | null; bibNumber: number | null };
+  let rawEntries: RawEntry[] = [];
+
   const browser = await chromium.launch({ headless: true });
   try {
     const page = await browser.newPage();
@@ -148,10 +150,49 @@ async function syncStartlistForRace(race: { id: string; name: string; pcsUrl: st
       "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
       "Accept-Language": "en-US,en;q=0.9",
     });
-    await page.goto(startlistUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
-    // Wait for startlist content
-    await page.waitForSelector(".startlist_v4, table.basic, .ridersCont", { timeout: 10000 }).catch(() => {});
-    html = await page.content();
+    await page.goto(startlistUrl, { waitUntil: "networkidle", timeout: 30000 });
+    await page.waitForTimeout(2000);
+    await page.waitForSelector(".startlist_v4, .ridersCont", { timeout: 10000 }).catch(() => {});
+
+    // Extract directly from live DOM to avoid cheerio/serialization issues
+    rawEntries = await page.evaluate(() => {
+      const entries: { riderName: string; riderPcsId: string; teamName: string | null; bibNumber: number | null }[] = [];
+
+      // Method 1: Team-based .startlist_v4
+      // Note: PCS uses relative hrefs ("rider/slug") — match with href*="rider/" not "/rider/"
+      const teamEls = document.querySelectorAll(".startlist_v4 > li");
+      teamEls.forEach((teamEl) => {
+        const teamNameEl = teamEl.querySelector("b, .team-name, h3, a[href*='team/']");
+        const teamName = teamNameEl?.textContent?.trim() || null;
+        teamEl.querySelectorAll(".ridersCont li, ul li").forEach((riderEl) => {
+          const link = riderEl.querySelector("a[href*='rider/']") as HTMLAnchorElement | null;
+          if (!link) return;
+          const riderName = link.textContent?.trim() || "";
+          const href = link.getAttribute("href") || "";
+          const riderPcsId = href.replace(/^\//, "").split("rider/")[1]?.split("/")[0]?.split("?")[0] || "";
+          const bibEl = riderEl.querySelector(".bib, .nr");
+          const bib = bibEl ? parseInt(bibEl.textContent?.trim() || "") || null : null;
+          if (riderName && riderPcsId) {
+            entries.push({ riderName, riderPcsId, teamName, bibNumber: bib });
+          }
+        });
+      });
+
+      // Method 2: flat rider links if method 1 empty
+      if (entries.length === 0) {
+        document.querySelectorAll("a[href*='rider/']").forEach((el) => {
+          const riderName = el.textContent?.trim() || "";
+          const href = el.getAttribute("href") || "";
+          const riderPcsId = href.replace(/^\//, "").split("rider/")[1]?.split("/")[0] || "";
+          if (riderName && riderPcsId && riderName.length > 2 && riderName.length < 60) {
+            const teamLink = el.closest("li, tr")?.querySelector("a[href*='team/']") as HTMLAnchorElement | null;
+            const teamName = teamLink?.textContent?.trim() || null;
+            entries.push({ riderName, riderPcsId, teamName, bibNumber: null });
+          }
+        });
+      }
+      return entries;
+    });
   } catch (err: any) {
     await browser.close();
     console.error(`   ❌ Playwright fetch failed: ${err.message}`);
@@ -159,55 +200,19 @@ async function syncStartlistForRace(race: { id: string; name: string; pcsUrl: st
   }
   await browser.close();
 
-  // Parse startlist from HTML using cheerio (same logic as pcs.ts scrapeStartlist)
-  const $ = cheerio.load(html);
-  const entries: Array<{ riderName: string; riderPcsId: string; teamName: string | null; bibNumber: number | null }> = [];
-
-  // Method 1: Team-based startlist (.startlist_v4)
-  $(".startlist_v4 > li").each((_, teamEl) => {
-    const teamName = $(teamEl).find("b, .team-name, h3").first().text().trim() || null;
-    $(teamEl).find(".ridersCont li, ul li").each((_, riderEl) => {
-      const link = $(riderEl).find("a[href*='/rider/']").first();
-      const riderName = link.text().trim();
-      const href = link.attr("href") || "";
-      const riderPcsId = href.split("/rider/")[1]?.split("/")[0]?.split("?")[0] || "";
-      const bib = parseInt($(riderEl).find(".bib, .nr").text().trim()) || null;
-      if (riderName && riderPcsId) {
-        entries.push({ riderName, riderPcsId, teamName, bibNumber: bib });
-      }
-    });
-  });
-
-  // Method 2: Flat list if method 1 failed
-  if (entries.length === 0) {
-    $("a[href*='/rider/']").each((_, el) => {
-      const riderName = $(el).text().trim();
-      const href = $(el).attr("href") || "";
-      const riderPcsId = href.split("/rider/")[1]?.split("/")[0] || "";
-      if (riderName && riderPcsId && riderName.length > 2 && riderName.length < 60) {
-        const teamEl = $(el).closest("li, tr").find("a[href*='/team/']").first();
-        const teamName = teamEl.text().trim() || null;
-        entries.push({ riderName, riderPcsId, teamName, bibNumber: null });
-      }
-    });
-  }
-
   // Deduplicate by pcsId
   const seen = new Set<string>();
-  const unique = entries.filter(e => {
-    if (seen.has(e.riderPcsId)) return false;
+  const entries2 = rawEntries.filter(e => {
+    if (!e.riderPcsId || seen.has(e.riderPcsId)) return false;
     seen.add(e.riderPcsId);
     return true;
   });
 
-  if (unique.length === 0) {
+  if (entries2.length === 0) {
     console.log(`   ⚠️  No entries found in HTML`);
     return { inserted: 0, updated: 0, skipped: 0 };
   }
-  console.log(`   📋 Found ${unique.length} riders`);
-  const entries2 = unique;
-
-  console.log(`   📋 Found ${entries.length} riders`);
+  console.log(`   📋 Found ${entries2.length} riders`);
 
   let inserted = 0, updated = 0, errors = 0;
 
