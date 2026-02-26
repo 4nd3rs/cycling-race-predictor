@@ -32,6 +32,15 @@ interface EventCardProps {
   discipline: string;
   subDiscipline?: string | null;
   series?: string | null;
+  uciCategory?: string | null;
+  externalLinks?: {
+    website?: string;
+    twitter?: string;
+    instagram?: string;
+    youtube?: string;
+    liveStream?: Array<{ name: string; url: string; free?: boolean }>;
+    tracking?: string;
+  } | null;
   categories: RaceCategory[];
   className?: string;
 }
@@ -200,6 +209,15 @@ interface EventListProps {
     discipline: string;
     subDiscipline?: string | null;
     series?: string | null;
+    uciCategory?: string | null;
+    externalLinks?: {
+      website?: string;
+      twitter?: string;
+      instagram?: string;
+      youtube?: string;
+      liveStream?: Array<{ name: string; url: string; free?: boolean }>;
+      tracking?: string;
+    } | null;
     categories: RaceCategory[];
   }>;
   emptyMessage?: string;
@@ -253,8 +271,20 @@ const DISC_COLORS: Record<string, string> = {
   cyclocross: "bg-purple-500/20 text-purple-400 border border-purple-500/30",
 };
 
+// ── Small SVG icons for link row ─────────────────────────────────────────────
+function LinkIcon({ href, title, className, children }: { href: string; title: string; className?: string; children: React.ReactNode }) {
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" title={title}
+      className={cn("text-muted-foreground/60 hover:text-foreground transition-colors", className)}
+      onClick={(e) => e.stopPropagation()}>
+      {children}
+    </a>
+  );
+}
+
 export function EventListRow({
-  id, name, slug, date, endDate, country, discipline, subDiscipline, categories,
+  id, name, slug, date, endDate, country, discipline, subDiscipline,
+  uciCategory, externalLinks, categories,
 }: EventCardProps) {
   const startDate = new Date(date + "T12:00:00");
   const isEventToday = isToday(startDate);
@@ -272,6 +302,8 @@ export function EventListRow({
     const bo = o[b.ageCategory as keyof typeof o] ?? 4;
     return ao !== bo ? ao - bo : (a.gender === "men" ? -1 : 1);
   });
+
+  const totalRiders = categories.reduce((s, c) => s + (c.riderCount || 0), 0);
 
   const statusEl = isEventToday ? (
     <span className="rounded px-1.5 py-0.5 text-xs font-bold bg-red-500 text-white animate-pulse">LIVE</span>
@@ -291,10 +323,15 @@ export function EventListRow({
       {/* Date */}
       <span className="w-12 shrink-0 text-xs font-mono text-muted-foreground tabular-nums">{dateStr}</span>
 
-      {/* Discipline badge */}
-      <span className={cn("hidden sm:inline-block shrink-0 rounded px-1.5 py-0.5 text-xs font-medium", discColor)}>
-        {subDiscipline ? getSubDisciplineShortLabel(subDiscipline) : discLabel}
-      </span>
+      {/* Discipline + UCI category */}
+      <div className="hidden sm:flex items-center gap-1 shrink-0 w-28">
+        <span className={cn("rounded px-1.5 py-0.5 text-xs font-medium", discColor)}>
+          {subDiscipline ? getSubDisciplineShortLabel(subDiscipline) : discLabel}
+        </span>
+        {uciCategory && (
+          <span className="text-[10px] text-muted-foreground/70 font-mono truncate">{uciCategory}</span>
+        )}
+      </div>
 
       {/* Name */}
       <Link href={eventUrl} className="flex-1 min-w-0 font-medium text-sm hover:text-primary transition-colors truncate">
@@ -303,20 +340,52 @@ export function EventListRow({
 
       {/* Country */}
       {country && (
-        <span className="hidden md:block text-xs text-muted-foreground shrink-0 w-8">{country}</span>
+        <span className="hidden lg:block text-xs text-muted-foreground shrink-0 w-8 font-mono">{country}</span>
       )}
 
       {/* Category pills */}
-      <div className="hidden sm:flex items-center gap-1 shrink-0">
-        {sortedCats.slice(0, 6).map((c) => (
+      <div className="hidden md:flex items-center gap-1 shrink-0">
+        {sortedCats.slice(0, 5).map((c) => (
           <span key={c.id} className="rounded px-1 py-0.5 text-[10px] bg-muted/50 text-muted-foreground font-mono">
             {catAbbr(c.ageCategory, c.gender)}
           </span>
         ))}
-        {sortedCats.length > 6 && (
-          <span className="text-[10px] text-muted-foreground">+{sortedCats.length - 6}</span>
+        {sortedCats.length > 5 && (
+          <span className="text-[10px] text-muted-foreground">+{sortedCats.length - 5}</span>
         )}
       </div>
+
+      {/* Riders count */}
+      <span className="hidden lg:block text-xs text-muted-foreground shrink-0 w-14 text-right tabular-nums">
+        {totalRiders > 0 ? `${totalRiders} 🚴` : ""}
+      </span>
+
+      {/* External links */}
+      {externalLinks && (
+        <div className="hidden sm:flex items-center gap-2 shrink-0 w-16 justify-end">
+          {externalLinks.website && (
+            <LinkIcon href={externalLinks.website} title="Website">
+              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <circle cx={12} cy={12} r={10}/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+              </svg>
+            </LinkIcon>
+          )}
+          {externalLinks.twitter && (
+            <LinkIcon href={externalLinks.twitter} title="X / Twitter">
+              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.213 5.567 5.951-5.567zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+              </svg>
+            </LinkIcon>
+          )}
+          {externalLinks.liveStream && externalLinks.liveStream.length > 0 && (
+            <LinkIcon href={externalLinks.liveStream[0].url} title={`Watch: ${externalLinks.liveStream.map(s => s.name).join(", ")}`} className="hover:text-red-400">
+              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <rect x={2} y={7} width={20} height={15} rx={2}/><polyline points="17 2 12 7 7 2"/>
+              </svg>
+            </LinkIcon>
+          )}
+        </div>
+      )}
 
       {/* Status */}
       <div className="shrink-0">{statusEl}</div>
@@ -337,12 +406,14 @@ export function EventListView({
   return (
     <div className="rounded-lg border border-border/50 overflow-hidden">
       {/* Header row */}
-      <div className="flex items-center gap-3 py-2 px-3 bg-muted/30 border-b border-border/50 text-xs font-medium text-muted-foreground">
+      <div className="flex items-center gap-3 py-2 px-3 bg-muted/30 border-b border-border/50 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
         <span className="w-12 shrink-0">Date</span>
-        <span className="hidden sm:block w-12 shrink-0">Type</span>
+        <span className="hidden sm:block w-28 shrink-0">Type</span>
         <span className="flex-1">Event</span>
-        <span className="hidden md:block w-8">Ctry</span>
-        <span className="hidden sm:block">Categories</span>
+        <span className="hidden lg:block w-8">Ctry</span>
+        <span className="hidden md:block w-24">Categories</span>
+        <span className="hidden lg:block w-14 text-right">Riders</span>
+        <span className="hidden sm:block w-16 text-right">Links</span>
         <span className="w-20 text-right">Status</span>
       </div>
       {events.map((event) => (
@@ -357,6 +428,8 @@ export function EventListView({
           discipline={event.discipline}
           subDiscipline={event.subDiscipline}
           series={event.series}
+          uciCategory={event.uciCategory}
+          externalLinks={event.externalLinks}
           categories={event.categories}
         />
       ))}

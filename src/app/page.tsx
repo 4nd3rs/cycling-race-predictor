@@ -4,47 +4,59 @@ import { IntelCard } from "@/components/intel-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { db, races, raceEvents, raceStartlist, riderRumours, riders, raceResults } from "@/lib/db";
+import { db, races, raceEvents, riderRumours, riders, raceResults } from "@/lib/db";
 import { desc, eq, gte, lt, and, sql, isNotNull } from "drizzle-orm";
 import { format, formatDistanceToNow, differenceInDays } from "date-fns";
 import { getFlag } from "@/lib/country-flags";
-import { buildRaceUrl, getDisciplineShortLabel } from "@/lib/url-utils";
-import { RaceLinksCompact, RaceLinksSection } from "@/components/race-links";
+import { buildEventUrl, buildRaceUrl, getDisciplineShortLabel } from "@/lib/url-utils";
+import { RaceLinksSection } from "@/components/race-links";
+import { EventListView } from "@/components/event-card";
 
 // ---------------------------------------------------------------------------
 // HYPE SCORING — only prestigious races on the homepage
 // ---------------------------------------------------------------------------
 
-/**
- * Returns a prestige score for a race based on its UCI category.
- * Used to filter/sort the homepage so low-profile events don't dominate.
- */
 function getHypeScore(uciCategory: string | null | undefined): number {
   const cat = (uciCategory || "").toUpperCase().trim();
   if (cat === "WORLDTOUR" || cat === "1.UWT" || cat === "2.UWT") return 100;
-  if (cat === "WC") return 90;          // MTB World Cup
+  if (cat === "WC") return 90;
   if (cat === "1.PRO" || cat === "2.PRO" || cat === "PROSERIES") return 80;
-  if (cat === "C1") return 70;          // UCI MTB C1
+  if (cat === "C1") return 70;
   if (cat === "1.1" || cat === "2.1") return 50;
   if (cat === "1.2" || cat === "2.2") return 35;
-  if (cat === "C2") return 20;          // Low-profile regional
+  if (cat === "C2") return 20;
   return 30;
 }
 
-/** Minimum hype score to appear on the homepage */
 const HOMEPAGE_HYPE_MIN = 70;
+
+/** Shape used by EventListView and the hero */
+interface HomepageEvent {
+  id: string;
+  name: string;
+  slug: string | null;
+  date: string;
+  endDate: string | null;
+  country: string | null;
+  discipline: string;
+  subDiscipline: string | null;
+  series: string | null;
+  uciCategory: string | null;
+  hypeScore: number;
+  externalLinks: {
+    website?: string; twitter?: string; instagram?: string; youtube?: string;
+    liveStream?: Array<{ name: string; url: string; free?: boolean }>;
+    tracking?: string;
+  } | null;
+  categories: Array<{ id: string; ageCategory: string; gender: string; categorySlug: string | null; riderCount: number }>;
+  totalRiders: number;
+}
 
 // ---------------------------------------------------------------------------
 // DATA FETCHING
 // ---------------------------------------------------------------------------
 
-/**
- * Returns { hero, calendar } where:
- * - hero  = the next high-hype race (WorldTour / WC / 1.Pro / C1)
- * - calendar = next 11 high-hype races after hero
- * Falls back to chronological order if no high-hype races exist.
- */
-async function getHighHypeRaces() {
+async function getHighHypeRaces(): Promise<{ hero: HomepageEvent | null; calendar: HomepageEvent[] }> {
   const today = new Date().toISOString().split("T")[0];
   try {
     const result = await db
@@ -57,19 +69,55 @@ async function getHighHypeRaces() {
       .innerJoin(raceEvents, eq(races.raceEventId, raceEvents.id))
       .where(and(gte(raceEvents.date, today), eq(races.status, "active")))
       .orderBy(raceEvents.date)
-      .limit(60);
+      .limit(150);
 
-    const highHype = result.filter(
-      (r) => getHypeScore(r.race.uciCategory) >= HOMEPAGE_HYPE_MIN
+    // Group by event id — deduplicate categories into one row per event
+    const eventsMap = new Map<string, HomepageEvent>();
+    for (const { race, event, startlistCount } of result) {
+      const riders = Number(startlistCount) || 0;
+      if (!eventsMap.has(event.id)) {
+        eventsMap.set(event.id, {
+          id: event.id,
+          name: event.name,
+          slug: event.slug,
+          date: event.date,
+          endDate: event.endDate,
+          country: event.country,
+          discipline: event.discipline,
+          subDiscipline: event.subDiscipline,
+          series: event.series,
+          uciCategory: race.uciCategory ?? null,
+          hypeScore: getHypeScore(race.uciCategory),
+          externalLinks: (event.externalLinks as HomepageEvent["externalLinks"]) ?? null,
+          categories: [],
+          totalRiders: 0,
+        });
+      } else {
+        const ev = eventsMap.get(event.id)!;
+        if (getHypeScore(race.uciCategory) > ev.hypeScore) {
+          ev.uciCategory = race.uciCategory ?? null;
+          ev.hypeScore = getHypeScore(race.uciCategory);
+        }
+      }
+      const ev = eventsMap.get(event.id)!;
+      ev.totalRiders += riders;
+      ev.categories.push({
+        id: race.id,
+        ageCategory: race.ageCategory || "elite",
+        gender: race.gender || "men",
+        categorySlug: race.categorySlug,
+        riderCount: riders,
+      });
+    }
+
+    const allGrouped = Array.from(eventsMap.values()).sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
-    // Fall back to all upcoming if nothing passes the bar
-    const pool = highHype.length > 0 ? highHype : result;
+    const highHype = allGrouped.filter(e => e.hypeScore >= HOMEPAGE_HYPE_MIN);
+    const pool = highHype.length > 0 ? highHype : allGrouped;
 
-    return {
-      hero: pool[0] ?? null,
-      calendar: pool.slice(1, 12),
-    };
+    return { hero: pool[0] ?? null, calendar: pool.slice(1, 20) };
   } catch {
     return { hero: null, calendar: [] };
   }
@@ -173,11 +221,7 @@ export default async function Home() {
         <section className="border-b border-border/50">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-10 md:py-16">
             {nextRace ? (
-              <NextRaceHero
-                race={nextRace.race}
-                event={nextRace.event}
-                startlistCount={Number(nextRace.startlistCount) || 0}
-              />
+              <NextRaceHero event={nextRace} />
             ) : (
               <div className="text-center py-12">
                 <p className="text-xl text-muted-foreground">No upcoming races — check back soon</p>
@@ -186,7 +230,7 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* ---- UPCOMING RACES GRID ---- */}
+        {/* ---- UPCOMING RACES TABLE ---- */}
         {upcomingRaces.length > 0 && (
           <section className="border-b border-border/50">
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-10">
@@ -196,16 +240,7 @@ export default async function Home() {
                   View all races &rarr;
                 </Link>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {upcomingRaces.map(({ race, event, startlistCount }) => (
-                  <UpcomingRaceCard
-                    key={race.id}
-                    race={race}
-                    event={event}
-                    startlistCount={Number(startlistCount) || 0}
-                  />
-                ))}
-              </div>
+              <EventListView events={upcomingRaces} />
             </div>
           </section>
         )}
@@ -307,22 +342,11 @@ export default async function Home() {
 // SUB-COMPONENTS
 // ---------------------------------------------------------------------------
 
-function NextRaceHero({
-  race,
-  event,
-  startlistCount,
-}: {
-  race: typeof races.$inferSelect;
-  event: typeof raceEvents.$inferSelect;
-  startlistCount: number;
-}) {
-  const raceDate = new Date(race.date);
+function NextRaceHero({ event: ev }: { event: HomepageEvent }) {
+  const raceDate = new Date(ev.date + "T12:00:00");
   const daysUntil = differenceInDays(raceDate, new Date());
-  const url = getRaceUrl(race, event);
-
-  const subLabel = event.subDiscipline
-    ? getDisciplineShortLabel(event.subDiscipline)
-    : null;
+  const url = ev.slug ? buildEventUrl(ev.discipline, ev.slug) : `/races/${ev.id}`;
+  const subLabel = ev.subDiscipline ? getDisciplineShortLabel(ev.subDiscipline) : null;
 
   return (
     <div className="relative">
@@ -334,111 +358,48 @@ function NextRaceHero({
             </span>
             {daysUntil >= 0 && daysUntil <= 7 && (
               <Badge className="bg-accent text-accent-foreground text-xs font-bold">
-                {daysUntil === 0
-                  ? "TODAY"
-                  : daysUntil === 1
-                  ? "TOMORROW"
-                  : `IN ${daysUntil} DAYS`}
+                {daysUntil === 0 ? "TODAY" : daysUntil === 1 ? "TOMORROW" : `IN ${daysUntil} DAYS`}
               </Badge>
             )}
           </div>
 
           <h1 className="text-3xl font-black tracking-tight sm:text-4xl md:text-5xl">
-            {event.name}
+            {ev.name}
           </h1>
 
           <div className="flex flex-wrap items-center gap-3 text-muted-foreground">
             <span className="flex items-center gap-1.5">
-              {getFlag(event.country)} {format(raceDate, "EEEE, MMMM d")}
+              {getFlag(ev.country)} {format(raceDate, "EEEE, MMMM d")}
             </span>
-            <Badge variant="outline" className={getDisciplineColor(event.discipline)}>
-              {getDisciplineLabel(event.discipline)}
-              {subLabel ? ` ${subLabel}` : ""}
+            <Badge variant="outline" className={getDisciplineColor(ev.discipline)}>
+              {getDisciplineLabel(ev.discipline)}{subLabel ? ` ${subLabel}` : ""}
             </Badge>
-            {race.uciCategory && (
-              <Badge variant="outline" className="text-xs">
-                {race.uciCategory}
-              </Badge>
+            {ev.uciCategory && (
+              <Badge variant="outline" className="text-xs">{ev.uciCategory}</Badge>
             )}
           </div>
 
-          {startlistCount > 0 && (
+          {ev.totalRiders > 0 && (
             <p className="text-sm text-muted-foreground">
-              {startlistCount} riders confirmed
+              {ev.totalRiders} riders confirmed across {ev.categories.length} categories
             </p>
           )}
 
-          {event.externalLinks && Object.keys(event.externalLinks).length > 0 && (
+          {ev.externalLinks && Object.keys(ev.externalLinks).length > 0 && (
             <div className="pt-1">
-              <RaceLinksSection links={event.externalLinks} />
+              <RaceLinksSection links={ev.externalLinks} />
             </div>
           )}
         </div>
 
         <Button asChild size="lg" className="self-start md:self-end shrink-0">
-          <Link href={url}>
-            View Predictions &rarr;
-          </Link>
+          <Link href={url}>View Predictions &rarr;</Link>
         </Button>
       </div>
 
-      {/* Racing stripe accent */}
       <div className="absolute -left-4 top-0 bottom-0 w-1 bg-primary rounded-full hidden md:block" />
     </div>
   );
 }
 
-function UpcomingRaceCard({
-  race,
-  event,
-  startlistCount,
-}: {
-  race: typeof races.$inferSelect;
-  event: typeof raceEvents.$inferSelect;
-  startlistCount: number;
-}) {
-  const raceDate = new Date(race.date);
-  const url = getRaceUrl(race, event);
-  const hype = getHypeScore(race.uciCategory);
-  const isFeatured = hype >= 90; // WorldTour or WC
-
-  return (
-    <Link
-      href={url}
-      className={`flex flex-col gap-2 p-4 rounded-lg border transition-colors group hover:bg-card ${
-        isFeatured
-          ? "border-yellow-500/40 hover:border-yellow-500/70 bg-yellow-500/5"
-          : "border-border/50 hover:border-border"
-      }`}
-    >
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5">
-          <Badge variant="outline" className={`text-[10px] shrink-0 ${getDisciplineColor(event.discipline)}`}>
-            {getDisciplineLabel(event.discipline)}
-          </Badge>
-          {isFeatured && (
-            <span className="text-[10px] font-bold text-yellow-500 uppercase tracking-wide">★</span>
-          )}
-        </div>
-        <span className="text-xs text-muted-foreground">
-          {format(raceDate, "MMM d")}
-        </span>
-      </div>
-      <p className="font-semibold text-sm truncate group-hover:text-primary transition-colors">
-        {event.name}
-      </p>
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <span>{getFlag(event.country)}</span>
-        {startlistCount > 0 && <span>{startlistCount} riders</span>}
-        {race.uciCategory && (
-          <span className="ml-auto font-medium text-muted-foreground/70">{race.uciCategory}</span>
-        )}
-      </div>
-      {event.externalLinks && Object.keys(event.externalLinks).length > 0 && (
-        <div className="pt-1 border-t border-border/30">
-          <RaceLinksCompact links={event.externalLinks} />
-        </div>
-      )}
-    </Link>
-  );
-}
+// UpcomingRaceCard replaced by EventListView (table) on homepage

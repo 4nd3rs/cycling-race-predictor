@@ -26,6 +26,12 @@ interface GroupedEvent {
   discipline: string;
   subDiscipline: string | null;
   series: string | null;
+  uciCategory: string | null;   // most prestigious category for this event
+  externalLinks: {
+    website?: string; twitter?: string; instagram?: string; youtube?: string;
+    liveStream?: Array<{ name: string; url: string; free?: boolean }>;
+    tracking?: string;
+  } | null;
   categories: Array<{
     id: string;
     ageCategory: string;
@@ -58,6 +64,17 @@ async function getEvents(discipline: string | null, upcoming: boolean): Promise<
       .orderBy(upcoming ? raceEvents.date : desc(raceEvents.date))
       .limit(300);
 
+    // hype score for picking the "best" uciCategory per event
+    const hype = (cat: string | null | undefined) => {
+      const c = (cat || "").toUpperCase().trim();
+      if (c === "WORLDTOUR" || c === "1.UWT") return 100;
+      if (c === "WC") return 90;
+      if (c === "1.PRO" || c === "2.PRO" || c === "PROSERIES") return 80;
+      if (c === "C1") return 70;
+      if (c === "1.1" || c === "2.1") return 50;
+      return 30;
+    };
+
     const eventsMap = new Map<string, GroupedEvent>();
     for (const { race, event, startlistCount, resultCount } of eventRaces) {
       if (!eventsMap.has(event.id)) {
@@ -71,8 +88,16 @@ async function getEvents(discipline: string | null, upcoming: boolean): Promise<
           discipline: event.discipline,
           subDiscipline: event.subDiscipline,
           series: event.series,
+          uciCategory: race.uciCategory ?? null,
+          externalLinks: (event.externalLinks as GroupedEvent["externalLinks"]) ?? null,
           categories: [],
         });
+      } else {
+        // Keep the most prestigious uciCategory
+        const existing = eventsMap.get(event.id)!;
+        if (hype(race.uciCategory) > hype(existing.uciCategory)) {
+          existing.uciCategory = race.uciCategory ?? null;
+        }
       }
       const riderCount = Math.max(Number(startlistCount) || 0, Number(resultCount) || 0);
       eventsMap.get(event.id)!.categories.push({
