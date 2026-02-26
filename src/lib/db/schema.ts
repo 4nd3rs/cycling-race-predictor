@@ -117,6 +117,9 @@ export const raceEvents = pgTable(
       youtube?: string;
       liveStream?: Array<{ name: string; url: string; regions?: string; free?: boolean }>;
       tracking?: string;
+      tvSchedule?: Array<{ region: string; channel: string; startTime?: string; url?: string }>;
+      raceStart?: string;
+      raceFinish?: string;
     }>(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
@@ -471,6 +474,27 @@ export const riderDisciplineStatsRelations = relations(riderDisciplineStats, ({ 
     references: [teams.id],
   }),
 }));
+
+export const raceNews = pgTable(
+  "race_news",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    raceEventId: uuid("race_event_id").notNull(),
+    title: text("title").notNull(),
+    summary: text("summary"),
+    url: text("url"),
+    imageUrl: text("image_url"),
+    source: varchar("source", { length: 50 }), // 'cyclingnews' | 'velonews' | 'manual'
+    category: varchar("category", { length: 30 }).default("news"), // 'news' | 'preview' | 'startlist' | 'social'
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    index("idx_race_news_event_id").on(table.raceEventId),
+    index("idx_race_news_published").on(table.publishedAt),
+    unique("race_news_url_unique").on(table.url),
+  ]
+);
 
 export const raceEventsRelations = relations(raceEvents, ({ many }) => ({
   races: many(races),

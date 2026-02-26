@@ -13,7 +13,7 @@ import { RaceLinksSection } from "@/components/race-links";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { db, races, predictions, riders, raceStartlist, riderDisciplineStats, raceResults, riderRumours, teams, raceEvents } from "@/lib/db";
+import { db, races, predictions, riders, raceStartlist, riderDisciplineStats, raceResults, riderRumours, teams, raceEvents, raceNews } from "@/lib/db";
 import { eq, desc, and, gte, ne, inArray } from "drizzle-orm";
 import { format, formatDistanceToNow } from "date-fns";
 import { generateRacePredictions, calculateForm, type RiderPredictionInput, type RecentResult, RACE_CATEGORY_WEIGHTS, type ProfileType } from "@/lib/prediction";
@@ -489,6 +489,19 @@ async function getRaceIntel(raceId: string) {
   }
 }
 
+async function getRaceNews(eventId: string) {
+  try {
+    return await db
+      .select()
+      .from(raceNews)
+      .where(eq(raceNews.raceEventId, eventId))
+      .orderBy(desc(raceNews.publishedAt))
+      .limit(6);
+  } catch {
+    return [];
+  }
+}
+
 function countryToFlag(countryCode?: string | null) {
   if (!countryCode) return null;
   const code = countryCode.toUpperCase();
@@ -560,9 +573,10 @@ export default async function CategoryPage({ params }: PageProps) {
   }
 
   // Get race intel (rumours for riders on the startlist) + weather in parallel
-  const [raceIntel, weather] = await Promise.all([
+  const [raceIntel, weather, latestNews] = await Promise.all([
     getRaceIntel(race.id),
     getRaceWeather(event.country, race.date),
+    getRaceNews(event.id),
   ]);
 
   // Get predictions
@@ -703,6 +717,12 @@ export default async function CategoryPage({ params }: PageProps) {
                   )}
                   {race.raceType === "one_day" && <span>🏁 One-day classic</span>}
                   {race.raceType === "stage_race" && <span>📅 Stage race</span>}
+                  {event.externalLinks?.raceStart && (
+                    <span>🕐 Start {event.externalLinks.raceStart}</span>
+                  )}
+                  {event.externalLinks?.raceFinish && (
+                    <span>🏁 Est. finish {event.externalLinks.raceFinish}</span>
+                  )}
                 </div>
 
                 {/* External links (website, social, streaming) */}
@@ -771,6 +791,93 @@ export default async function CategoryPage({ params }: PageProps) {
             </div>{/* /flex row */}
           </div>
         </section>
+
+        {/* ── Race Pulse: Latest News ─────────────────────────────────── */}
+        {latestNews.length > 0 && (
+          <section className="border-b border-border/50">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-6">
+              <h2 className="text-lg font-bold mb-4">📰 Race Pulse</h2>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {latestNews.map((article) => (
+                  <a
+                    key={article.id}
+                    href={article.url || "#"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group flex flex-col rounded-xl border border-border/50 bg-card/30 hover:bg-card/80 hover:border-border transition-all overflow-hidden"
+                  >
+                    {article.imageUrl && (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <div className="h-36 overflow-hidden bg-muted/30 shrink-0">
+                        <img
+                          src={article.imageUrl}
+                          alt=""
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                      </div>
+                    )}
+                    <div className="p-3 flex flex-col gap-1.5 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] uppercase tracking-wider font-semibold text-primary/70">
+                          {article.source}
+                        </span>
+                        {article.publishedAt && (
+                          <span className="text-[10px] text-muted-foreground/60">
+                            · {formatDistanceToNow(article.publishedAt, { addSuffix: true })}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm font-semibold leading-snug line-clamp-3 group-hover:text-primary transition-colors">
+                        {article.title}
+                      </p>
+                      {article.summary && (
+                        <p className="text-xs text-muted-foreground line-clamp-2 mt-auto pt-1">
+                          {article.summary}
+                        </p>
+                      )}
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* ── Watch: TV Schedule ──────────────────────────────────────── */}
+        {event.externalLinks?.tvSchedule && event.externalLinks.tvSchedule.length > 0 && (
+          <section className="border-b border-border/50">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-6">
+              <h2 className="text-lg font-bold mb-4">📺 How to Watch</h2>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {event.externalLinks.tvSchedule.map((entry, i) => (
+                  <div key={i} className="flex items-center justify-between gap-3 rounded-lg border border-border/40 bg-card/30 px-3 py-2.5">
+                    <div className="min-w-0">
+                      <p className="text-xs text-muted-foreground truncate">{entry.region}</p>
+                      {entry.url ? (
+                        <a href={entry.url} target="_blank" rel="noopener noreferrer"
+                          className="text-sm font-semibold hover:text-primary transition-colors truncate block">
+                          {entry.channel}
+                        </a>
+                      ) : (
+                        <p className="text-sm font-semibold truncate">{entry.channel}</p>
+                      )}
+                    </div>
+                    {entry.startTime && (
+                      <span className="text-xs font-mono bg-primary/10 text-primary px-2 py-0.5 rounded shrink-0">
+                        {entry.startTime}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {(event.externalLinks.raceStart || event.externalLinks.raceFinish) && (
+                <p className="text-xs text-muted-foreground mt-3">
+                  ⏱ Race: {event.externalLinks.raceStart} → {event.externalLinks.raceFinish} (CET)
+                </p>
+              )}
+            </div>
+          </section>
+        )}
 
         {/* ── Pre-Race Intel ──────────────────────────────────────────── */}
         {raceIntel.length > 0 && (
