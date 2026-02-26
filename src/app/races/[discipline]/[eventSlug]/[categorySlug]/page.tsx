@@ -9,6 +9,7 @@ import { SyncSupercupButton } from "@/components/sync-supercup-button";
 import { AddInfoButton } from "@/components/add-info-button";
 import { DeleteRaceButton } from "@/components/delete-race-button";
 import { TelegramSubscribeButton } from "@/components/telegram-subscribe-button";
+import { RaceLinksSection } from "@/components/race-links";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,6 +27,68 @@ import {
   buildCategoryUrl,
   generateCategorySlug,
 } from "@/lib/url-utils";
+
+// ── Weather ────────────────────────────────────────────────────────────────
+
+const COUNTRY_COORDS: Record<string, { lat: number; lon: number; city: string }> = {
+  BEL: { lat: 50.85, lon: 4.35, city: "Belgium" },
+  ITA: { lat: 41.90, lon: 12.49, city: "Italy" },
+  FRA: { lat: 48.85, lon: 2.35, city: "France" },
+  ESP: { lat: 40.41, lon: -3.70, city: "Spain" },
+  NED: { lat: 52.37, lon: 4.89, city: "Netherlands" },
+  SUI: { lat: 46.95, lon: 7.44, city: "Switzerland" },
+  GBR: { lat: 51.50, lon: -0.12, city: "UK" },
+  GER: { lat: 52.52, lon: 13.40, city: "Germany" },
+  NOR: { lat: 59.91, lon: 10.75, city: "Norway" },
+  DEN: { lat: 55.67, lon: 12.57, city: "Denmark" },
+  AUT: { lat: 48.20, lon: 16.37, city: "Austria" },
+  POL: { lat: 52.22, lon: 21.01, city: "Poland" },
+  SLO: { lat: 46.05, lon: 14.50, city: "Slovenia" },
+  POR: { lat: 38.71, lon: -9.14, city: "Portugal" },
+};
+
+type RaceWeather = {
+  tempMax: number; tempMin: number;
+  precipMm: number; windKmh: number;
+  weatherCode: number; city: string;
+} | null;
+
+async function getRaceWeather(country: string | null, date: string): Promise<RaceWeather> {
+  if (!country || !COUNTRY_COORDS[country]) return null;
+  const { lat, lon, city } = COUNTRY_COORDS[country];
+  try {
+    const res = await fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,windspeed_10m_max,weathercode&timezone=auto&start_date=${date}&end_date=${date}`,
+      { next: { revalidate: 3600 } }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const d = data.daily;
+    if (!d?.temperature_2m_max?.[0]) return null;
+    return {
+      tempMax: Math.round(d.temperature_2m_max[0]),
+      tempMin: Math.round(d.temperature_2m_min[0]),
+      precipMm: Math.round(d.precipitation_sum[0] * 10) / 10,
+      windKmh: Math.round(d.windspeed_10m_max[0]),
+      weatherCode: d.weathercode[0],
+      city,
+    };
+  } catch { return null; }
+}
+
+function wmoToEmoji(code: number): { emoji: string; desc: string } {
+  if (code === 0) return { emoji: "☀️", desc: "Clear sky" };
+  if (code <= 2) return { emoji: "⛅", desc: "Partly cloudy" };
+  if (code === 3) return { emoji: "☁️", desc: "Overcast" };
+  if (code <= 49) return { emoji: "🌫️", desc: "Fog" };
+  if (code <= 67) return { emoji: "🌧️", desc: "Rain" };
+  if (code <= 77) return { emoji: "❄️", desc: "Snow" };
+  if (code <= 82) return { emoji: "🌦️", desc: "Showers" };
+  if (code <= 99) return { emoji: "⛈️", desc: "Thunderstorm" };
+  return { emoji: "🌡️", desc: "Unknown" };
+}
+
+// ──────────────────────────────────────────────────────────────────────────
 
 interface PageProps {
   params: Promise<{ discipline: string; eventSlug: string; categorySlug: string }>;
@@ -496,8 +559,11 @@ export default async function CategoryPage({ params }: PageProps) {
     await generatePredictionsIfNeeded(race, startlist.length);
   }
 
-  // Get race intel (rumours for riders on the startlist)
-  const raceIntel = await getRaceIntel(race.id);
+  // Get race intel (rumours for riders on the startlist) + weather in parallel
+  const [raceIntel, weather] = await Promise.all([
+    getRaceIntel(race.id),
+    getRaceWeather(event.country, race.date),
+  ]);
 
   // Get predictions
   const racePredictions = isCompleted ? [] : await getRacePredictions(race.id, race);
@@ -562,124 +628,234 @@ export default async function CategoryPage({ params }: PageProps) {
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
-      <main className="flex-1 container mx-auto px-4 sm:px-6 lg:px-8 py-8 max-w-6xl">
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-2 mb-4 text-sm flex-wrap">
-          <Link href="/races" className="text-muted-foreground hover:text-foreground">
-            Races
-          </Link>
-          <span className="text-muted-foreground">/</span>
-          <Link href={`/races/${discipline}`} className="text-muted-foreground hover:text-foreground">
-            {disciplineLabel}
-          </Link>
-          <span className="text-muted-foreground">/</span>
-          <Link href={`/races/${discipline}/${eventSlug}`} className="text-muted-foreground hover:text-foreground">
-            {event.name}
-          </Link>
-          <span className="text-muted-foreground">/</span>
-          <span className="font-medium">{categoryDisplay}</span>
-        </div>
+      <main className="flex-1">
 
-        {/* Race Header */}
-        <div className="mb-8">
-          <div className="flex items-start justify-between gap-4 mb-3">
-            <div>
-              <div className="flex flex-wrap items-center gap-2 mb-2">
-                <Badge variant="secondary">{disciplineLabel}</Badge>
-                {event.subDiscipline && (
-                  <Badge variant="outline" className="bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
-                    {getSubDisciplineShortLabel(event.subDiscipline)}
-                  </Badge>
-                )}
-                <Badge variant="outline" className="bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
-                  {categoryDisplay}
-                </Badge>
-                {race.profileType && (
-                  <Badge variant="outline">
-                    {getProfileIcon(race.profileType)} {race.profileType}
-                  </Badge>
-                )}
-                {race.uciCategory && (
-                  <Badge variant="outline">{race.uciCategory}</Badge>
-                )}
-                {isUpcoming ? (
-                  <Badge className="bg-green-500">Upcoming</Badge>
-                ) : (
-                  <Badge variant="secondary">Completed</Badge>
-                )}
-              </div>
-              <h1 className="text-3xl font-bold">{event.name}</h1>
-              <p className="text-xl text-muted-foreground">{categoryDisplay}</p>
-              <div className="flex flex-wrap items-center gap-3 mt-2 text-muted-foreground">
-                <span>{format(raceDate, "EEEE, MMMM d, yyyy")}</span>
-                {race.country && (
-                  <span className="flex items-center gap-1">
-                    {countryToFlag(race.country)} {race.country}
-                  </span>
-                )}
-                {race.distanceKm && (
-                  <span>• {parseFloat(race.distanceKm).toFixed(1)} km</span>
-                )}
-                {race.elevationM && <span>• {race.elevationM}m ↑</span>}
-              </div>
-            </div>
-            {admin && (
-              <div className="flex flex-wrap gap-2">
-                {discipline === "mtb" && isSuperCup && <SyncSupercupButton raceId={race.id} />}
-                {discipline === "mtb" && (
-                  <AddInfoButton raceId={race.id} raceName={`${event.name} - ${categoryDisplay}`} />
-                )}
-                {!isCompleted && event.sourceType !== "cronomancha" && event.sourceType !== "copa_catalana" && (
-                  <RefreshStartlistButton raceId={race.id} />
-                )}
-                {isCompleted && event.sourceType === "copa_catalana" && (
-                  <ReimportResultsButton raceId={race.id} />
-                )}
-                <DeleteRaceButton raceId={race.id} raceName={race.name} />
-              </div>
-            )}
-          </div>
+        {/* ── Race Hero ──────────────────────────────────────────────── */}
+        <section className="border-b border-border/50">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-8">
 
-          {/* Source link */}
-          {(race.startlistUrl || event.sourceUrl) && (
-            <div className="mt-2">
-              <a
-                href={race.startlistUrl || event.sourceUrl || ""}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
-              >
-                View source PDF ↗
-              </a>
-            </div>
-          )}
+            {/* Breadcrumb */}
+            <nav className="flex items-center gap-1.5 mb-5 text-xs text-muted-foreground flex-wrap">
+              <Link href="/races" className="hover:text-foreground transition-colors">Races</Link>
+              <span>/</span>
+              <Link href={`/races/${discipline}`} className="hover:text-foreground transition-colors capitalize">{discipline}</Link>
+              <span>/</span>
+              <Link href={`/races/${discipline}/${eventSlug}`} className="hover:text-foreground transition-colors">{event.name}</Link>
+              <span>/</span>
+              <span className="text-foreground font-medium">{categoryDisplay}</span>
+            </nav>
 
-          {/* Telegram subscribe */}
-          <div className="mt-3">
-            <TelegramSubscribeButton />
-          </div>
+            <div className="flex flex-col lg:flex-row gap-8">
 
-          {/* Related category races */}
-          {siblingRaces.length > 0 && (
-            <div className="mt-4 p-3 bg-muted/50 rounded-lg">
-              <p className="text-sm text-muted-foreground mb-2">Other categories in this event:</p>
-              <div className="flex flex-wrap gap-2">
-                {siblingRaces.map((sibling) => (
-                  <Link
-                    key={sibling.id}
-                    href={sibling.href}
-                    className="inline-flex items-center gap-1 text-sm px-2 py-1 rounded bg-background hover:bg-muted transition-colors"
-                  >
-                    <Badge variant="outline" className="text-xs">
-                      {formatCategoryDisplay(sibling.ageCategory || "elite", sibling.gender || "men")}
+              {/* ── Left: race identity ─────────────── */}
+              <div className="flex-1 space-y-4">
+
+                {/* Badges */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="secondary">{disciplineLabel}</Badge>
+                  {event.subDiscipline && (
+                    <Badge variant="outline" className="bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
+                      {getSubDisciplineShortLabel(event.subDiscipline)}
                     </Badge>
-                  </Link>
-                ))}
+                  )}
+                  <Badge variant="outline" className="bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
+                    {categoryDisplay}
+                  </Badge>
+                  {race.uciCategory && <Badge variant="outline">{race.uciCategory}</Badge>}
+                  {isUpcoming
+                    ? <Badge className="bg-green-500 text-white">Upcoming</Badge>
+                    : <Badge variant="secondary">Completed</Badge>}
+                </div>
+
+                {/* Title */}
+                <div>
+                  <h1 className="text-3xl font-black tracking-tight">{event.name}</h1>
+                  <p className="text-lg text-muted-foreground mt-0.5">{categoryDisplay}</p>
+                </div>
+
+                {/* Date + location */}
+                <div className="flex flex-wrap items-center gap-3 text-muted-foreground">
+                  <span>
+                    {event.country && countryToFlag(event.country)}{" "}
+                    {format(raceDate, "EEEE, MMMM d, yyyy")}
+                  </span>
+                  {race.country && race.country !== event.country && (
+                    <span className="flex items-center gap-1">{countryToFlag(race.country)} {race.country}</span>
+                  )}
+                </div>
+
+                {/* Key facts strip */}
+                <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                  {race.distanceKm && (
+                    <span className="flex items-center gap-1">
+                      📏 {parseFloat(String(race.distanceKm)).toFixed(0)} km
+                    </span>
+                  )}
+                  {race.elevationM && (
+                    <span className="flex items-center gap-1">
+                      ⛰️ {race.elevationM}m ↑
+                    </span>
+                  )}
+                  {race.profileType && (
+                    <span className="flex items-center gap-1 capitalize">
+                      {getProfileIcon(race.profileType)} {race.profileType}
+                    </span>
+                  )}
+                  {race.raceType === "one_day" && <span>🏁 One-day classic</span>}
+                  {race.raceType === "stage_race" && <span>📅 Stage race</span>}
+                </div>
+
+                {/* External links (website, social, streaming) */}
+                {event.externalLinks && Object.keys(event.externalLinks).length > 0 && (
+                  <RaceLinksSection links={event.externalLinks} />
+                )}
+
+                {/* Source PDF + Telegram subscribe */}
+                <div className="flex flex-wrap items-center gap-3 pt-1">
+                  {(race.startlistUrl || event.sourceUrl) && (
+                    <a href={race.startlistUrl || event.sourceUrl || ""} target="_blank" rel="noopener noreferrer"
+                      className="text-sm text-blue-500 hover:text-blue-400 hover:underline inline-flex items-center gap-1">
+                      View source PDF ↗
+                    </a>
+                  )}
+                  <TelegramSubscribeButton />
+                </div>
+
+                {/* Admin controls */}
+                {admin && (
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {discipline === "mtb" && isSuperCup && <SyncSupercupButton raceId={race.id} />}
+                    {discipline === "mtb" && <AddInfoButton raceId={race.id} raceName={`${event.name} - ${categoryDisplay}`} />}
+                    {!isCompleted && event.sourceType !== "cronomancha" && event.sourceType !== "copa_catalana" && (
+                      <RefreshStartlistButton raceId={race.id} />
+                    )}
+                    {isCompleted && event.sourceType === "copa_catalana" && <ReimportResultsButton raceId={race.id} />}
+                    <DeleteRaceButton raceId={race.id} raceName={race.name} />
+                  </div>
+                )}
+
+              </div>{/* /left */}
+
+              {/* ── Right: weather card ──────────────── */}
+              {weather && (() => {
+                const wx = wmoToEmoji(weather.weatherCode);
+                return (
+                  <div className="lg:w-60 shrink-0">
+                    <div className="rounded-xl border border-border/60 bg-muted/20 p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Race Day</span>
+                        <span className="text-xs text-muted-foreground">{weather.city}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-4xl">{wx.emoji}</span>
+                        <div>
+                          <p className="text-lg font-bold">{weather.tempMax}° / {weather.tempMin}°C</p>
+                          <p className="text-sm text-muted-foreground">{wx.desc}</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/30">
+                        <div className="text-xs">
+                          <p className="text-muted-foreground">💧 Rain</p>
+                          <p className="font-semibold">{weather.precipMm} mm</p>
+                        </div>
+                        <div className="text-xs">
+                          <p className="text-muted-foreground">💨 Wind</p>
+                          <p className="font-semibold">{weather.windKmh} km/h</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+            </div>{/* /flex row */}
+          </div>
+        </section>
+
+        {/* ── Pre-Race Intel ──────────────────────────────────────────── */}
+        {raceIntel.length > 0 && (
+          <section className="border-b border-border/50">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-6">
+              <h2 className="text-lg font-bold mb-4">🔍 Pre-Race Intel</h2>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {raceIntel.slice(0, 6).map(({ rider, rumour }) => {
+                  const score = parseFloat(rumour.aggregateScore || "0");
+                  const sentiment = score > 0.3 ? { label: "FORM ✓", cls: "bg-green-500/15 text-green-400" }
+                    : score < -0.3 ? { label: "DOUBT", cls: "bg-red-500/15 text-red-400" }
+                    : { label: "NEUTRAL", cls: "bg-muted/50 text-muted-foreground" };
+                  return (
+                    <div key={rumour.id} className="rounded-lg border border-border/50 p-3 space-y-2 bg-card/30 hover:bg-card/60 transition-colors">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-sm shrink-0">{countryToFlag(rider.nationality)}</span>
+                          <Link href={`/riders/${rider.id}`} className="font-medium text-sm truncate hover:text-primary transition-colors">
+                            {rider.name}
+                          </Link>
+                        </div>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${sentiment.cls}`}>
+                          {sentiment.label}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground line-clamp-3">{rumour.summary}</p>
+                      {rumour.tipCount && rumour.tipCount > 1 && (
+                        <p className="text-[10px] text-muted-foreground/50">{rumour.tipCount} sources</p>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
-          )}
-        </div>
+          </section>
+        )}
 
+        {/* ── Course ──────────────────────────────────────────────────── */}
+        {race.pcsUrl && (
+          <section className="border-b border-border/50">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold">🗺️ Course</h2>
+                <a href={race.pcsUrl} target="_blank" rel="noopener noreferrer"
+                  className="text-sm text-primary hover:underline">
+                  View on ProCyclingStats →
+                </a>
+              </div>
+              {/* PCS course profile image */}
+              {(() => {
+                const pcsSlug = race.pcsUrl!.match(/race\/([^/]+)/)?.[1];
+                const year = race.date.substring(0, 4);
+                if (!pcsSlug) return null;
+                return (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={`https://www.procyclingstats.com/images/profiles/races/${year}/${pcsSlug}.jpg`}
+                    alt={`${event.name} course profile`}
+                    className="w-full h-auto max-h-52 object-contain rounded-lg border border-border/30 bg-white/5"
+                    onError={(e) => { (e.target as HTMLImageElement).parentElement!.style.display = "none"; }}
+                  />
+                );
+              })()}
+              {/* Other categories */}
+              {siblingRaces.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-sm text-muted-foreground mb-2">Other categories in this event:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {siblingRaces.map((sibling) => (
+                      <Link key={sibling.id} href={sibling.href}
+                        className="inline-flex items-center gap-1 text-sm px-2 py-1 rounded bg-muted/50 hover:bg-muted transition-colors">
+                        <Badge variant="outline" className="text-xs">
+                          {formatCategoryDisplay(sibling.ageCategory || "elite", sibling.gender || "men")}
+                        </Badge>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* ── Tabs: Results / Startlist / Predictions ─────────────────── */}
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-8">
         <Tabs defaultValue={isCompleted ? "results" : "startlist"} className="space-y-6">
           <TabsList>
             {isCompleted && (
@@ -888,52 +1064,7 @@ export default async function CategoryPage({ params }: PageProps) {
             </TabsContent>
           )}
         </Tabs>
-
-        {/* Race Intel Section */}
-        {raceIntel.length > 0 && (
-          <div className="mt-10">
-            <h2 className="text-xl font-bold mb-4">Race Intel</h2>
-            <div className="grid gap-3 md:grid-cols-2">
-              {raceIntel.map(({ rumour, rider }) => {
-                const score = parseFloat(rumour.aggregateScore || "0");
-                const typeInfo = score < -0.3
-                  ? { label: "INJURY", cls: "bg-red-500/20 text-red-400 border-red-500/30" }
-                  : score > 0.3
-                  ? { label: "FORM", cls: "bg-green-500/20 text-green-400 border-green-500/30" }
-                  : { label: "INTEL", cls: "bg-purple-500/20 text-purple-400 border-purple-500/30" };
-
-                return (
-                  <div
-                    key={rumour.id}
-                    className="flex items-start gap-3 p-3 rounded-lg border border-border/50"
-                  >
-                    <span className="text-base mt-0.5 shrink-0">{"\u{1F575}\u{FE0F}"}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Link
-                          href={`/riders/${rider.id}`}
-                          className="font-semibold text-sm hover:text-primary transition-colors truncate"
-                        >
-                          {rider.name}
-                        </Link>
-                        <Badge variant="outline" className={`text-[10px] px-1.5 py-0 shrink-0 ${typeInfo.cls}`}>
-                          {typeInfo.label}
-                        </Badge>
-                      </div>
-                      {rumour.summary && (
-                        <p className="text-sm text-muted-foreground line-clamp-2">{rumour.summary}</p>
-                      )}
-                      <span className="text-xs text-muted-foreground mt-1 block">
-                        {formatDistanceToNow(rumour.lastUpdated, { addSuffix: true })}
-                        {rumour.tipCount && rumour.tipCount > 0 && ` \u00B7 ${rumour.tipCount} sources`}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        </div>{/* /tabs container */}
       </main>
     </div>
   );
