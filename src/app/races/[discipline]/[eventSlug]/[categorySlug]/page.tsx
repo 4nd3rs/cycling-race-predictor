@@ -819,21 +819,13 @@ export default async function CategoryPage({ params }: PageProps) {
                   View on ProCyclingStats →
                 </a>
               </div>
-              {/* PCS course profile image */}
-              {(() => {
-                const pcsSlug = race.pcsUrl!.match(/race\/([^/]+)/)?.[1];
-                const year = race.date.substring(0, 4);
-                if (!pcsSlug) return null;
-                return (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img
-                    src={`https://www.procyclingstats.com/images/profiles/races/${year}/${pcsSlug}.jpg`}
-                    alt={`${event.name} course profile`}
-                    className="w-full h-auto max-h-52 object-contain rounded-lg border border-border/30 bg-white/5"
-                    onError={(e) => { (e.target as HTMLImageElement).parentElement!.style.display = "none"; }}
-                  />
-                );
-              })()}
+              {/* Course info card */}
+              <div className="rounded-lg border border-border/30 bg-muted/20 p-4 text-sm text-muted-foreground">
+                <p>Course profile and race maps available on ProCyclingStats.</p>
+                {race.raceType === "one_day" && race.distanceKm && (
+                  <p className="mt-1">📏 {parseFloat(String(race.distanceKm)).toFixed(0)} km one-day race</p>
+                )}
+              </div>
               {/* Other categories */}
               {siblingRaces.length > 0 && (
                 <div className="mt-4">
