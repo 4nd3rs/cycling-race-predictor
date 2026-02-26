@@ -48,7 +48,7 @@ async function TeamsList() {
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       {teamList.map(({ team, riderCount }) => (
-        <Link key={team.id} href={`/teams/${team.id}`}>
+        <Link key={team.id} href={`/teams/${team.slug || team.id}`}>
           <Card className="h-full hover:shadow-md transition-shadow cursor-pointer">
             <CardHeader className="pb-2">
               <CardTitle className="text-lg">{team.name}</CardTitle>
