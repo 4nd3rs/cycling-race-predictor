@@ -8,6 +8,7 @@ import { ReimportResultsButton } from "@/components/reimport-results-button";
 import { SyncSupercupButton } from "@/components/sync-supercup-button";
 import { AddInfoButton } from "@/components/add-info-button";
 import { DeleteRaceButton } from "@/components/delete-race-button";
+import { TelegramSubscribeButton } from "@/components/telegram-subscribe-button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -650,6 +651,11 @@ export default async function CategoryPage({ params }: PageProps) {
               </a>
             </div>
           )}
+
+          {/* Telegram subscribe */}
+          <div className="mt-3">
+            <TelegramSubscribeButton />
+          </div>
 
           {/* Related category races */}
           {siblingRaces.length > 0 && (
