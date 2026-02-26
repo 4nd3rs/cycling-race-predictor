@@ -41,12 +41,6 @@ interface PredictionRowProps {
   showSupercup?: boolean;
 }
 
-const PODIUM_RINGS: Record<number, string> = {
-  1: "ring-2 ring-yellow-400",
-  2: "ring-2 ring-gray-300",
-  3: "ring-2 ring-amber-500",
-};
-
 const PODIUM_LABELS: Record<number, string> = {
   1: "bg-yellow-500 text-yellow-950",
   2: "bg-gray-300 text-gray-800",
@@ -77,7 +71,7 @@ function PredictionRow({
       {/* Position / Photo */}
       {isPodium ? (
         photoUrl ? (
-          <div className={cn("relative h-9 w-9 shrink-0 rounded-full overflow-hidden", PODIUM_RINGS[position])}>
+          <div className="relative h-10 w-10 shrink-0 rounded-full overflow-hidden">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={photoUrl} alt={riderName} className="h-full w-full object-cover" />
             <span className={cn(
@@ -88,7 +82,7 @@ function PredictionRow({
             </span>
           </div>
         ) : (
-          <div className={cn("relative h-9 w-9 shrink-0 rounded-full flex items-center justify-center text-xs font-black", PODIUM_RINGS[position], PODIUM_LABELS[position])}>
+          <div className={cn("relative h-10 w-10 shrink-0 rounded-full flex items-center justify-center text-sm font-black", PODIUM_LABELS[position])}>
             {riderName.split(" ").filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase()}
             <span className={cn(
               "absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-black",
@@ -99,12 +93,7 @@ function PredictionRow({
           </div>
         )
       ) : (
-        <div
-          className={cn(
-            "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold",
-            "bg-muted text-muted-foreground"
-          )}
-        >
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold bg-muted text-muted-foreground">
           {position}
         </div>
       )}

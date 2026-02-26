@@ -217,7 +217,6 @@ function countryToFlag(code?: string | null) {
 }
 
 const MEDALS = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"];
-const PODIUM_RING = ["ring-yellow-400", "ring-gray-300", "ring-amber-500"];
 const PODIUM_BADGE = ["bg-yellow-500 text-yellow-950", "bg-gray-300 text-gray-800", "bg-amber-600 text-amber-50"];
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -526,7 +525,7 @@ export default async function EventPage({ params }: PageProps) {
                                     <div key={rider.id} className="flex items-center gap-2 text-sm">
                                       {i < 3 ? (
                                         rider.photoUrl ? (
-                                          <div className={`relative h-7 w-7 shrink-0 rounded-full overflow-hidden ring-2 ${PODIUM_RING[i]}`}>
+                                          <div className="relative h-9 w-9 shrink-0 rounded-full overflow-hidden">
                                             {/* eslint-disable-next-line @next/next/no-img-element */}
                                             <img src={rider.photoUrl} alt={rider.name} className="h-full w-full object-cover" />
                                             <span className={`absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full text-[8px] font-black ${PODIUM_BADGE[i]}`}>
@@ -534,7 +533,7 @@ export default async function EventPage({ params }: PageProps) {
                                             </span>
                                           </div>
                                         ) : (
-                                          <div className={`relative h-7 w-7 shrink-0 rounded-full flex items-center justify-center text-[10px] font-black ring-2 ${PODIUM_RING[i]} ${PODIUM_BADGE[i]}`}>
+                                          <div className={`relative h-9 w-9 shrink-0 rounded-full flex items-center justify-center text-xs font-black ${PODIUM_BADGE[i]}`}>
                                             {rider.name.split(" ").filter(Boolean).slice(0, 2).map((w: string) => w[0]).join("").toUpperCase()}
                                             <span className={`absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full text-[8px] font-black ${PODIUM_BADGE[i]}`}>
                                               {i + 1}
@@ -542,7 +541,9 @@ export default async function EventPage({ params }: PageProps) {
                                           </div>
                                         )
                                       ) : (
-                                        <span className="text-base w-6 shrink-0 text-center">{MEDALS[i]}</span>
+                                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold bg-muted text-muted-foreground">
+                                          {i + 1}
+                                        </div>
                                       )}
                                       <span className="shrink-0">{countryToFlag(rider.nationality)}</span>
                                       <Link href={`/riders/${rider.id}`} className="font-medium truncate hover:text-primary transition-colors flex-1">
