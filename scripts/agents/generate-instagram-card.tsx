@@ -19,7 +19,8 @@ const args = process.argv.slice(2);
 const eventSlug = args[args.indexOf("--event") + 1] ?? null;
 const cardType: "preview" | "results" = (args[args.indexOf("--type") + 1] as any) ?? "preview";
 const gender: "men" | "women" = (args[args.indexOf("--gender") + 1] as any) ?? "men";
-const outPath = args[args.indexOf("--out") + 1] ?? `/tmp/pcp-instagram-${cardType}-${gender}-${Date.now()}.png`;
+const isStories = args.includes("--stories");
+const outPath = args[args.indexOf("--out") + 1] ?? `/tmp/pcp-instagram-${cardType}-${gender}-${isStories ? "story" : "feed"}-${Date.now()}.png`;
 
 if (!eventSlug) {
   console.error("Usage: tsx generate-instagram-card.tsx --event <slug> --type preview|results [--gender men|women]");
@@ -109,7 +110,7 @@ async function fetchData(sql: ReturnType<typeof neon>) {
 
 // ── Card design ───────────────────────────────────────────────────────────────
 const W = 1080;
-const H = 1080;
+const H = isStories ? 1920 : 1080;
 const RED = "#C8102E";
 const BLACK = "#0D0D0D";
 const WHITE = "#F2EDE6";
@@ -159,97 +160,109 @@ function RiderAvatar({ photoDataUri, name, size = 72 }: { photoDataUri: string |
   );
 }
 
+function BrandBar() {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+      <span style={{ fontSize: 20, fontWeight: 400, color: WHITE, letterSpacing: "0.06em", fontFamily: "Inter" }}>
+        procyclingpredictor.com
+      </span>
+      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+          <span style={{ fontSize: 16, fontWeight: 700, color: WHITE, letterSpacing: "0.1em", textTransform: "uppercase" }}>Pro Cycling</span>
+          <span style={{ fontSize: 22, fontWeight: 800, color: RED, letterSpacing: "0.02em", textTransform: "uppercase" }}>Predictor</span>
+        </div>
+        <BibIcon size={60} />
+      </div>
+    </div>
+  );
+}
+
 function PreviewCard({ event, race, preds }: any) {
   const country = event.country ?? "";
   const uci = race?.uci_category ?? "";
   const discipline = (event.discipline ?? "").toUpperCase();
   const metaParts = [country, discipline, uci].filter(Boolean).join("  ·  ");
+  const nameFontSize = event.name.length > 35 ? 88 : event.name.length > 24 ? 104 : 126;
+
+  const content = (
+    <div style={{ display: "flex", flexDirection: "column", width: "100%" }}>
+      {/* Eyebrow */}
+      <span style={{ fontSize: 20, fontWeight: 700, color: RED, letterSpacing: "0.18em", fontFamily: "Inter", marginBottom: 28 }}>
+        {gender === "women" ? "WOMEN  ·  RACE PREVIEW" : "RACE PREVIEW"}
+      </span>
+      {/* Race name */}
+      <span style={{ fontSize: nameFontSize, fontWeight: 800, color: WHITE, textTransform: "uppercase", lineHeight: 0.9, letterSpacing: "-0.01em", marginBottom: 64 }}>
+        {event.name.toUpperCase()}
+      </span>
+      {/* Meta */}
+      <span style={{ fontSize: 24, fontWeight: 700, color: RED, letterSpacing: "0.1em", fontFamily: "Inter", marginBottom: 12 }}>
+        {metaParts}
+      </span>
+      <span style={{ fontSize: 28, fontWeight: 700, color: RED, fontFamily: "Inter", marginBottom: 48 }}>
+        {race?.date ? fmtDate(race.date) : ""}
+      </span>
+      {/* Divider */}
+      <div style={{ width: "100%", height: 1, background: DIMMED, marginBottom: 44 }} />
+      {/* Predictions */}
+      {preds.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          <span style={{ fontSize: 18, fontWeight: 700, color: WHITE, letterSpacing: "0.14em", fontFamily: "Inter", marginBottom: 32 }}>
+            TOP PREDICTIONS
+          </span>
+          <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+            {preds.map((p: any, i: number) => {
+              const pct = Math.round(Number(p.win_probability) * 100);
+              return (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 20 }}>
+                  <span style={{ fontSize: 22, fontWeight: 700, color: WHITE, width: 28, flexShrink: 0, fontFamily: "Inter" }}>{i + 1}</span>
+                  <RiderAvatar photoDataUri={p._photoDataUri ?? null} name={p.rider_name} size={68} />
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+                      <span style={{ fontSize: 38, fontWeight: 800, color: i === 0 ? WHITE : "#C8C0B8", letterSpacing: "0.01em", lineHeight: 1 }}>
+                        {p.rider_name}
+                      </span>
+                      <span style={{ fontSize: 34, fontWeight: 800, color: i === 0 ? RED : "#8A3020", lineHeight: 1, marginLeft: 16 }}>
+                        {pct}%
+                      </span>
+                    </div>
+                    <ProbBar pct={pct} width={isStories ? 700 : 560} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {/* Brand inline for stories */}
+      {isStories && (
+        <div style={{ display: "flex", marginTop: 60, paddingTop: 36, borderTop: `1px solid ${DIMMED}` }}>
+          <BrandBar />
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div style={{ width: W, height: H, background: BLACK, display: "flex", flexDirection: "column", fontFamily: "Barlow Condensed", position: "relative", overflow: "hidden" }}>
-      {/* Red top border */}
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 8, background: RED }} />
-      {/* Red left bar */}
       <div style={{ position: "absolute", left: 0, top: 8, bottom: 0, width: 8, background: RED }} />
 
-      {/* Content */}
-      <div style={{ display: "flex", flexDirection: "column", padding: "72px 72px 0 88px", flex: 1 }}>
-
-        {/* Eyebrow */}
-        <span style={{ fontSize: 20, fontWeight: 700, color: RED, letterSpacing: "0.18em", fontFamily: "Inter", marginBottom: 24 }}>
-          {gender === "women" ? "WOMEN  ·  RACE PREVIEW" : "RACE PREVIEW"}
-        </span>
-
-        {/* Race name */}
-        <span style={{
-          fontSize: event.name.length > 35 ? 88 : event.name.length > 24 ? 104 : 126,
-          fontWeight: 800, color: WHITE, textTransform: "uppercase",
-          lineHeight: 0.9, letterSpacing: "-0.01em", marginBottom: 48,
-        }}>
-          {event.name.toUpperCase()}
-        </span>
-
-        {/* Meta — red, no emoji */}
-        <span style={{ fontSize: 24, fontWeight: 700, color: RED, letterSpacing: "0.1em", fontFamily: "Inter", marginBottom: 12 }}>
-          {metaParts}
-        </span>
-        <span style={{ fontSize: 22, fontWeight: 400, color: RED, fontFamily: "Inter", marginBottom: 48, opacity: 0.7 }}>
-          {race?.date ? fmtDate(race.date) : ""}
-        </span>
-
-        {/* Divider */}
-        <div style={{ width: "100%", height: 1, background: DIMMED, marginBottom: 48 }} />
-
-        {/* Predictions with photos */}
-        {preds.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-            <span style={{ fontSize: 18, fontWeight: 700, color: DIMMED, letterSpacing: "0.14em", fontFamily: "Inter", marginBottom: 32 }}>
-              TOP PREDICTIONS
-            </span>
-            <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-              {preds.map((p: any, i: number) => {
-                const pct = Math.round(Number(p.win_probability) * 100);
-                return (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 20 }}>
-                    {/* Rank */}
-                    <span style={{ fontSize: 22, fontWeight: 700, color: WHITE, width: 28, flexShrink: 0, fontFamily: "Inter" }}>
-                      {i + 1}
-                    </span>
-                    {/* Photo */}
-                    <RiderAvatar photoDataUri={p._photoDataUri ?? null} name={p.rider_name} size={68} />
-                    {/* Name + bar */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
-                      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-                        <span style={{ fontSize: 38, fontWeight: 800, color: i === 0 ? WHITE : "#C8C0B8", letterSpacing: "0.01em", lineHeight: 1 }}>
-                          {p.rider_name}
-                        </span>
-                        <span style={{ fontSize: 34, fontWeight: 800, color: i === 0 ? RED : "#8A3020", lineHeight: 1, marginLeft: 16 }}>
-                          {pct}%
-                        </span>
-                      </div>
-                      <ProbBar pct={pct} width={560} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Bottom brand bar */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "28px 72px 44px 88px", borderTop: `1px solid ${DIMMED}` }}>
-        <span style={{ fontSize: 20, fontWeight: 400, color: DIMMED, letterSpacing: "0.06em", fontFamily: "Inter" }}>
-          procyclingpredictor.com
-        </span>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
-            <span style={{ fontSize: 16, fontWeight: 700, color: WHITE, letterSpacing: "0.1em", textTransform: "uppercase" }}>Pro Cycling</span>
-            <span style={{ fontSize: 22, fontWeight: 800, color: RED, letterSpacing: "0.02em", textTransform: "uppercase" }}>Predictor</span>
-          </div>
-          <BibIcon size={60} />
+      {isStories ? (
+        /* Stories: content centered vertically */
+        <div style={{ display: "flex", flex: 1, alignItems: "center", justifyContent: "center", padding: "80px 96px" }}>
+          {content}
         </div>
-      </div>
+      ) : (
+        /* Feed: content fills top, brand bar at bottom */
+        <>
+          <div style={{ display: "flex", flexDirection: "column", padding: "80px 96px 0 96px", flex: 1 }}>
+            {content}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "28px 96px 52px 96px", borderTop: `1px solid ${DIMMED}` }}>
+            <BrandBar />
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -263,19 +276,19 @@ function ResultsCard({ event, race, results }: any) {
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 8, background: RED }} />
       <div style={{ position: "absolute", left: 0, top: 8, bottom: 0, width: 8, background: RED }} />
 
-      <div style={{ display: "flex", flexDirection: "column", padding: "72px 72px 0 88px", flex: 1 }}>
-        <span style={{ fontSize: 20, fontWeight: 700, color: RED, letterSpacing: "0.18em", fontFamily: "Inter", marginBottom: 24 }}>
+      <div style={{ display: "flex", flexDirection: "column", padding: "80px 96px 0 96px", flex: 1 }}>
+        <span style={{ fontSize: 20, fontWeight: 700, color: RED, letterSpacing: "0.18em", fontFamily: "Inter", marginBottom: 28 }}>
           {gender === "women" ? "WOMEN  ·  RESULTS" : "RESULTS"}
         </span>
 
-        <span style={{ fontSize: event.name.length > 35 ? 88 : event.name.length > 24 ? 104 : 126, fontWeight: 800, color: WHITE, textTransform: "uppercase", lineHeight: 0.9, letterSpacing: "-0.01em", marginBottom: 48 }}>
+        <span style={{ fontSize: event.name.length > 35 ? 88 : event.name.length > 24 ? 104 : 126, fontWeight: 800, color: WHITE, textTransform: "uppercase", lineHeight: 0.9, letterSpacing: "-0.01em", marginBottom: 64 }}>
           {event.name.toUpperCase()}
         </span>
 
         <span style={{ fontSize: 24, fontWeight: 700, color: RED, letterSpacing: "0.1em", fontFamily: "Inter", marginBottom: 12 }}>
           {[country, discipline].filter(Boolean).join("  ·  ")}
         </span>
-        <span style={{ fontSize: 22, fontWeight: 400, color: RED, fontFamily: "Inter", marginBottom: 52, opacity: 0.7 }}>
+        <span style={{ fontSize: 28, fontWeight: 700, color: RED, fontFamily: "Inter", marginBottom: 48 }}>
           {race?.date ? fmtDate(race.date) : ""}
         </span>
 
@@ -299,8 +312,8 @@ function ResultsCard({ event, race, results }: any) {
         ))}
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "28px 72px 44px 88px", borderTop: `1px solid ${DIMMED}` }}>
-        <span style={{ fontSize: 20, fontWeight: 400, color: DIMMED, letterSpacing: "0.06em", fontFamily: "Inter" }}>procyclingpredictor.com</span>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "28px 96px 52px 96px", borderTop: `1px solid ${DIMMED}` }}>
+        <span style={{ fontSize: 20, fontWeight: 400, color: WHITE, letterSpacing: "0.06em", fontFamily: "Inter" }}>procyclingpredictor.com</span>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
             <span style={{ fontSize: 16, fontWeight: 700, color: WHITE, letterSpacing: "0.1em", textTransform: "uppercase" }}>Pro Cycling</span>
@@ -340,7 +353,7 @@ async function main() {
 
   const svg = await satori(card, {
     width: W,
-    height: H,
+    height: H, // 1080 feed or 1920 stories
     fonts: [
       { name: "Barlow Condensed", data: barlowBold,     weight: 800, style: "normal" },
       { name: "Barlow Condensed", data: barlowSemibold, weight: 700, style: "normal" },
