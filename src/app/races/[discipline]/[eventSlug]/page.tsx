@@ -339,7 +339,7 @@ export default async function EventPage({ params }: PageProps) {
                       const href = categorySlug
                         ? `/races/${discipline}/${eventSlug}/${categorySlug}`
                         : `/races/${race.id}`;
-                      const label = race.gender === "women" ? "♀ Elite Women" : "♂ Elite Men";
+                      const label = race.gender === "women" ? "Elite Women" : "Elite Men";
                       return (
                         <Link key={race.id} href={href}
                           className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors">
@@ -453,7 +453,7 @@ export default async function EventPage({ params }: PageProps) {
                 const allCompleted = eliteRaces.every(c => c.race.status === "completed" || c.resultCount > 0);
                 return (
                   <h2 className="text-lg font-bold mb-4">
-                    {allCompleted ? "🏆 Results" : anyCompleted ? "🏁 Results & Preview" : "🏁 Race Preview"}
+                    {allCompleted ? "Results" : anyCompleted ? "Results & Preview" : "Race Preview"}
                   </h2>
                 );
               })()}
@@ -467,7 +467,6 @@ export default async function EventPage({ params }: PageProps) {
                     (race.ageCategory && race.gender ? generateCategorySlug(race.ageCategory, race.gender) : null);
                   const href = categorySlug ? buildCategoryUrl(discipline, eventSlug, categorySlug) : `/races/${race.id}`;
                   const hasResults = race.status === "completed" || resultCount > 0;
-                  const genderEmoji = race.gender === "women" ? "♀" : "♂";
                   const genderLabel = race.gender === "women" ? "Elite Women" : "Elite Men";
 
                   return (
@@ -475,14 +474,13 @@ export default async function EventPage({ params }: PageProps) {
                       {/* Card header */}
                       <div className="flex items-center justify-between px-4 py-3 border-b border-border/30 bg-muted/20">
                         <div className="flex items-center gap-2">
-                          <span className="text-lg">{genderEmoji}</span>
                           <span className="font-bold">{genderLabel}</span>
                           {riderCount > 0 && (
                             <Badge variant="outline" className="text-xs">{riderCount} riders</Badge>
                           )}
                         </div>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          {event.externalLinks?.raceStart && <span>🕐 {event.externalLinks.raceStart}</span>}
+                          {event.externalLinks?.raceStart && <span>{event.externalLinks.raceStart}</span>}
                           <Badge variant={hasResults ? "secondary" : "default"} className={!hasResults ? "bg-green-500 text-white text-xs" : "text-xs"}>
                             {hasResults ? "Completed" : "Upcoming"}
                           </Badge>
@@ -494,7 +492,7 @@ export default async function EventPage({ params }: PageProps) {
                         <div>
                           {hasResults ? (
                             <>
-                              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">🏆 Results</h3>
+                              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Results</h3>
                               {topResults.length > 0 ? (
                                 <div className="space-y-1.5">
                                   {topResults.map(({ result, rider }, i) => (
@@ -522,7 +520,7 @@ export default async function EventPage({ params }: PageProps) {
                             </>
                           ) : (
                             <>
-                              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">🏆 Top Contenders</h3>
+                              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Top Contenders</h3>
                               {topPicks.length > 0 ? (
                                 <div className="space-y-1.5">
                                   {topPicks.map(({ prediction, rider }, i) => (
@@ -548,8 +546,8 @@ export default async function EventPage({ params }: PageProps) {
                                         {rider.name}
                                       </Link>
                                       {prediction.winProbability != null && Number(prediction.winProbability) > 0 && (
-                                        <span className="text-xs shrink-0 font-semibold text-amber-600 dark:text-amber-400">
-                                          ★ {(Number(prediction.winProbability) * 100).toFixed(1)}% win
+                                        <span className="text-xs shrink-0 font-semibold tabular-nums text-primary">
+                                          {(Number(prediction.winProbability) * 100).toFixed(1)}%
                                         </span>
                                       )}
                                     </div>
@@ -585,7 +583,7 @@ export default async function EventPage({ params }: PageProps) {
                           if (mentions.length === 0) return null;
                           return (
                             <div>
-                              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">📰 Media Coverage</h3>
+                              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Media Coverage</h3>
                               <div className="space-y-1.5">
                                 {mentions.map(({ rider, count }) => (
                                   <div key={rider.id} className="flex items-center gap-2 text-sm">
@@ -594,7 +592,7 @@ export default async function EventPage({ params }: PageProps) {
                                       {rider.name}
                                     </Link>
                                     <span className="text-xs shrink-0 text-muted-foreground">
-                                      📰 {count} {count === 1 ? "article" : "articles"}
+                                      {count} {count === 1 ? "article" : "articles"}
                                     </span>
                                   </div>
                                 ))}
@@ -606,7 +604,7 @@ export default async function EventPage({ params }: PageProps) {
                         {/* Rider Intel (per-race filtered) */}
                         {intel.length > 0 && (
                           <div>
-                            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">🔍 Rider Intel</h3>
+                            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Rider Intel</h3>
                             <div className="space-y-2">
                               {intel.map(({ rider, rumour }) => {
                                 const score = parseFloat(rumour.aggregateScore || "0");
@@ -639,7 +637,7 @@ export default async function EventPage({ params }: PageProps) {
                         {/* Latest News (gender-specific) */}
                         {raceNews.length > 0 && (
                           <div>
-                            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">📰 Latest News</h3>
+                            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Latest News</h3>
                             <div className="space-y-2">
                               {raceNews.slice(0, 2).map((article) => (
                                 <a key={article.id} href={article.url || "#"} target="_blank" rel="noopener noreferrer"
