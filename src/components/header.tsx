@@ -12,14 +12,11 @@ const navigation = [
   { name: "Teams", href: "/teams" },
 ];
 
-const authNavigation = [
-  { name: "Add Race", href: "/races/new" },
-];
+
 
 export function Header() {
   const pathname = usePathname();
-  const { isSignedIn, isLoaded, user } = useUser();
-  const isAdmin = user?.publicMetadata?.role === "admin";
+  const { isSignedIn, isLoaded } = useUser();
 
   return (
     <header className="sticky top-0 z-50 w-full border-t-2 border-primary bg-secondary text-secondary-foreground backdrop-blur supports-[backdrop-filter]:bg-secondary/95">
@@ -52,34 +49,7 @@ export function Header() {
               {item.name}
             </Link>
           ))}
-          {isSignedIn &&
-            authNavigation.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
-                  pathname === item.href
-                    ? "text-white bg-white/10"
-                    : "text-white/60 hover:text-white hover:bg-white/5"
-                )}
-              >
-                {item.name}
-              </Link>
-            ))}
-          {isAdmin && (
-            <Link
-              href="/admin"
-              className={cn(
-                "px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
-                pathname.startsWith("/admin")
-                  ? "text-white bg-white/10"
-                  : "text-white/60 hover:text-white hover:bg-white/5"
-              )}
-            >
-              Admin
-            </Link>
-          )}
+
         </nav>
 
         {/* Right: Auth */}
