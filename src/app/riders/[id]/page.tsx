@@ -340,6 +340,22 @@ export default async function RiderDetailPage({ params }: PageProps) {
                   </div>
                 )}
 
+                {/* PCS / UCI IDs */}
+                {(rider.pcsId || rider.uciId) && (
+                  <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground/60">
+                    {rider.pcsId && (
+                      <a href={`https://www.procyclingstats.com/rider/${rider.pcsId}`}
+                        target="_blank" rel="noopener noreferrer"
+                        className="hover:text-primary transition-colors">
+                        PCS: {rider.pcsId}
+                      </a>
+                    )}
+                    {rider.uciId && (
+                      <span>UCI ID: {rider.uciId}</span>
+                    )}
+                  </div>
+                )}
+
                 {/* Key stats strip */}
                 <div className="flex flex-wrap gap-4 pt-2">
                   {bestElo > 0 && (
@@ -553,6 +569,20 @@ export default async function RiderDetailPage({ params }: PageProps) {
                     target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-2 text-sm hover:text-primary transition-colors">
                     <span>📊</span> ProCyclingStats
+                  </a>
+                )}
+                {rider.uciId && (
+                  <a href={`https://www.uci.org/en/road/rankings/athlete/${rider.uciId}`}
+                    target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-sm hover:text-primary transition-colors">
+                    <span>🏅</span> UCI Rankings
+                  </a>
+                )}
+                {rider.uciId && (
+                  <a href={`https://firstcycling.com/rider.php?r=${rider.uciId}`}
+                    target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-sm hover:text-primary transition-colors">
+                    <span>🔢</span> FirstCycling
                   </a>
                 )}
                 {rider.wikiSlug && (

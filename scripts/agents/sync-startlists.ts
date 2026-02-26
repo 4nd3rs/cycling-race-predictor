@@ -30,6 +30,15 @@ function stripAccents(str: string): string {
   return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 }
 
+function normalizeName(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // strip accents
+    .replace(/[^a-z\s]/g, "")
+    .trim()
+    .split(/\s+/).sort().join(" "); // sort words so "van der poel mathieu" = "mathieu van der poel"
+}
+
 async function findOrCreateTeam(name: string): Promise<string> {
   const existing = await db.query.teams.findFirst({
     where: ilike(schema.teams.name, name),
@@ -67,7 +76,7 @@ async function findOrCreateRider(
     return byName.id;
   }
 
-  // Try accent-stripped name match
+  // Try accent-stripped name match, then normalized (word-order-independent) match
   const allRiders = await db.select({ id: schema.riders.id, name: schema.riders.name })
     .from(schema.riders)
     .limit(5000);
@@ -76,6 +85,14 @@ async function findOrCreateRider(
   if (match) {
     await db.update(schema.riders).set({ teamId, ...(pcsId ? { pcsId } : {}) }).where(eq(schema.riders.id, match.id));
     return match.id;
+  }
+
+  // Try normalized match (handles "VAN DER POEL Mathieu" vs "Mathieu van der Poel")
+  const normalized = normalizeName(name);
+  const normalizedMatch = allRiders.find(r => normalizeName(r.name) === normalized);
+  if (normalizedMatch) {
+    await db.update(schema.riders).set({ teamId, ...(pcsId ? { pcsId } : {}) }).where(eq(schema.riders.id, normalizedMatch.id));
+    return normalizedMatch.id;
   }
 
   // Create new rider
