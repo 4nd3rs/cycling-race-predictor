@@ -269,10 +269,21 @@ async function syncStartlistForRace(race: { id: string; name: string; pcsUrl: st
           ),
         });
         if (existingByBib && existingByBib.riderId !== riderId) {
-          // Bib collision with a different rider — update existing bib row
-          await db.update(schema.raceStartlist)
-            .set({ riderId, teamId: teamId || undefined })
-            .where(eq(schema.raceStartlist.id, existingByBib.id));
+          // Bib collision: another row holds this bib for a different rider.
+          // If the correct rider already has their own row, update that row with
+          // the bib and delete the stale collision row — avoids unique (raceId, riderId) violation.
+          if (existingByRider) {
+            await db.update(schema.raceStartlist)
+              .set({ teamId: teamId || undefined, bibNumber: entry.bibNumber })
+              .where(eq(schema.raceStartlist.id, existingByRider.id));
+            await db.delete(schema.raceStartlist)
+              .where(eq(schema.raceStartlist.id, existingByBib.id));
+          } else {
+            // Rider has no existing row — safe to repurpose the collision row
+            await db.update(schema.raceStartlist)
+              .set({ riderId, teamId: teamId || undefined })
+              .where(eq(schema.raceStartlist.id, existingByBib.id));
+          }
           updated++;
           await ensureDisciplineStats(riderId, raceDiscipline, raceAgeCategory, raceGender);
           continue;
