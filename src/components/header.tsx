@@ -22,61 +22,68 @@ export function Header() {
   const isAdmin = user?.publicMetadata?.role === "admin";
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-14 items-center">
-        <div className="mr-4 flex">
-          <Link href="/" className="mr-6 flex items-center space-x-2">
-            <span className="text-xl">🚴</span>
-            <span className="hidden font-bold sm:inline-block">
-              Cycling Predictor
+    <header className="sticky top-0 z-50 w-full border-t-2 border-primary bg-secondary text-secondary-foreground backdrop-blur supports-[backdrop-filter]:bg-secondary/95">
+      <div className="container mx-auto flex h-14 items-center px-4 sm:px-6 lg:px-8 max-w-6xl">
+        {/* Left: Brand */}
+        <div className="mr-6 flex shrink-0">
+          <Link href="/" className="flex items-center gap-2">
+            <span className="text-lg font-black tracking-tight text-white">
+              ProCycling
+            </span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-accent">
+              Predictor
             </span>
           </Link>
-          <nav className="flex items-center space-x-6 text-sm font-medium">
-            {navigation.map((item) => (
+        </div>
+
+        {/* Center: Nav */}
+        <nav className="flex flex-1 items-center justify-center gap-1">
+          {navigation.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
+                pathname === item.href || pathname.startsWith(item.href + "/")
+                  ? "text-white bg-white/10"
+                  : "text-white/60 hover:text-white hover:bg-white/5"
+              )}
+            >
+              {item.name}
+            </Link>
+          ))}
+          {isSignedIn &&
+            authNavigation.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "transition-colors hover:text-foreground/80",
-                  pathname === item.href || pathname.startsWith(item.href + "/")
-                    ? "text-foreground"
-                    : "text-foreground/60"
+                  "px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
+                  pathname === item.href
+                    ? "text-white bg-white/10"
+                    : "text-white/60 hover:text-white hover:bg-white/5"
                 )}
               >
                 {item.name}
               </Link>
             ))}
-            {isSignedIn &&
-              authNavigation.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "transition-colors hover:text-foreground/80",
-                    pathname === item.href
-                      ? "text-foreground"
-                      : "text-foreground/60"
-                  )}
-                >
-                  {item.name}
-                </Link>
-              ))}
-            {isAdmin && (
-              <Link
-                href="/admin"
-                className={cn(
-                  "transition-colors hover:text-foreground/80",
-                  pathname.startsWith("/admin")
-                    ? "text-foreground"
-                    : "text-foreground/60"
-                )}
-              >
-                Admin
-              </Link>
-            )}
-          </nav>
-        </div>
-        <div className="flex flex-1 items-center justify-end space-x-2">
+          {isAdmin && (
+            <Link
+              href="/admin"
+              className={cn(
+                "px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
+                pathname.startsWith("/admin")
+                  ? "text-white bg-white/10"
+                  : "text-white/60 hover:text-white hover:bg-white/5"
+              )}
+            >
+              Admin
+            </Link>
+          )}
+        </nav>
+
+        {/* Right: Auth */}
+        <div className="flex shrink-0 items-center gap-2">
           {isLoaded && (
             <>
               {isSignedIn ? (
@@ -91,12 +98,14 @@ export function Header() {
               ) : (
                 <div className="flex items-center gap-2">
                   <SignInButton mode="modal">
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" className="text-white/70 hover:text-white hover:bg-white/10">
                       Sign In
                     </Button>
                   </SignInButton>
                   <SignUpButton mode="modal">
-                    <Button size="sm">Sign Up</Button>
+                    <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90">
+                      Sign Up
+                    </Button>
                   </SignUpButton>
                 </div>
               )}

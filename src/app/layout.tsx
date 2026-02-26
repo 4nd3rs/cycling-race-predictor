@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
+import { Geist_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
-const geistSans = Geist({
+const inter = Inter({
   variable: "--font-geist-sans",
   subsets: ["latin"],
 });
@@ -15,13 +16,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Cycling Race Predictor",
+  title: "ProCycling Predictor — AI Race Predictions",
   description:
-    "AI-powered cycling race predictions using ELO ratings and community intel",
+    "AI-powered cycling race predictions using TrueSkill ELO ratings, form analysis, and community intel. Win probabilities, podium chances, and more.",
   openGraph: {
-    title: "Cycling Race Predictor",
+    title: "ProCycling Predictor — AI Race Predictions",
     description:
-      "AI-powered cycling race predictions using ELO ratings and community intel",
+      "AI-powered cycling race predictions using TrueSkill ELO ratings, form analysis, and community intel.",
     type: "website",
   },
 };
@@ -33,9 +34,9 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider>
-      <html lang="en">
+      <html lang="en" className="dark">
         <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+          className={`${inter.variable} ${geistMono.variable} antialiased`}
         >
           {children}
           <Toaster />

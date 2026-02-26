@@ -13,9 +13,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { db, races, predictions, riders, raceStartlist, riderDisciplineStats, raceResults, riderRumours, teams, raceEvents } from "@/lib/db";
 import { eq, desc, and, gte, ne, inArray } from "drizzle-orm";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { generateRacePredictions, calculateForm, type RiderPredictionInput, type RecentResult, RACE_CATEGORY_WEIGHTS, type ProfileType } from "@/lib/prediction";
 import { formatCategoryDisplay } from "@/lib/category-utils";
+import { isNotNull } from "drizzle-orm";
 import {
   isValidDiscipline,
   getDisciplineLabel,
@@ -401,6 +402,29 @@ async function generatePredictionsIfNeeded(race: typeof races.$inferSelect, star
   }
 }
 
+async function getRaceIntel(raceId: string) {
+  try {
+    const result = await db
+      .select({ rumour: riderRumours, rider: riders })
+      .from(riderRumours)
+      .innerJoin(riders, eq(riderRumours.riderId, riders.id))
+      .innerJoin(raceStartlist, eq(raceStartlist.riderId, riders.id))
+      .where(and(eq(raceStartlist.raceId, raceId), isNotNull(riderRumours.summary)))
+      .orderBy(desc(riderRumours.lastUpdated))
+      .limit(10);
+
+    // Deduplicate by rider ID (a rider may appear multiple times from join)
+    const seen = new Set<string>();
+    return result.filter(({ rider }) => {
+      if (seen.has(rider.id)) return false;
+      seen.add(rider.id);
+      return true;
+    });
+  } catch {
+    return [];
+  }
+}
+
 function countryToFlag(countryCode?: string | null) {
   if (!countryCode) return null;
   const code = countryCode.toUpperCase();
@@ -470,6 +494,9 @@ export default async function CategoryPage({ params }: PageProps) {
   if (startlist.length > 0 && !isCompleted) {
     await generatePredictionsIfNeeded(race, startlist.length);
   }
+
+  // Get race intel (rumours for riders on the startlist)
+  const raceIntel = await getRaceIntel(race.id);
 
   // Get predictions
   const racePredictions = isCompleted ? [] : await getRacePredictions(race.id, race);
@@ -848,6 +875,52 @@ export default async function CategoryPage({ params }: PageProps) {
             </TabsContent>
           )}
         </Tabs>
+
+        {/* Race Intel Section */}
+        {raceIntel.length > 0 && (
+          <div className="mt-10">
+            <h2 className="text-xl font-bold mb-4">Race Intel</h2>
+            <div className="grid gap-3 md:grid-cols-2">
+              {raceIntel.map(({ rumour, rider }) => {
+                const score = parseFloat(rumour.aggregateScore || "0");
+                const typeInfo = score < -0.3
+                  ? { label: "INJURY", cls: "bg-red-500/20 text-red-400 border-red-500/30" }
+                  : score > 0.3
+                  ? { label: "FORM", cls: "bg-green-500/20 text-green-400 border-green-500/30" }
+                  : { label: "INTEL", cls: "bg-purple-500/20 text-purple-400 border-purple-500/30" };
+
+                return (
+                  <div
+                    key={rumour.id}
+                    className="flex items-start gap-3 p-3 rounded-lg border border-border/50"
+                  >
+                    <span className="text-base mt-0.5 shrink-0">{"\u{1F575}\u{FE0F}"}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Link
+                          href={`/riders/${rider.id}`}
+                          className="font-semibold text-sm hover:text-primary transition-colors truncate"
+                        >
+                          {rider.name}
+                        </Link>
+                        <Badge variant="outline" className={`text-[10px] px-1.5 py-0 shrink-0 ${typeInfo.cls}`}>
+                          {typeInfo.label}
+                        </Badge>
+                      </div>
+                      {rumour.summary && (
+                        <p className="text-sm text-muted-foreground line-clamp-2">{rumour.summary}</p>
+                      )}
+                      <span className="text-xs text-muted-foreground mt-1 block">
+                        {formatDistanceToNow(rumour.lastUpdated, { addSuffix: true })}
+                        {rumour.tipCount && rumour.tipCount > 0 && ` \u00B7 ${rumour.tipCount} sources`}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
