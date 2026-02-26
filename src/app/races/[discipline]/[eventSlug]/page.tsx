@@ -524,7 +524,17 @@ export default async function EventPage({ params }: PageProps) {
                                 <div className="space-y-1.5">
                                   {topPicks.map(({ prediction, rider }, i) => (
                                     <div key={rider.id} className="flex items-center gap-2 text-sm">
-                                      <span className="text-base w-6 shrink-0 text-center">{MEDALS[i]}</span>
+                                      {i < 3 && rider.photoUrl ? (
+                                        <div className={`relative h-7 w-7 shrink-0 rounded-full overflow-hidden ring-2 ${PODIUM_RING[i]}`}>
+                                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                                          <img src={rider.photoUrl} alt={rider.name} className="h-full w-full object-cover" />
+                                          <span className={`absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full text-[8px] font-black ${PODIUM_BADGE[i]}`}>
+                                            {i + 1}
+                                          </span>
+                                        </div>
+                                      ) : (
+                                        <span className="text-base w-6 shrink-0 text-center">{MEDALS[i]}</span>
+                                      )}
                                       <span className="shrink-0">{countryToFlag(rider.nationality)}</span>
                                       <Link href={`/riders/${rider.id}`} className="font-medium truncate hover:text-primary transition-colors flex-1">
                                         {rider.name}
