@@ -255,11 +255,13 @@ export default async function EventPage({ params }: PageProps) {
   const eliteRaces = sorted.filter(c => c.race.ageCategory === "elite");
   const otherRaces = sorted.filter(c => c.race.ageCategory !== "elite");
   // Fetch predictions + results + intel + per-race news for elite races
-  const [predictionsPerRace, resultsPerRace, intelPerRace, newsPerRace] = await Promise.all([
+  const [predictionsPerRace, resultsPerRace, intelPerRace, newsPerRace, otherResultsPerRace, otherPredictionsPerRace] = await Promise.all([
     Promise.all(eliteRaces.map(c => getTopPredictions(c.race.id, 5))),
     Promise.all(eliteRaces.map(c => getTopResults(c.race.id, 5))),
     Promise.all(eliteRaces.map(c => getRaceIntel(c.race.id))),
     Promise.all(eliteRaces.map(c => getRaceSpecificNews(event.id, c.race.id, c.race.gender))),
+    Promise.all(otherRaces.map(c => getTopResults(c.race.id, 5))),
+    Promise.all(otherRaces.map(c => getTopPredictions(c.race.id, 5))),
   ]);
 
   const wx = weather ? wmoToEmoji(weather.weatherCode) : null;
@@ -647,18 +649,120 @@ export default async function EventPage({ params }: PageProps) {
         {otherRaces.length > 0 && (
           <section className="border-b border-border/50">
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-6">
-              <h2 className="text-base font-bold mb-3 text-muted-foreground">Other categories</h2>
-              <div className="flex flex-wrap gap-2">
-                {otherRaces.map(({ race, riderCount }) => {
+              <h2 className="text-base font-bold mb-4 text-muted-foreground uppercase tracking-wider text-xs">Other categories</h2>
+              <div className={`grid gap-6 ${otherRaces.length >= 2 ? "sm:grid-cols-2" : ""} ${otherRaces.length >= 3 ? "lg:grid-cols-2 xl:grid-cols-4" : ""}`}>
+                {otherRaces.map(({ race, riderCount, resultCount }, idx) => {
                   const categorySlug = race.categorySlug ||
                     (race.ageCategory && race.gender ? generateCategorySlug(race.ageCategory, race.gender) : null);
                   const href = categorySlug ? buildCategoryUrl(discipline, eventSlug, categorySlug) : `/races/${race.id}`;
+                  const hasResults = race.status === "completed" || resultCount > 0;
+                  const topResults = otherResultsPerRace[idx] ?? [];
+                  const topPicks = otherPredictionsPerRace[idx] ?? [];
+                  const categoryLabel = formatCategoryDisplay(race.ageCategory || "elite", race.gender || "men");
+
                   return (
-                    <Link key={race.id} href={href}
-                      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-border/50 bg-card/30 hover:bg-card/70 transition-colors text-sm">
-                      <span className="font-medium">{formatCategoryDisplay(race.ageCategory || "elite", race.gender || "men")}</span>
-                      {riderCount > 0 && <span className="text-xs text-muted-foreground">{riderCount} riders</span>}
-                    </Link>
+                    <div key={race.id} className="rounded-xl border border-border/50 bg-card/20 overflow-hidden flex flex-col">
+                      {/* Card header */}
+                      <div className="flex items-center justify-between px-4 py-3 border-b border-border/30 bg-muted/20">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-sm">{categoryLabel}</span>
+                          {riderCount > 0 && (
+                            <Badge variant="outline" className="text-xs">{riderCount} riders</Badge>
+                          )}
+                        </div>
+                        <Badge variant={hasResults ? "secondary" : "default"} className={!hasResults ? "bg-green-500 text-white text-xs" : "text-xs"}>
+                          {hasResults ? "Completed" : "Upcoming"}
+                        </Badge>
+                      </div>
+
+                      <div className="p-4 flex-1">
+                        {hasResults ? (
+                          <div>
+                            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Results</h3>
+                            {topResults.length > 0 ? (
+                              <div className="space-y-1.5">
+                                {topResults.map(({ result, rider }, i) => (
+                                  <div key={rider.id} className="flex items-center gap-2 text-sm">
+                                    {i < 3 ? (
+                                      rider.photoUrl ? (
+                                        <div className="h-7 w-7 shrink-0 rounded-full overflow-hidden">
+                                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                                          <img src={rider.photoUrl} alt={rider.name} className="h-full w-full object-cover" />
+                                        </div>
+                                      ) : (
+                                        <div className={`h-7 w-7 shrink-0 rounded-full flex items-center justify-center text-[10px] font-black ${PODIUM_BADGE[i]}`}>
+                                          {rider.name.split(" ").filter(Boolean).slice(0, 2).map((w: string) => w[0]).join("").toUpperCase()}
+                                        </div>
+                                      )
+                                    ) : (
+                                      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold bg-muted text-muted-foreground">
+                                        {i + 1}
+                                      </div>
+                                    )}
+                                    <span className="shrink-0">{countryToFlag(rider.nationality)}</span>
+                                    <Link href={`/riders/${rider.id}`} className="font-medium truncate hover:text-primary transition-colors flex-1">
+                                      {rider.name}
+                                    </Link>
+                                    {result.timeSeconds != null && result.position === 1 && (
+                                      <span className="text-xs shrink-0 text-muted-foreground font-mono">
+                                        {[
+                                          Math.floor(result.timeSeconds / 3600),
+                                          Math.floor((result.timeSeconds % 3600) / 60),
+                                          result.timeSeconds % 60,
+                                        ].map(n => String(n).padStart(2, "0")).join(":")}
+                                      </span>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-muted-foreground italic">Results not yet available</p>
+                            )}
+                          </div>
+                        ) : (
+                          <div>
+                            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Top Contenders</h3>
+                            {topPicks.length > 0 ? (
+                              <div className="space-y-1.5">
+                                {topPicks.map(({ prediction, rider }, i) => (
+                                  <div key={rider.id} className="flex items-center gap-2 text-sm">
+                                    {i < 3 ? (
+                                      rider.photoUrl ? (
+                                        <div className="h-7 w-7 shrink-0 rounded-full overflow-hidden">
+                                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                                          <img src={rider.photoUrl} alt={rider.name} className="h-full w-full object-cover" />
+                                        </div>
+                                      ) : (
+                                        <div className={`h-7 w-7 shrink-0 rounded-full flex items-center justify-center text-[10px] font-black ${PODIUM_BADGE[i]}`}>
+                                          {rider.name.split(" ").filter(Boolean).slice(0, 2).map((w: string) => w[0]).join("").toUpperCase()}
+                                        </div>
+                                      )
+                                    ) : (
+                                      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold bg-muted text-muted-foreground">
+                                        {i + 1}
+                                      </div>
+                                    )}
+                                    <span className="shrink-0">{countryToFlag(rider.nationality)}</span>
+                                    <Link href={`/riders/${rider.id}`} className="font-medium truncate hover:text-primary transition-colors flex-1">
+                                      {rider.name}
+                                    </Link>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-muted-foreground italic">No predictions yet</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* CTA */}
+                      <Link href={href}
+                        className="flex items-center justify-between px-4 py-3 border-t border-border/30 bg-muted/10 hover:bg-muted/30 transition-colors text-sm font-medium text-primary group">
+                        <span>{hasResults ? "Full results" : "Startlist & predictions"}</span>
+                        <span className="group-hover:translate-x-0.5 transition-transform">→</span>
+                      </Link>
+                    </div>
                   );
                 })}
               </div>
