@@ -203,7 +203,12 @@ async function main() {
           const ok = await sendTelegramMessage(chatId, message);
           console.log(`  ${ok ? "✅" : "❌"} Telegram → user ${userId}`);
         }
-        const waPhone = (row as { whatsapp_phone?: string }).whatsapp_phone;
+        const waRows = await sql`
+          SELECT phone_number FROM user_whatsapp
+          WHERE user_id = ${userId} AND phone_number IS NOT NULL AND connected_at IS NOT NULL
+          LIMIT 1
+        `;
+        const waPhone = waRows.length > 0 ? (waRows[0].phone_number as string) : null;
         if (waPhone) {
           const waText = message.replace(/<[^>]+>/g, "");
           const ok = await sendWhatsAppMessage(waPhone, waText);
