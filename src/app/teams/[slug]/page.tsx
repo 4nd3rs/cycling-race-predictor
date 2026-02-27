@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Header } from "@/components/header";
+import { FollowButton } from "@/components/follow-button";
 import { Badge } from "@/components/ui/badge";
 import {
   db,
@@ -208,10 +209,13 @@ export default async function TeamProfilePage({ params }: PageProps) {
                   )}
                 </div>
 
-                <h1 className="text-3xl font-black tracking-tight">
-                  {team.country && <span className="mr-2">{countryToFlag(team.country)}</span>}
-                  {team.name}
-                </h1>
+                <div className="flex items-center gap-3">
+                  <h1 className="text-3xl font-black tracking-tight">
+                    {team.country && <span className="mr-2">{countryToFlag(team.country)}</span>}
+                    {team.name}
+                  </h1>
+                  <FollowButton entityId={team.id} followType="team" entityName={team.name} />
+                </div>
 
                 {/* Social links */}
                 {(team.website || team.twitter || team.instagram) && (

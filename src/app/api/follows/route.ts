@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
-import { db, userFollows, riders, raceEvents, races, userTelegram } from "@/lib/db";
+import { db, userFollows, riders, raceEvents, races, teams, userTelegram } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import { sendTelegramMessage } from "@/lib/telegram";
 
@@ -29,6 +29,13 @@ export async function GET() {
           .where(eq(races.id, f.entityId))
           .limit(1);
         return { ...f, entity: race || null };
+      } else if (f.followType === "team") {
+        const [team] = await db
+          .select({ id: teams.id, name: teams.name, slug: teams.slug, logoUrl: teams.logoUrl })
+          .from(teams)
+          .where(eq(teams.id, f.entityId))
+          .limit(1);
+        return { ...f, entity: team || null };
       } else {
         const [event] = await db
           .select({ id: raceEvents.id, name: raceEvents.name, discipline: raceEvents.discipline, date: raceEvents.date, slug: raceEvents.slug })
@@ -151,12 +158,22 @@ async function sendFollowNotification(
         ? `https://procyclingpredictor.com/races/${event.discipline}/${event.slug}`
         : `https://procyclingpredictor.com`;
     }
+  } else if (followType === "team") {
+    const [team] = await db
+      .select({ name: teams.name, slug: teams.slug })
+      .from(teams)
+      .where(eq(teams.id, entityId))
+      .limit(1);
+    if (team) {
+      entityName = team.name;
+      entityUrl = `https://procyclingpredictor.com/teams/${team.slug || entityId}`;
+    }
   }
 
   if (!entityName) return;
 
-  const emoji = followType === "rider" ? "🚴" : "🏁";
-  const typeLabel = followType === "rider" ? "rider" : "race";
+  const emoji = followType === "rider" ? "🚴" : followType === "team" ? "👥" : "🏁";
+  const typeLabel = followType === "rider" ? "rider" : followType === "team" ? "team" : "race";
 
   const message = [
     `${emoji} <b>You're now following ${entityName}!</b>`,

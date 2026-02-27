@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Check, Loader2 } from "lucide-react";
 
 interface FollowButtonProps {
-  followType: "rider" | "race_event";
+  followType: "rider" | "race_event" | "team";
   entityId: string;
   entityName: string;
   className?: string;
