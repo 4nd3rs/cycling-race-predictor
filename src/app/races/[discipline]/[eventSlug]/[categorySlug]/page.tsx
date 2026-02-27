@@ -1265,14 +1265,6 @@ export default async function CategoryPage({ params }: PageProps) {
           </section>
         )}
 
-        {/* ── FOLLOW ON WHATSAPP ──────────────────────────────────────── */}
-        <section className="border-t border-border/50">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-8">
-            <h2 className="text-lg font-bold mb-1">Follow on WhatsApp</h2>
-            <p className="text-sm text-muted-foreground mb-4">Get predictions and results for every race delivered to WhatsApp</p>
-          </div>
-        </section>
-
       </main>
     </div>
   );
