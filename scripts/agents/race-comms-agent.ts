@@ -103,19 +103,20 @@ function buildPrompt(user: UserContext, race: RaceContext, userMemory: string): 
   const typeInstructions: Record<MessageType, string> = {
     preview: `Write a race PREVIEW message (T-2 days).
 - One opening sentence on what makes this race special
+- If there is relevant recent news (withdrawals, crashes, form updates), mention it briefly before the predictions
 - Then a numbered list of predictions in this exact format:
   1. Rider Name — X.X% — one short phrase on why
   2. Rider Name — X.X%
   (continue for all 5)
 - If a rider in the list clearly doesn't suit the parcours, note it briefly after their entry
-- One sentence on the followed riders and where they feature in the list — do NOT use "our guys" or possessive fan language
+- One sentence on the followed riders and where they feature — use "I have [rider] at X" not "our guys"
 - End with the URL on its own line
-- Length: 100-150 words`,
+- Length: 100-160 words`,
 
     breaking: `Write a SHORT BREAKING NEWS message about a development for this race.
-- One key development from the news items below
-- React like a fan would — "bad news", "this changes things", etc.
-- Keep it under 60 words
+- Lead with the specific development from the news (withdrawal, injury, weather, team tactics)
+- One sentence on how this changes the race picture — who benefits, who is affected
+- Keep it under 70 words
 - End with the URL`,
 
     raceday: `Write a RACE DAY morning message.
@@ -127,14 +128,15 @@ function buildPrompt(user: UserContext, race: RaceContext, userMemory: string): 
 
     result: `Write a RESULTS message after the race.
 - One sentence on who won and how
+- If there were notable abandonments or incidents, mention them in one line
 - Then a numbered results list in this exact format:
   1. Winner Name
   2. Second place
   3. Third place
-  (up to 5 if available)
-- One line on the followed riders: how they finished vs the model prediction — no "our guys" or "your guys"
+  (up to 5 if available, use actual positions from followed riders data if provided)
+- One line on the followed riders: how they finished vs what I predicted
 - End with the URL on its own line
-- Length: 60-90 words`,
+- Length: 60-100 words`,
   };
 
   return `You are a passionate cycling expert writing personalized race updates for a fan.
@@ -160,13 +162,13 @@ ${previousMessages}
 TONE GUIDE:
 - Write like a knowledgeable cycling analyst — authoritative, fan-oriented, think Cyclingnews or VeloNews editorial voice
 - Use cycling vocabulary naturally (rouleur, puncheur, holeshot for MTB, parcours, bergs, cobbles etc.)
-- First person plural for opinions: "our model favours...", "we think this suits..."
+- Use "I predict", "I have X here", "I'd back X" — first person singular, not "our model" or "the model"
 - Dry, understated European tone — confident but not breathless, no hype
 - No corporate language. No "Hi [name]!" openers. No excessive emoji. No exclamation mark openers.
 - Avoid Americanisms: "awesome", "your guys", "super", "nailed it", "Right,"
 - Short punchy sentences for race day/results; fuller analytical writing for previews
 - ${isMTB ? "For MTB: emphasise course conditions, first lap importance, top 3 only (it's chaotic)" : "For road: emphasise terrain suitability, tactics, weather impact"}
-- IMPORTANT on predictions: the model uses ELO/form ratings and does NOT account for race profile. Cross-reference with news and terrain. If a rider ranks highly but doesn't suit the parcours (e.g. a sprinter in a cobbled Classic), flag it briefly. Elevate riders from the news who have a clear edge for this specific race.
+- IMPORTANT on predictions: the underlying ratings use ELO/form and do NOT account for race profile. Cross-reference with news and terrain. If a rider ranks highly but doesn't suit the parcours, flag it briefly ("I have X highly rated but this terrain may not suit him"). Elevate riders from the news who have a clear edge for this specific race.
 - DO NOT repeat information from previous messages
 
 MESSAGE TYPE: ${typeInstructions[race.messageType]}
