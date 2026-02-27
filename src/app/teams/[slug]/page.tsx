@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { getFlag } from "@/lib/country-flags";
 import { Header } from "@/components/header";
 import { FollowButton } from "@/components/follow-button";
 import { Badge } from "@/components/ui/badge";
@@ -19,19 +20,7 @@ interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
-function countryToFlag(code?: string | null) {
-  if (!code) return "";
-  const c = code.toUpperCase();
-  const map: Record<string, string> = {
-    GER: "DE", USA: "US", RSA: "ZA", GBR: "GB", NED: "NL", DEN: "DK",
-    SUI: "CH", AUT: "AT", BEL: "BE", FRA: "FR", ITA: "IT", ESP: "ES",
-    POR: "PT", NOR: "NO", SWE: "SE", FIN: "FI", POL: "PL", CZE: "CZ",
-    AUS: "AU", NZL: "NZ", JPN: "JP", COL: "CO", ECU: "EC", SLO: "SI",
-    CRO: "HR", UKR: "UA", KAZ: "KZ", ERI: "ER", ETH: "ET", RWA: "RW",
-  };
-  const a2 = c.length === 2 ? c : (map[c] || c.slice(0, 2));
-  return String.fromCodePoint(...[...a2].map(ch => 0x1F1E6 + ch.charCodeAt(0) - 65));
-}
+
 
 function getEloTier(elo: number) {
   if (elo >= 1500) return { label: "Elite", color: "bg-purple-500" };
@@ -211,7 +200,7 @@ export default async function TeamProfilePage({ params }: PageProps) {
 
                 <div className="flex items-center gap-3">
                   <h1 className="text-3xl font-black tracking-tight">
-                    {team.country && <span className="mr-2">{countryToFlag(team.country)}</span>}
+                    {team.country && <span className="mr-2">{getFlag(team.country)}</span>}
                     {team.name}
                   </h1>
                   <FollowButton entityId={team.id} followType="team" entityName={team.name} />
@@ -277,7 +266,7 @@ export default async function TeamProfilePage({ params }: PageProps) {
 
             {/* Current Roster (2 cols) */}
             <div className="lg:col-span-2">
-              <h2 className="text-base font-bold mb-3">🚴 Current Roster ({rosterRiders.length})</h2>
+              <h2 className="text-base font-bold mb-3">Current Roster ({rosterRiders.length})</h2>
               {rosterRiders.length > 0 ? (
                 <div className="rounded-xl border border-border/50 divide-y divide-border/30">
                   {rosterRiders.map(({ rider, bestElo, bestUciRank }) => {
@@ -291,7 +280,7 @@ export default async function TeamProfilePage({ params }: PageProps) {
                       <Link key={rider.id} href={`/riders/${rider.id}`}
                         className="flex items-center gap-3 py-2.5 px-3 hover:bg-muted/50 transition-colors">
                         <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold bg-muted/50 shrink-0">
-                          {rider.nationality ? countryToFlag(rider.nationality) : rider.name.charAt(0)}
+                          {rider.nationality ? getFlag(rider.nationality) : rider.name.charAt(0)}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{rider.name}</p>
@@ -322,7 +311,7 @@ export default async function TeamProfilePage({ params }: PageProps) {
 
             {/* Recent Results (1 col sidebar) */}
             <div>
-              <h2 className="text-base font-bold mb-3">🏁 Recent Results</h2>
+              <h2 className="text-base font-bold mb-3">Recent Results</h2>
               {recentResults.length > 0 ? (
                 <div className="rounded-xl border border-border/50 divide-y divide-border/30">
                   {recentResults.map(({ result, rider, race, event }) => (
