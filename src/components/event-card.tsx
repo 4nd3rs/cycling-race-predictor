@@ -13,24 +13,8 @@ import {
   generateCategorySlug,
   getSubDisciplineShortLabel,
 } from "@/lib/url-utils";
+import { getFlag } from "@/lib/country-flags";
 
-
-// 3-letter → flag emoji
-function countryFlag(code: string | null | undefined): string {
-  if (!code) return "";
-  const map: Record<string, string> = {
-    BEL:"BE",FRA:"FR",ESP:"ES",ITA:"IT",GER:"DE",NED:"NL",GBR:"GB",SUI:"CH",CHE:"CH",
-    AUT:"AT",DEN:"DK",NOR:"NO",SWE:"SE",FIN:"FI",POL:"PL",CZE:"CZ",SVK:"SK",HUN:"HU",
-    POR:"PT",USA:"US",CAN:"CA",MEX:"MX",BRA:"BR",ARG:"AR",COL:"CO",CHI:"CL",ECU:"EC",
-    AUS:"AU",NZL:"NZ",JPN:"JP",CHN:"CN",KOR:"KR",RSA:"ZA",MAR:"MA",AND:"AD",LUX:"LU",
-    IRL:"IE",GRE:"GR",TUR:"TR",UKR:"UA",SLO:"SI",CRO:"HR",SRB:"RS",ROU:"RO",BUL:"BG",
-    LAT:"LV",LTU:"LT",EST:"EE",KAZ:"KZ",ERI:"ER",RWA:"RW",ETH:"ET",URU:"UY",PER:"PE",
-  };
-  const c = code.toUpperCase();
-  const a2 = c.length === 2 ? c : (map[c] || c.slice(0, 2));
-  try { return String.fromCodePoint(...[...a2].map(ch => 0x1F1E6 + ch.charCodeAt(0) - 65)); }
-  catch { return ""; }
-}
 
 interface RaceCategory {
   id: string;
@@ -353,10 +337,10 @@ export function EventListRow({
 
       {/* Name + Country flag */}
       <div className="flex-1 min-w-0 flex items-center gap-2">
+        {country && <span className="text-base shrink-0 leading-none">{getFlag(country)}</span>}
         <Link href={eventUrl} className="font-medium text-sm hover:text-primary transition-colors truncate">
           {name}
         </Link>
-        {country && <span className="text-sm shrink-0 opacity-80">{countryFlag(country)}</span>}
       </div>
 
 
