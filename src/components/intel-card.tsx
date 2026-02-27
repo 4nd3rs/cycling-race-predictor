@@ -34,7 +34,7 @@ export function IntelCard({
   return (
     <Link
       href={`/riders/${riderId}`}
-      className="flex items-start gap-3 py-3 px-3 rounded-lg hover:bg-muted/20 transition-colors group border border-transparent hover:border-border/30"
+      className="flex items-start gap-3 py-3 px-3 rounded-lg hover:bg-muted/20 transition-colors group border border-transparent hover:border-border/30 w-full overflow-hidden"
     >
       {/* Rider photo */}
       <div className="shrink-0 mt-0.5">
