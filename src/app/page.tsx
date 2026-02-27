@@ -356,9 +356,9 @@ export default async function Home({ searchParams }: HomePageProps) {
         </section>
 
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-10 overflow-hidden">
-          <div className="grid gap-10 lg:grid-cols-5 overflow-hidden">
+          <div className="grid grid-cols-1 gap-10 lg:grid-cols-5 overflow-hidden">
             {/* ---- LATEST INTEL ---- */}
-            <div className="lg:col-span-3">
+            <div className="lg:col-span-3 min-w-0 overflow-hidden">
               <h2 className="text-xl font-bold tracking-tight mb-6">
                 Latest Intel
               </h2>
@@ -387,7 +387,7 @@ export default async function Home({ searchParams }: HomePageProps) {
             </div>
 
             {/* ---- RECENT RESULTS ---- */}
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-2 min-w-0 overflow-hidden">
               <h2 className="text-xl font-bold tracking-tight mb-6">
                 Latest Results
               </h2>

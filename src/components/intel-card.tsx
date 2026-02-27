@@ -34,7 +34,7 @@ export function IntelCard({
   return (
     <Link
       href={`/riders/${riderId}`}
-      className="flex items-start gap-3 py-3 px-3 rounded-lg hover:bg-muted/20 transition-colors group border border-transparent hover:border-border/30 w-full overflow-hidden"
+      className="flex items-start gap-3 py-3 px-3 rounded-lg hover:bg-muted/20 transition-colors group border border-transparent hover:border-border/30 w-full max-w-full overflow-hidden min-w-0"
     >
       {/* Rider photo */}
       <div className="shrink-0 mt-0.5">
@@ -52,9 +52,9 @@ export function IntelCard({
       </div>
 
       {/* Content */}
-      <div className="flex-1 min-w-0 overflow-hidden">
+      <div className="flex-1 min-w-0 overflow-hidden max-w-full w-0">
         <div className="flex items-center gap-2 mb-1 flex-wrap">
-          <span className="font-semibold text-sm group-hover:text-primary transition-colors truncate">
+          <span className="font-semibold text-sm group-hover:text-primary transition-colors truncate max-w-full block">
             {riderName}
           </span>
           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${className}`}>
@@ -62,7 +62,7 @@ export function IntelCard({
           </span>
         </div>
         {summary && (
-          <p className="text-xs text-muted-foreground line-clamp-2 break-words leading-relaxed">
+          <p className="text-xs text-muted-foreground line-clamp-2 break-all leading-relaxed">
             {summary}
           </p>
         )}
