@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Header } from "@/components/header";
 import { Badge } from "@/components/ui/badge";
-import { TelegramSubscribeButton } from "@/components/telegram-subscribe-button";
 import { RaceLinksSection } from "@/components/race-links";
 import { getRaceProfile } from "@/lib/race-profiles";
 import { analyzeRaceWeather } from "@/lib/weather-analysis";
@@ -386,8 +385,6 @@ export default async function EventPage({ params }: PageProps) {
                 {event.externalLinks && Object.keys(event.externalLinks).filter(k => !["tvSchedule","raceStart","raceFinish"].includes(k)).length > 0 && (
                   <RaceLinksSection links={event.externalLinks} />
                 )}
-
-                <TelegramSubscribeButton />
 
                 {/* Quick-nav to Men / Women race categories */}
                 {sorted.length > 0 && (
