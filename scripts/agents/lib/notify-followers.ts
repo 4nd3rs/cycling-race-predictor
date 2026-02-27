@@ -50,6 +50,18 @@ async function getChatIdsForFollowers(
     .filter((id): id is string => !!id);
 }
 
+/** Notify all followers of a specific race (category-level follow) */
+export async function notifyRaceFollowers(
+  raceId: string,
+  message: string
+): Promise<number> {
+  const chatIds = await getChatIdsForFollowers("race", raceId);
+  for (const chatId of chatIds) {
+    await sendTg(chatId, message);
+  }
+  return chatIds.length;
+}
+
 /** Notify all followers of a race_event */
 export async function notifyRaceEventFollowers(
   raceEventId: string,

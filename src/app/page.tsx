@@ -12,6 +12,7 @@ import { buildEventUrl, buildRaceUrl, getDisciplineShortLabel } from "@/lib/url-
 import { RaceLinksSection } from "@/components/race-links";
 import { EventListView } from "@/components/event-card";
 import { RaceFilters } from "@/components/race-filters";
+import { RaceFollowButton } from "@/components/race-follow-button";
 
 // ---------------------------------------------------------------------------
 // HYPE SCORING — only prestigious races on the homepage
@@ -490,9 +491,17 @@ function NextRaceHero({ event: ev }: { event: HomepageEvent }) {
           )}
         </div>
 
-        <Button asChild size="lg" className="self-start md:self-end shrink-0">
-          <Link href={url}>View Predictions &rarr;</Link>
-        </Button>
+        <div className="flex items-center gap-3 self-start md:self-end shrink-0">
+          <RaceFollowButton
+            eventId={ev.id}
+            eventName={ev.name}
+            categories={ev.categories}
+            size="default"
+          />
+          <Button asChild size="lg">
+            <Link href={url}>View Predictions &rarr;</Link>
+          </Button>
+        </div>
       </div>
 
       <div className="absolute -left-4 top-0 bottom-0 w-1 bg-primary rounded-full hidden md:block" />

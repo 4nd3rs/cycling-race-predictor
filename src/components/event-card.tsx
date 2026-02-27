@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { RaceFollowButton } from "@/components/race-follow-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -347,6 +348,15 @@ export function EventListRow({
       </div>
 
 
+
+      {/* Follow button */}
+      <RaceFollowButton
+        eventId={id}
+        eventName={name}
+        categories={categories}
+        size="sm"
+        className="hidden sm:flex"
+      />
 
       {/* Category pills */}
       <div className="hidden md:flex items-center gap-1 shrink-0">

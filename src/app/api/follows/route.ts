@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
-import { db, userFollows, riders, raceEvents, userTelegram } from "@/lib/db";
+import { db, userFollows, riders, raceEvents, races, userTelegram } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import { sendTelegramMessage } from "@/lib/telegram";
 
@@ -22,6 +22,13 @@ export async function GET() {
           .where(eq(riders.id, f.entityId))
           .limit(1);
         return { ...f, entity: rider || null };
+      } else if (f.followType === "race") {
+        const [race] = await db
+          .select({ id: races.id, name: races.name, discipline: races.discipline, date: races.date })
+          .from(races)
+          .where(eq(races.id, f.entityId))
+          .limit(1);
+        return { ...f, entity: race || null };
       } else {
         const [event] = await db
           .select({ id: raceEvents.id, name: raceEvents.name, discipline: raceEvents.discipline, date: raceEvents.date, slug: raceEvents.slug })
@@ -109,6 +116,28 @@ async function sendFollowNotification(
     if (rider) {
       entityName = rider.name;
       entityUrl = `https://procyclingpredictor.com/riders/${entityId}`;
+    }
+  } else if (followType === "race") {
+    const [race] = await db
+      .select({ name: races.name, raceEventId: races.raceEventId, discipline: races.discipline })
+      .from(races)
+      .where(eq(races.id, entityId))
+      .limit(1);
+    if (race) {
+      entityName = race.name;
+      // Build URL from race_event if possible
+      if (race.raceEventId) {
+        const [ev] = await db
+          .select({ slug: raceEvents.slug, discipline: raceEvents.discipline })
+          .from(raceEvents)
+          .where(eq(raceEvents.id, race.raceEventId))
+          .limit(1);
+        entityUrl = ev?.slug
+          ? `https://procyclingpredictor.com/races/${ev.discipline}/${ev.slug}`
+          : `https://procyclingpredictor.com`;
+      } else {
+        entityUrl = `https://procyclingpredictor.com`;
+      }
     }
   } else if (followType === "race_event") {
     const [event] = await db
