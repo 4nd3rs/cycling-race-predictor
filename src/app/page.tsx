@@ -14,6 +14,7 @@ import { EventListView } from "@/components/event-card";
 import { MyFeedWidget } from "@/components/my-feed-widget";
 import { RaceFilters } from "@/components/race-filters";
 import { RaceFollowButton } from "@/components/race-follow-button";
+import { WhatsAppChannels } from "@/components/whatsapp-channels";
 
 // ---------------------------------------------------------------------------
 // HYPE SCORING — only prestigious races on the homepage
@@ -417,6 +418,19 @@ export default async function Home({ searchParams }: HomePageProps) {
           </div>
         </div>
       </main>
+
+        {/* ── FOLLOW ON WHATSAPP ──────────────────────────────────────── */}
+        <section className="border-t border-border/50">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-10">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-bold tracking-tight">Get Predictions on WhatsApp</h2>
+                <p className="text-sm text-muted-foreground mt-1">Follow our channels for race previews and results delivered straight to WhatsApp</p>
+              </div>
+            </div>
+            <WhatsAppChannels variant="full" />
+          </div>
+        </section>
 
       {/* Footer */}
       <footer className="border-t border-border/50 py-6">

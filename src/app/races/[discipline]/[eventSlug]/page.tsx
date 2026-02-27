@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { WhatsAppChannels } from "@/components/whatsapp-channels";
 import Link from "next/link";
 import { Header } from "@/components/header";
 import { Badge } from "@/components/ui/badge";
@@ -835,6 +836,14 @@ export default async function EventPage({ params }: PageProps) {
             </div>
           </section>
         )}
+
+        {/* ── FOLLOW ON WHATSAPP ──────────────────────────────────────── */}
+        <section className="border-t border-border/50">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-8">
+            <h2 className="text-lg font-bold mb-4">Follow on WhatsApp</h2>
+            <WhatsAppChannels variant={discipline === "mtb" ? "mtb" : "road"} />
+          </div>
+        </section>
 
       </main>
     </div>
