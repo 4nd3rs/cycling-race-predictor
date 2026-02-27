@@ -108,8 +108,16 @@ export function ConnectWhatsAppButton({ connected, phoneNumber }: Props) {
 
   if (step === "enter-phone") {
     return (
-      <div className="space-y-2">
-        <p className="text-sm text-muted-foreground">Enter your WhatsApp number (with country code):</p>
+      <div className="space-y-3">
+        <div className="rounded-lg border border-[#25D366]/20 bg-[#25D366]/5 p-3 text-sm">
+          <p className="font-medium text-[#25D366] mb-1">First: activate your alerts</p>
+          <p className="text-muted-foreground text-xs">Send a WhatsApp message to <span className="font-mono font-semibold text-foreground">+1 681 271 0565</span> (any text). This lets us send you alerts.</p>
+          <a href="https://wa.me/16812710565?text=hi" target="_blank" rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 mt-2 text-xs font-semibold text-[#25D366] hover:underline">
+            Open in WhatsApp →
+          </a>
+        </div>
+        <p className="text-sm text-muted-foreground">Then enter your number to receive a verification code:</p>
         <div className="flex gap-2">
           <input
             type="tel"
