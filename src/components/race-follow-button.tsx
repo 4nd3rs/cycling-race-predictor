@@ -26,6 +26,7 @@ interface RaceFollowButtonProps {
   categories: RaceCategory[];
   className?: string;
   size?: "sm" | "default";
+  compact?: boolean; // icon-only bell indicator, no text, no toggle on click
 }
 
 type FollowState = "idle" | "loading" | "toggling";
@@ -52,6 +53,7 @@ export function RaceFollowButton({
   categories,
   className,
   size = "sm",
+  compact = false,
 }: RaceFollowButtonProps) {
   const { isSignedIn, isLoaded } = useUser();
   const router = useRouter();
@@ -113,22 +115,37 @@ export function RaceFollowButton({
     setState("idle");
   }
 
+  // Compact: icon-only bell, no text, click still toggles
+  if (compact) {
+    if (state === "loading") return null;
+    return (
+      <button
+        onClick={categories.length === 1 ? () => toggleCategory(categories[0].id) : toggleAll}
+        disabled={state === "toggling"}
+        title={isFollowingAny ? "Following — click to unfollow" : "Follow"}
+        className={cn("h-5 w-5 flex items-center justify-center text-muted-foreground transition-colors hover:text-primary", isFollowingAny && "text-primary", className)}
+      >
+        <Bell className={"h-3.5 w-3.5" + (isFollowingAny ? " fill-current" : "")} />
+      </button>
+    );
+  }
+
   // Single category — simple toggle, no popup
   if (categories.length <= 1) {
     return (
       <Button
         variant={isFollowingAny ? "secondary" : "outline"}
-        size={size}
+        size="sm"
         onClick={categories.length === 1 ? () => toggleCategory(categories[0].id) : toggleAll}
         disabled={state !== "idle"}
-        className={cn("shrink-0", className)}
+        className={cn("shrink-0 h-7 px-2.5 text-xs gap-1", className)}
       >
         {state === "loading" || state === "toggling" ? (
           <Loader2 className="h-3 w-3 animate-spin" />
         ) : isFollowingAny ? (
-          <><Check className="h-3 w-3 mr-1" />Following</>
+          <><Bell className="h-3 w-3 fill-current" />Following</>
         ) : (
-          <><Bell className="h-3 w-3 mr-1" />Follow</>
+          <><Bell className="h-3 w-3" />Follow</>
         )}
       </Button>
     );
@@ -140,9 +157,9 @@ export function RaceFollowButton({
       <PopoverTrigger asChild>
         <Button
           variant={isFollowingAny ? "secondary" : "outline"}
-          size={size}
+          size="sm"
           disabled={state === "loading"}
-          className={cn("shrink-0", className)}
+          className={cn("shrink-0 h-7 px-2.5 text-xs gap-1", className)}
           onClick={(e) => {
             if (!isSignedIn) { e.preventDefault(); handleNotSignedIn(); return; }
           }}
@@ -150,9 +167,9 @@ export function RaceFollowButton({
           {state === "loading" ? (
             <Loader2 className="h-3 w-3 animate-spin" />
           ) : isFollowingAny ? (
-            <><Check className="h-3 w-3 mr-1" />Following<ChevronDown className="h-3 w-3 ml-1" /></>
+            <><Bell className="h-3 w-3 fill-current" />Following<ChevronDown className="h-3 w-3" /></>
           ) : (
-            <><Bell className="h-3 w-3 mr-1" />Follow<ChevronDown className="h-3 w-3 ml-1" /></>
+            <><Bell className="h-3 w-3" />Follow<ChevronDown className="h-3 w-3" /></>
           )}
         </Button>
       </PopoverTrigger>

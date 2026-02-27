@@ -368,10 +368,18 @@ export function EventListRow({
 
 
 
-      {/* Status / Follow swap on hover */}
-      <div className="shrink-0 flex items-center justify-end min-w-[80px]">
-        <div className="group-hover:hidden flex items-center">{statusEl}</div>
-        <div className="hidden group-hover:flex">
+      {/* Status + Follow bell */}
+      <div className="shrink-0 flex items-center gap-2 justify-end">
+        <div className="group-hover:hidden flex items-center gap-1.5">
+          {statusEl}
+          <RaceFollowButton
+            eventId={id}
+            eventName={name}
+            categories={categories}
+            compact
+          />
+        </div>
+        <div className="hidden group-hover:flex items-center h-7">
           <RaceFollowButton
             eventId={id}
             eventName={name}
