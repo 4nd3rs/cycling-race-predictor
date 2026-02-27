@@ -226,6 +226,24 @@ const PODIUM_BADGE = ["bg-yellow-500 text-yellow-950", "bg-gray-300 text-gray-80
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
+
+function getCategoryLabel(categorySlug?: string | null, ageCategory?: string | null, gender?: string | null): string {
+  if (categorySlug) {
+    const labels: Record<string, string> = {
+      "elite-men": "Elite Men", "elite-women": "Elite Women",
+      "u23-men": "U23 Men", "u23-women": "U23 Women",
+      "junior-men": "Junior Men", "junior-women": "Junior Women",
+      "under-23-men": "U23 Men", "under-23-women": "U23 Women",
+    };
+    if (labels[categorySlug]) return labels[categorySlug];
+    // Fallback: capitalise slug
+    return categorySlug.replace(/-/g, " ").replace(/\w/g, c => c.toUpperCase());
+  }
+  if (ageCategory === "u23") return gender === "women" ? "U23 Women" : "U23 Men";
+  if (ageCategory === "junior") return gender === "women" ? "Junior Women" : "Junior Men";
+  return gender === "women" ? "Elite Women" : "Elite Men";
+}
+
 export default async function EventPage({ params }: PageProps) {
   const { discipline, eventSlug } = await params;
 
@@ -337,15 +355,15 @@ export default async function EventPage({ params }: PageProps) {
                 <TelegramSubscribeButton />
 
                 {/* Quick-nav to Men / Women race categories */}
-                {eliteRaces.length > 0 && (
+                {sorted.length > 0 && (
                   <div className="flex flex-wrap gap-2 pt-1">
-                    {eliteRaces.map(({ race }) => {
+                    {sorted.map(({ race }) => {
                       const categorySlug = race.categorySlug ||
                         (race.ageCategory && race.gender ? `${race.ageCategory}-${race.gender}` : null);
                       const href = categorySlug
                         ? `/races/${discipline}/${eventSlug}/${categorySlug}`
                         : `/races/${race.id}`;
-                      const label = race.gender === "women" ? "Elite Women" : "Elite Men";
+                      const label = getCategoryLabel(race.categorySlug, race.ageCategory, race.gender);
                       return (
                         <Link key={race.id} href={href}
                           className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors">
@@ -446,7 +464,7 @@ export default async function EventPage({ params }: PageProps) {
                     (race.ageCategory && race.gender ? generateCategorySlug(race.ageCategory, race.gender) : null);
                   const href = categorySlug ? buildCategoryUrl(discipline, eventSlug, categorySlug) : `/races/${race.id}`;
                   const hasResults = race.status === "completed" || resultCount > 0;
-                  const genderLabel = race.gender === "women" ? "Elite Women" : "Elite Men";
+                  const genderLabel = getCategoryLabel(race.categorySlug, race.ageCategory, race.gender);
 
                   return (
                     <div key={race.id} className="rounded-xl border border-border/50 bg-card/20 overflow-hidden flex flex-col">
