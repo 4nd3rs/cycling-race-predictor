@@ -138,7 +138,7 @@ export function RaceFollowButton({
         size="sm"
         onClick={categories.length === 1 ? () => toggleCategory(categories[0].id) : toggleAll}
         disabled={state !== "idle"}
-        className={cn("shrink-0 h-7 px-2.5 text-xs gap-1", className)}
+        className={cn("shrink-0 h-7 px-2.5 text-xs gap-1 border-white/40 text-white bg-white/10 hover:bg-white/20 hover:border-white/60", isFollowingAny && "bg-primary/20 border-primary/60 text-primary hover:bg-primary/30", className)}
       >
         {state === "loading" || state === "toggling" ? (
           <Loader2 className="h-3 w-3 animate-spin" />
@@ -159,7 +159,7 @@ export function RaceFollowButton({
           variant={isFollowingAny ? "secondary" : "outline"}
           size="sm"
           disabled={state === "loading"}
-          className={cn("shrink-0 h-7 px-2.5 text-xs gap-1", className)}
+          className={cn("shrink-0 h-7 px-2.5 text-xs gap-1 border-white/40 text-white bg-white/10 hover:bg-white/20 hover:border-white/60", isFollowingAny && "bg-primary/20 border-primary/60 text-primary hover:bg-primary/30", className)}
           onClick={(e) => {
             if (!isSignedIn) { e.preventDefault(); handleNotSignedIn(); return; }
           }}
