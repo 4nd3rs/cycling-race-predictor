@@ -80,16 +80,31 @@ function buildPrompt(user: UserContext, race: RaceContext, userMemory: string): 
     ? new Date(race.date.split("T")[0] + "T12:00:00Z").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" })
     : race.date.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
 
+  // Normalize DB name format: "VAN DER POEL Mathieu" → "Mathieu Van Der Poel"
+  const normalizeName = (name: string): string => {
+    const parts = name.trim().split(" ");
+    if (parts.length < 2) return name;
+    // Heuristic: if last token looks like a first name (Title case, not ALL CAPS), it's already good
+    const last = parts[parts.length - 1];
+    if (last === last.toUpperCase() || parts[0] === parts[0].toUpperCase()) {
+      // Likely "LASTNAME Firstname" or "ALL CAPS" format — move last word to front
+      const firstName = parts[parts.length - 1];
+      const lastName = parts.slice(0, -1).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+      return `${firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase()} ${lastName}`;
+    }
+    return name;
+  };
+
   const predictionsText = race.topPredictions.slice(0, 5)
-    .map((p, i) => `${i + 1}. ${p.riderName} — ${(p.winProbability * 100).toFixed(1)}%`)
+    .map((p, i) => `${i + 1}. ${normalizeName(p.riderName)} — ${(p.winProbability * 100).toFixed(0)}%`)
     .join("\n");
 
   const followedText = race.followedRiders.length > 0
     ? race.followedRiders.map(r => {
         if (race.messageType === "result" && r.actualPosition != null) {
-          return `${r.name} — finished ${r.actualPosition}${r.predictedPosition ? ` (predicted ${r.predictedPosition})` : ""}`;
+          return `${normalizeName(r.name)} — finished ${r.actualPosition}${r.predictedPosition ? ` (predicted ${r.predictedPosition})` : ""}`;
         }
-        return r.predictedPosition ? `${r.name} — predicted ${r.predictedPosition}` : r.name;
+        return r.predictedPosition ? `${normalizeName(r.name)} — predicted ${r.predictedPosition}` : normalizeName(r.name);
       }).join("\n")
     : "None";
 
@@ -104,14 +119,13 @@ function buildPrompt(user: UserContext, race: RaceContext, userMemory: string): 
     preview: `Write a race PREVIEW message (T-2 days).
 - One opening sentence on what makes this race special
 - If there is relevant recent news (withdrawals, crashes, form updates), mention it briefly before the predictions
-- Then a numbered list of predictions in this exact format:
-  1. Rider Name — X.X% — one short phrase on why
-  2. Rider Name — X.X%
-  (continue for all 5)
-- If a rider in the list clearly doesn't suit the parcours, note it briefly after their entry
-- One sentence on the followed riders and where they feature — use "I have [rider] at X" not "our guys"
+- Then a numbered list of predictions. Format each line as:
+  1. Firstname Lastname — X% — one short distinctive phrase (vary the phrasing each line, do NOT repeat "I have X at Y%" for every entry)
+  Use natural name order (Firstname Lastname, not LASTNAME Firstname)
+- If a followed rider appears in the top 5 already, do NOT add a separate sentence about them — they're already listed
+- If a followed rider is NOT in the top 5, add one sentence mentioning where they sit
 - End with the URL on its own line
-- Length: 100-160 words`,
+- Length: 80-130 words`,
 
     breaking: `Write a SHORT BREAKING NEWS message about a development for this race.
 - Lead with the specific development from the news (withdrawal, injury, weather, team tactics)
