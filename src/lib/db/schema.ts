@@ -482,6 +482,15 @@ export const userTelegram = pgTable("user_telegram", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const userWhatsapp = pgTable("user_whatsapp", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull().unique(),
+  phoneNumber: varchar("phone_number", { length: 20 }),
+  connectToken: varchar("connect_token", { length: 64 }).unique(),
+  connectedAt: timestamp("connected_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // ============================================================================
 // RELATIONS
 // ============================================================================
@@ -728,3 +737,5 @@ export type UserFollow = typeof userFollows.$inferSelect;
 export type NewUserFollow = typeof userFollows.$inferInsert;
 export type UserTelegram = typeof userTelegram.$inferSelect;
 export type NewUserTelegram = typeof userTelegram.$inferInsert;
+export type UserWhatsapp = typeof userWhatsapp.$inferSelect;
+export type NewUserWhatsapp = typeof userWhatsapp.$inferInsert;

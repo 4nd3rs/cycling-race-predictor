@@ -5,6 +5,9 @@ config({ path: ".env.local" });
 
 const sql = neon(process.env.DATABASE_URL as string);
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TWILIO_SID = process.env.TWILIO_ACCOUNT_SID;
+const TWILIO_TOKEN = process.env.TWILIO_AUTH_TOKEN;
+const TWILIO_FROM = process.env.TWILIO_WHATSAPP_NUMBER || "+16812710565";
 const DRY_RUN = process.argv.includes("--dry-run");
 
 async function sendTelegramMessage(chatId: string, text: string): Promise<boolean> {
@@ -16,6 +19,25 @@ async function sendTelegramMessage(chatId: string, text: string): Promise<boolea
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML" }),
+  });
+  return res.ok;
+}
+
+async function sendWhatsAppMessage(to: string, text: string): Promise<boolean> {
+  if (!TWILIO_SID || !TWILIO_TOKEN) return false;
+  const normalized = to.startsWith("+") ? to : `+${to}`;
+  const body = new URLSearchParams({
+    From: `whatsapp:${TWILIO_FROM}`,
+    To: `whatsapp:${normalized}`,
+    Body: text,
+  });
+  const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${TWILIO_SID}/Messages.json`, {
+    method: "POST",
+    headers: {
+      Authorization: "Basic " + Buffer.from(`${TWILIO_SID}:${TWILIO_TOKEN}`).toString("base64"),
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: body.toString(),
   });
   return res.ok;
 }
@@ -177,8 +199,16 @@ async function main() {
         console.log(`  [DRY RUN] Would send to user ${userId} (chat ${chatId}):`);
         console.log(`    ${message.split("\n").join("\n    ")}`);
       } else {
-        const ok = await sendTelegramMessage(chatId, message);
-        console.log(`  ${ok ? "✅" : "❌"} Sent to user ${userId} (chat ${chatId})`);
+        if (chatId) {
+          const ok = await sendTelegramMessage(chatId, message);
+          console.log(`  ${ok ? "✅" : "❌"} Telegram → user ${userId}`);
+        }
+        const waPhone = (row as { whatsapp_phone?: string }).whatsapp_phone;
+        if (waPhone) {
+          const waText = message.replace(/<[^>]+>/g, "");
+          const ok = await sendWhatsAppMessage(waPhone, waText);
+          console.log(`  ${ok ? "✅" : "❌"} WhatsApp → ${waPhone}`);
+        }
       }
       totalSent++;
     }
@@ -186,7 +216,7 @@ async function main() {
 
   console.log(`\n📊 Summary:`);
   console.log(`  ${DRY_RUN ? "Would send" : "Sent"}: ${totalSent} messages`);
-  console.log(`  Skipped (no Telegram): ${totalSkipped}`);
+  console.log(`  Skipped (no Telegram/WhatsApp): ${totalSkipped}`);
 }
 
 main().catch(console.error);
