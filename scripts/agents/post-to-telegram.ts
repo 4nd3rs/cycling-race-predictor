@@ -6,6 +6,22 @@ import { readFileSync } from "fs";
 import { db, races, predictions, riders, raceResults, raceStartlist, riderRumours, teams, riderDisciplineStats } from "./lib/db";
 import { eq, and, asc, desc } from "drizzle-orm";
 
+// ─── Intel file ─────────────────────────────────────────────────────────────
+import { readFileSync, existsSync } from "fs";
+
+interface IntelItem { type: string; subject: string; title: string; sentiment?: number; tags: string[]; }
+
+function loadTodayRaceIntel(raceName: string): IntelItem[] {
+  const today = new Date().toISOString().slice(0, 10);
+  const file = `./data/intel/${today}.jsonl`;
+  if (!existsSync(file)) return [];
+  try {
+    const all: IntelItem[] = readFileSync(file, "utf-8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
+    const word = raceName.split(" ")[0].toLowerCase();
+    return all.filter((i) => i.type === "race" && i.subject.toLowerCase().includes(word) && i.tags.length > 0);
+  } catch { return []; }
+}
+
 const countryFlags: Record<string, string> = {
   BEL: "🇧🇪", NED: "🇳🇱", FRA: "🇫🇷", ITA: "🇮🇹", ESP: "🇪🇸",
   GBR: "🇬🇧", GER: "🇩🇪", DEU: "🇩🇪", SUI: "🇨🇭", CHE: "🇨🇭",
@@ -211,11 +227,20 @@ async function buildPreviewCaption(race: typeof races.$inferSelect, raceId: stri
   const p2 = top3[1] ? `🥈 ${escapeMd(top3[1].name)} ${getFlag(top3[1].nationality)}` : "";
   const p3 = top3[2] ? `🥉 ${escapeMd(top3[2].name)} ${getFlag(top3[2].nationality)}` : "";
 
-  const intelSection = intel
+  // Also pull from today's intel file
+  const fileIntel = loadTodayRaceIntel(race.name);
+  const intelLines: string[] = [];
+  if (intel) intelLines.push(escapeMd(intel));
+  for (const fi of fileIntel.slice(0, 2)) {
+    const line = fi.title.length > 100 ? fi.title.slice(0, 97) + "..." : fi.title;
+    intelLines.push(escapeMd(line));
+  }
+
+  const intelSection = intelLines.length > 0
     ? `━━━━━━━━━━━━━━━
 🕵️ INTEL
 ━━━━━━━━━━━━━━━
-${escapeMd(intel)}`
+${intelLines.join("\n")}`
     : "";
 
   return `🏁 RACE PREVIEW

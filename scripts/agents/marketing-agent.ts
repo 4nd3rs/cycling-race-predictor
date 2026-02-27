@@ -7,6 +7,32 @@ import { db, races, raceResults } from "./lib/db";
 import { and, gte, lte, eq, sql } from "drizzle-orm";
 
 const TRACKING_FILE = "/tmp/marketing-posted.json";
+const INTEL_DIR = "./data/intel";
+
+interface IntelItem {
+  type: "rider" | "race";
+  subject: string;
+  title: string;
+  url: string;
+  publishedAt: string;
+  source: string;
+  sentiment?: number;
+  tags: string[];
+}
+
+function loadTodayIntel(): IntelItem[] {
+  const today = new Date().toISOString().slice(0, 10);
+  const file = `${INTEL_DIR}/${today}.jsonl`;
+  if (!existsSync(file)) return [];
+  try {
+    return readFileSync(file, "utf-8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
+  } catch { return []; }
+}
+
+function getIntelForRace(raceName: string, intel: IntelItem[]): IntelItem[] {
+  const lower = raceName.toLowerCase();
+  return intel.filter((i) => i.type === "race" && i.subject.toLowerCase().includes(lower.split(" ")[0]));
+}
 
 interface TrackingData {
   previews: string[]; // race IDs
@@ -45,6 +71,8 @@ async function main() {
 
   const tracking = loadTracking();
   let postsCount = 0;
+  const latestIntel = loadTodayIntel();
+  if (latestIntel.length > 0) console.log(`📡 Loaded ${latestIntel.length} intel items for today`);
 
   // ─── 1. PREVIEW: Upcoming races in next 3 days ───────────────
   const today = dayStr(0);
@@ -72,6 +100,7 @@ async function main() {
 
     console.log(`📸 Posting preview: ${race.name} (${race.date})`);
     try {
+      const intelFlag = latestIntel.length > 0 ? `--has-intel` : "";
       execSync(
         `node_modules/.bin/tsx scripts/agents/post-to-telegram.ts --race-id ${race.id} --type preview --channel "${channel}"`,
         { encoding: "utf-8", stdio: "inherit", cwd: process.cwd() }
