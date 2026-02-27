@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import { WhatsAppChannels } from "@/components/whatsapp-channels";
 import Link from "next/link";
 import { Header } from "@/components/header";
 import { PredictionList } from "@/components/prediction-card";
@@ -1212,7 +1211,6 @@ export default async function CategoryPage({ params }: PageProps) {
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-8">
             <h2 className="text-lg font-bold mb-1">Follow on WhatsApp</h2>
             <p className="text-sm text-muted-foreground mb-4">Get predictions and results for every race delivered to WhatsApp</p>
-            <WhatsAppChannels variant={discipline === "mtb" ? "mtb" : race?.gender === "women" ? "road_women" : race?.gender === "men" ? "road_men" : "road"} compact />
           </div>
         </section>
 

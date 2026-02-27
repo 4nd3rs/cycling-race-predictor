@@ -14,7 +14,6 @@ import { EventListView } from "@/components/event-card";
 import { MyFeedWidget } from "@/components/my-feed-widget";
 import { RaceFilters } from "@/components/race-filters";
 import { RaceFollowButton } from "@/components/race-follow-button";
-import { WhatsAppChannels } from "@/components/whatsapp-channels";
 
 // ---------------------------------------------------------------------------
 // HYPE SCORING — only prestigious races on the homepage
@@ -428,7 +427,6 @@ export default async function Home({ searchParams }: HomePageProps) {
                 <p className="text-sm text-muted-foreground mt-1">Follow our channels for race previews and results delivered straight to WhatsApp</p>
               </div>
             </div>
-            <WhatsAppChannels variant="full" />
           </div>
         </section>
 
