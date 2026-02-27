@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Header } from "@/components/header";
 import { Badge } from "@/components/ui/badge";
 import { getAuthUser } from "@/lib/auth";
-import { db, userFollows, userTelegram, riders, raceEvents, teams } from "@/lib/db";
+import { db, userFollows, userTelegram, riders, raceEvents, races, teams } from "@/lib/db";
 import { eq, and, inArray } from "drizzle-orm";
 import { getFlag } from "@/lib/country-flags";
 import { ConnectTelegramButton } from "@/components/connect-telegram-button";
@@ -47,6 +47,21 @@ export default async function ProfilePage() {
       return event || null;
     })
   );
+
+  // Individual race category follows (follow_type = "race")
+  const raceCatFollowIds = follows.filter((f) => f.followType === "race").map(f => f.entityId);
+  const raceCatDetails = raceCatFollowIds.length > 0
+    ? await db.select({
+        id: races.id, gender: races.gender, ageCategory: races.ageCategory,
+        discipline: races.discipline, categorySlug: races.categorySlug,
+        eventId: races.raceEventId,
+        eventName: raceEvents.name, eventSlug: raceEvents.slug, eventDate: raceEvents.date,
+      })
+      .from(races)
+      .innerJoin(raceEvents, eq(races.raceEventId, raceEvents.id))
+      .where(inArray(races.id, raceCatFollowIds))
+      .limit(30)
+    : [];
 
   const teamFollowIds = follows.filter((f) => f.followType === "team").map(f => f.entityId);
   const teamDetails = teamFollowIds.length > 0
@@ -150,6 +165,33 @@ export default async function ProfilePage() {
               </p>
             )}
           </section>
+
+          {/* Followed Race Categories */}
+          {raceCatDetails.length > 0 && (
+            <section>
+              <h2 className="text-lg font-bold mb-3">Followed Race Categories</h2>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {raceCatDetails.map((rc) => {
+                  const g = rc.gender === "men" ? "M" : "F";
+                  const age = rc.ageCategory === "elite" ? "" : rc.ageCategory === "u23" ? " U23" : rc.ageCategory === "junior" ? " Junior" : ` ${rc.ageCategory}`;
+                  const label = `${g}${age}`;
+                  const url = rc.eventSlug && rc.categorySlug
+                    ? `/races/${rc.discipline}/${rc.eventSlug}/${rc.categorySlug}`
+                    : `/races/${rc.discipline}/${rc.eventSlug}`;
+                  return (
+                    <Link key={rc.id} href={url}
+                      className="flex items-center gap-3 rounded-lg border border-border/50 bg-card/30 p-3 hover:bg-card/60 transition-colors">
+                      <span className="text-xs font-bold bg-primary/20 text-primary rounded px-2 py-0.5 shrink-0">{label}</span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{rc.eventName}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{rc.eventDate}</p>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </section>
+          )}
 
           {/* Followed Teams */}
           <section>
