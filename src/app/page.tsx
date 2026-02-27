@@ -11,6 +11,7 @@ import { getFlag } from "@/lib/country-flags";
 import { buildEventUrl, buildRaceUrl, getDisciplineShortLabel } from "@/lib/url-utils";
 import { RaceLinksSection } from "@/components/race-links";
 import { EventListView } from "@/components/event-card";
+import { MyFeedWidget } from "@/components/my-feed-widget";
 import { RaceFilters } from "@/components/race-filters";
 import { RaceFollowButton } from "@/components/race-follow-button";
 
@@ -321,6 +322,9 @@ export default async function Home({ searchParams }: HomePageProps) {
             )}
           </div>
         </section>
+
+        {/* ---- MY FEED (logged in users) ---- */}
+        <MyFeedWidget />
 
         {/* ---- UPCOMING RACES TABLE ---- */}
         <section className="border-b border-border/50">
