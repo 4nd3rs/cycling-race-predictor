@@ -108,7 +108,7 @@ function buildPrompt(user: UserContext, race: RaceContext, userMemory: string): 
   2. Rider Name — X.X%
   (continue for all 5)
 - If a rider in the list clearly doesn't suit the parcours, note it briefly after their entry
-- One sentence on the user's followed riders and where they feature in the list
+- One sentence on the followed riders and where they feature in the list — do NOT use "our guys" or possessive fan language
 - End with the URL on its own line
 - Length: 100-150 words`,
 
@@ -132,7 +132,7 @@ function buildPrompt(user: UserContext, race: RaceContext, userMemory: string): 
   2. Second place
   3. Third place
   (up to 5 if available)
-- One line on the user's followed riders: how they finished vs our prediction
+- One line on the followed riders: how they finished vs the model prediction — no "our guys" or "your guys"
 - End with the URL on its own line
 - Length: 60-90 words`,
   };
@@ -188,7 +188,7 @@ export async function generateRaceMessage(
   const prompt = buildPrompt(user, race, userMemory);
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
