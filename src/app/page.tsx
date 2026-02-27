@@ -11,6 +11,7 @@ import { getFlag } from "@/lib/country-flags";
 import { buildEventUrl, buildRaceUrl, getDisciplineShortLabel } from "@/lib/url-utils";
 import { RaceLinksSection } from "@/components/race-links";
 import { EventListView } from "@/components/event-card";
+import { RaceFilters } from "@/components/race-filters";
 
 // ---------------------------------------------------------------------------
 // HYPE SCORING — only prestigious races on the homepage
@@ -202,16 +203,99 @@ function getRaceUrl(race: typeof races.$inferSelect, event: typeof raceEvents.$i
   return buildRaceUrl(race, event);
 }
 
+
+// ─── Country name helper (shared with races page) ─────────────────────────
+function getCountryName(code: string): string {
+  const map: Record<string, string> = {
+    BEL:"Belgium",ITA:"Italy",FRA:"France",ESP:"Spain",GER:"Germany",NED:"Netherlands",
+    GBR:"Great Britain",SUI:"Switzerland",CHE:"Switzerland",AUT:"Austria",DEN:"Denmark",
+    NOR:"Norway",SWE:"Sweden",FIN:"Finland",POL:"Poland",CZE:"Czech Republic",
+    POR:"Portugal",USA:"United States",CAN:"Canada",BRA:"Brazil",ARG:"Argentina",
+    COL:"Colombia",AUS:"Australia",JPN:"Japan",KOR:"South Korea",RSA:"South Africa",
+    AND:"Andorra",LUX:"Luxembourg",IRL:"Ireland",CHI:"Chile",ECU:"Ecuador",
+  };
+  return map[code] || code;
+}
+
+async function getFilteredCalendarEvents(
+  discipline: string | null,
+  gender: string | null,
+  country: string | null
+) {
+  const today = new Date().toISOString().split("T")[0];
+  try {
+    const conditions: Parameters<typeof and>[0][] = [gte(raceEvents.date, today)];
+    if (discipline && discipline !== "all") conditions.push(eq(raceEvents.discipline, discipline as any));
+    if (country) conditions.push(eq(raceEvents.country, country));
+
+    const rows = await db
+      .select({
+        race: races,
+        event: raceEvents,
+        startlistCount: sql<number>`(SELECT COUNT(*) FROM race_startlist WHERE race_startlist.race_id = ${races.id})`,
+        resultCount: sql<number>`(SELECT COUNT(*) FROM race_results WHERE race_results.race_id = ${races.id})`,
+      })
+      .from(races)
+      .innerJoin(raceEvents, eq(races.raceEventId, raceEvents.id))
+      .where(and(...conditions))
+      .orderBy(raceEvents.date)
+      .limit(200);
+
+    const eventsMap = new Map<string, HomepageEvent>();
+    for (const { race, event, startlistCount } of rows) {
+      if (gender && gender !== "all" && race.gender !== gender) continue;
+      if (!eventsMap.has(event.id)) {
+        eventsMap.set(event.id, {
+          id: event.id, name: event.name, slug: event.slug, date: event.date,
+          endDate: event.endDate, country: event.country, discipline: event.discipline,
+          subDiscipline: event.subDiscipline, series: event.series,
+          uciCategory: race.uciCategory ?? null, hypeScore: getHypeScore(race.uciCategory),
+          externalLinks: (event.externalLinks as HomepageEvent["externalLinks"]) ?? null,
+          categories: [], totalRiders: 0,
+        });
+      }
+      const riders = Number(startlistCount) || 0;
+      const ev = eventsMap.get(event.id)!;
+      ev.totalRiders += riders;
+      ev.categories.push({ id: race.id, ageCategory: race.ageCategory || "elite", gender: race.gender || "men", categorySlug: race.categorySlug, riderCount: riders });
+    }
+    return Array.from(eventsMap.values()).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()).slice(0, 30);
+  } catch { return []; }
+}
+
+async function getUpcomingCountries() {
+  const today = new Date().toISOString().split("T")[0];
+  try {
+    const rows = await db.selectDistinct({ country: raceEvents.country }).from(raceEvents)
+      .where(and(gte(raceEvents.date, today), sql`${raceEvents.country} IS NOT NULL`))
+      .orderBy(raceEvents.country);
+    return rows.filter(r => r.country).map(r => ({ code: r.country!, name: getCountryName(r.country!) })).sort((a,b) => a.name.localeCompare(b.name));
+  } catch { return []; }
+}
+
 // ---------------------------------------------------------------------------
 // PAGE
 // ---------------------------------------------------------------------------
 
-export default async function Home() {
-  const [{ hero: nextRace, calendar: upcomingRaces }, latestIntel, recentResults] = await Promise.all([
+interface HomePageProps {
+  searchParams: Promise<{ d?: string; gender?: string; country?: string }>;
+}
+
+export default async function Home({ searchParams }: HomePageProps) {
+  const { d, gender: genderParam, country: countryParam } = await searchParams;
+  const filterDiscipline = d && d !== "all" ? d : null;
+  const filterGender = genderParam && genderParam !== "all" ? genderParam : null;
+  const filterCountry = countryParam || null;
+  const hasFilters = !!(filterDiscipline || filterGender || filterCountry);
+
+  const [{ hero: nextRace, calendar: highHypeRaces }, latestIntel, recentResults, filteredRaces, calendarCountries] = await Promise.all([
     getHighHypeRaces(),
     getLatestIntel(),
     getRecentResults(),
+    hasFilters ? getFilteredCalendarEvents(filterDiscipline, filterGender, filterCountry) : Promise.resolve([]),
+    getUpcomingCountries(),
   ]);
+  const upcomingRaces = hasFilters ? filteredRaces : highHypeRaces;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -231,19 +315,24 @@ export default async function Home() {
         </section>
 
         {/* ---- UPCOMING RACES TABLE ---- */}
-        {upcomingRaces.length > 0 && (
-          <section className="border-b border-border/50">
-            <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-10">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold tracking-tight">On the Calendar</h2>
-                <Link href="/races" className="text-sm text-primary hover:text-primary/80 transition-colors">
-                  View all races &rarr;
-                </Link>
-              </div>
-              <EventListView events={upcomingRaces} />
+        <section className="border-b border-border/50">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-10">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold tracking-tight">On the Calendar</h2>
+              <Link href="/races" className="text-sm text-primary hover:text-primary/80 transition-colors">
+                View all races &rarr;
+              </Link>
             </div>
-          </section>
-        )}
+            <div className="mb-4">
+              <RaceFilters countries={calendarCountries} basePath="/" />
+            </div>
+            {upcomingRaces.length > 0 ? (
+              <EventListView events={upcomingRaces} />
+            ) : (
+              <p className="text-muted-foreground text-sm py-8 text-center">No races match your filters.</p>
+            )}
+          </div>
+        </section>
 
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-10">
           <div className="grid gap-10 lg:grid-cols-5">
