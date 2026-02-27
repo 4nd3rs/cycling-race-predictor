@@ -94,7 +94,7 @@ function EventRow({ event, extra }: {
   extra?: React.ReactNode;
 }) {
   const start = new Date(event.date + "T12:00:00");
-  const done = isPast(new Date((event.endDate ?? event.date) + "T23:59:59"));
+  const done = isPast(new Date((event.endDate ?? event.date).toString().split("T")[0] + "T23:59:59Z"));
   const url = event.slug ? buildEventUrl(event.discipline, event.slug) : `/races/${event.id}`;
   return (
     <div className="flex items-center gap-3 py-2.5 border-b border-border/20 last:border-0 group">

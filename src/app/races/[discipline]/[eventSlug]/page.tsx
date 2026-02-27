@@ -284,7 +284,7 @@ export default async function EventPage({ params }: PageProps) {
   if (!event) notFound();
 
   const disciplineLabel = getDisciplineLabel(discipline);
-  const eventDate = new Date(event.date + "T12:00:00");
+  const eventDate = new Date(String(event.date).split("T")[0] + "T12:00:00Z");
 
   // All data in parallel
   const [categories, latestNews, weather] = await Promise.all([
@@ -351,7 +351,7 @@ export default async function EventPage({ params }: PageProps) {
                   {sorted[0]?.race.uciCategory && (
                     <Badge variant="outline" className="border-primary/50 text-primary font-mono font-semibold">{normalizeUciCategory(sorted[0].race.uciCategory)}</Badge>
                   )}
-                  {new Date(event.date) >= new Date(new Date().toDateString())
+                  {new Date(String(event.date).split("T")[0] + "T12:00:00Z") >= new Date(new Date().toISOString().split("T")[0] + "T12:00:00Z")
                     ? <Badge className="bg-green-500 text-white">Upcoming</Badge>
                     : <Badge variant="secondary">Completed</Badge>}
                 </div>

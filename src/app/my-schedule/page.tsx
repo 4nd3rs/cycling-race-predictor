@@ -92,7 +92,7 @@ function EventRow({ event, riders: riderList }: {
   riders?: { id: string; name: string; photoUrl: string | null }[];
 }) {
   const start = new Date(event.date + "T12:00:00");
-  const done = isPast(new Date((event.endDate ?? event.date) + "T23:59:59"));
+  const done = isPast(new Date((event.endDate ?? event.date).toString().split("T")[0] + "T23:59:59Z"));
   const live = isToday(start);
   const url = event.slug ? buildEventUrl(event.discipline, event.slug) : `/races/${event.id}`;
   return (

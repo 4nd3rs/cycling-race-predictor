@@ -690,7 +690,7 @@ export default async function CategoryPage({ params }: PageProps) {
 
   const isSuperCup = event.series === "supercup";
 
-  const raceDate = new Date(race.date);
+  const raceDate = new Date(String(race.date).split("T")[0] + "T12:00:00Z");
   const isUpcoming = raceDate > new Date() && !isCompleted;
   const disciplineLabel = getDisciplineLabel(discipline);
   const categoryDisplay = formatCategoryDisplay(race.ageCategory || "elite", race.gender || "men");

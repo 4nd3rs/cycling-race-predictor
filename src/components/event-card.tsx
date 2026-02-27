@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { format, formatDistanceToNow, isPast, isFuture, isToday } from "date-fns";
+import { toRaceDate, toDateStr } from "@/lib/utils";
 import { formatCategoryDisplay } from "@/lib/category-utils";
 import { EventEditDialog } from "./event-edit-dialog";
 import {
@@ -61,8 +62,8 @@ export function EventCard({
   categories,
   className,
 }: EventCardProps) {
-  const startDate = new Date(date);
-  const eventEndDate = endDate ? new Date(endDate) : startDate;
+  const startDate = toRaceDate(date);
+  const eventEndDate = endDate ? toRaceDate(endDate) : startDate;
   const isUpcoming = isFuture(startDate);
   const isEventToday = isToday(startDate) || isToday(eventEndDate);
   const isCompleted = isPast(eventEndDate);
@@ -101,8 +102,8 @@ export function EventCard({
 
   const formatDateRange = () => {
     if (endDate && endDate !== date) {
-      const start = new Date(date);
-      const end = new Date(endDate);
+      const start = toRaceDate(date);
+      const end = toRaceDate(endDate);
       // Same month
       if (start.getMonth() === end.getMonth()) {
         return `${format(start, "MMM d")}-${format(end, "d, yyyy")}`;
@@ -292,9 +293,9 @@ export function EventListRow({
   id, name, slug, date, endDate, country, discipline, subDiscipline,
   uciCategory, externalLinks, categories, initialFollowing,
 }: EventCardProps & { initialFollowing?: boolean }) {
-  const startDate = new Date(date + "T12:00:00");
+  const startDate = toRaceDate(date);
   const isEventToday = isToday(startDate);
-  const isCompleted = isPast(new Date((endDate ?? date) + "T23:59:59"));
+  const isCompleted = isPast(new Date(toDateStr(endDate ?? date) + "T23:59:59Z"));
 
   const eventUrl = slug ? buildEventUrl(discipline, slug) : `/races/${id}`;
 

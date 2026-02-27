@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { db, races, raceEvents, riderRumours, riders, raceResults } from "@/lib/db";
 import { desc, eq, gte, lt, and, sql, isNotNull } from "drizzle-orm";
 import { format, formatDistanceToNow, differenceInDays } from "date-fns";
+import { toRaceDate, toDateStr } from "@/lib/utils";
 import { getFlag } from "@/lib/country-flags";
 import { buildEventUrl, buildRaceUrl, getDisciplineShortLabel } from "@/lib/url-utils";
 import { RaceLinksSection } from "@/components/race-links";
@@ -407,7 +408,7 @@ export default async function Home({ searchParams }: HomePageProps) {
                           {event.name}
                         </p>
                         <p className="text-xs text-muted-foreground truncate">
-                          {winner.name} &middot; {format(new Date(race.date), "MMM d")}
+                          {winner.name} &middot; {format(toRaceDate(race.date), "MMM d")}
                         </p>
                       </div>
                       <Badge variant="outline" className={`text-[10px] shrink-0 ${getDisciplineColor(event.discipline)}`}>
@@ -466,7 +467,7 @@ export default async function Home({ searchParams }: HomePageProps) {
 // ---------------------------------------------------------------------------
 
 function NextRaceHero({ event: ev }: { event: HomepageEvent }) {
-  const raceDate = new Date(ev.date + "T12:00:00");
+  const raceDate = toRaceDate(ev.date);
   const daysUntil = differenceInDays(raceDate, new Date());
   const url = ev.slug ? buildEventUrl(ev.discipline, ev.slug) : `/races/${ev.id}`;
   const subLabel = ev.subDiscipline ? getDisciplineShortLabel(ev.subDiscipline) : null;

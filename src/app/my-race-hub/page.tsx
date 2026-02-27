@@ -130,8 +130,8 @@ function EventRow({ event, riderList }: {
   riderList?: { id: string; name: string; photoUrl: string | null }[];
 }) {
   const start = new Date(event.date + "T12:00:00");
-  const done = isPast(new Date((event.endDate ?? event.date) + "T23:59:59"));
-  const live = isToday(start);
+  const done = isPast(new Date((event.endDate ?? event.date).toString().split("T")[0] + "T23:59:59Z"));
+  const live = isToday(new Date(String(start instanceof Date ? start.toISOString().split("T")[0] : String(start).split("T")[0]) + "T12:00:00Z"));
   const url = event.slug ? buildEventUrl(event.discipline, event.slug) : `/races/${event.id}`;
   return (
     <div className={"flex items-center gap-3 py-3 px-4 border-b border-border/20 last:border-0 hover:bg-muted/10 transition-colors" + (live ? " bg-red-500/5 border-l-2 border-l-red-500" : "")}>
