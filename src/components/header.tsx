@@ -35,17 +35,7 @@ export function Header() {
 
         {/* Brand */}
         <Link href="/" className="flex shrink-0 items-center gap-2">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="36" height="36" aria-hidden="true">
-            <rect width="200" height="200" fill="#0D0D0D"/>
-            <rect x="22" y="14" width="156" height="172" rx="7" fill="#FFFFFF"/>
-            <circle cx="38" cy="30" r="5.5" fill="#0D0D0D"/>
-            <circle cx="162" cy="30" r="5.5" fill="#0D0D0D"/>
-            <circle cx="38" cy="170" r="5.5" fill="#0D0D0D"/>
-            <circle cx="162" cy="170" r="5.5" fill="#0D0D0D"/>
-            <g transform="translate(100,100) rotate(180)">
-              <text x="0" y="0" fontFamily="'Barlow Condensed','Arial Narrow',Impact,sans-serif" fontWeight="800" fontSize="108" fill="#C8102E" textAnchor="middle" dominantBaseline="central">13</text>
-            </g>
-          </svg>
+          <img src="/logo@2x.png" alt="Pro Cycling Predictor" width="36" height="36" className="rounded-sm" />
           <div className="flex flex-col leading-none">
             <span className="font-display text-[11px] font-semibold uppercase tracking-[0.12em] text-foreground">Pro Cycling</span>
             <span className="font-display text-[19px] font-extrabold uppercase tracking-tight text-primary leading-none">Predictor</span>
