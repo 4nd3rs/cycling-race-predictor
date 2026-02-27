@@ -23,6 +23,26 @@ import {
   generateCategorySlug,
 } from "@/lib/url-utils";
 
+
+function normalizeUciCategory(raw: string): string {
+  const map: Record<string, string> = {
+    "WorldTour": "WT",
+    "1.Pro": "1.Pro",
+    "WorldCup": "WC",
+    "Continental Series": "CS",
+    "HC": "HC",
+    "C1": "C1",
+    "C2": "C2",
+    "CN": "CN",
+    "WC": "WC",
+    "CS": "CS",
+    "1": "1.1",
+    "2": "1.2",
+    "3": "1.3",
+  };
+  return map[raw] ?? raw;
+}
+
 // ── Weather ────────────────────────────────────────────────────────────────
 
 const COUNTRY_COORDS: Record<string, { lat: number; lon: number; city: string }> = {
@@ -674,7 +694,9 @@ export default async function CategoryPage({ params }: PageProps) {
                   <Badge variant="outline" className="bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
                     {categoryDisplay}
                   </Badge>
-                  {race.uciCategory && <Badge variant="outline">{race.uciCategory}</Badge>}
+                  {race.uciCategory && (
+                    <Badge variant="outline" className="border-primary/50 text-primary font-mono font-semibold">{normalizeUciCategory(race.uciCategory)}</Badge>
+                  )}
                   {isUpcoming
                     ? <Badge className="bg-green-500 text-white">Upcoming</Badge>
                     : <Badge variant="secondary">Completed</Badge>}

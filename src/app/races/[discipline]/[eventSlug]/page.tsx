@@ -94,6 +94,16 @@ function wmoToEmoji(code: number): { emoji: string; desc: string } {
 
 // ── Data fetchers ─────────────────────────────────────────────────────────────
 
+
+function normalizeUciCategory(raw: string): string {
+  const map: Record<string, string> = {
+    "WorldTour": "WT", "1.Pro": "1.Pro", "WorldCup": "WC",
+    "Continental Series": "CS", "HC": "HC", "C1": "C1", "C2": "C2",
+    "CN": "CN", "WC": "WC", "CS": "CS", "1": "1.1", "2": "1.2", "3": "1.3",
+  };
+  return map[raw] ?? raw;
+}
+
 async function getEventBySlug(discipline: string, slug: string) {
   try {
     const [event] = await db
@@ -320,7 +330,7 @@ export default async function EventPage({ params }: PageProps) {
                     </Badge>
                   )}
                   {sorted[0]?.race.uciCategory && (
-                    <Badge variant="outline">{sorted[0].race.uciCategory}</Badge>
+                    <Badge variant="outline" className="border-primary/50 text-primary font-mono font-semibold">{normalizeUciCategory(sorted[0].race.uciCategory)}</Badge>
                   )}
                   {new Date(event.date) >= new Date(new Date().toDateString())
                     ? <Badge className="bg-green-500 text-white">Upcoming</Badge>
