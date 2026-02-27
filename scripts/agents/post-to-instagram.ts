@@ -1,9 +1,9 @@
 /**
- * Instagram posting agent — publishes a 1080×1080 image to @procyclingpredictor
+ * Instagram posting agent — publishes feed (1080×1080) or stories (1080×1920) to @procyclingpredictor
  *
  * Usage:
  *   tsx scripts/agents/post-to-instagram.ts --image /path/to/image.png --caption "..." 
- *   tsx scripts/agents/post-to-instagram.ts --event omloop-het-nieuwsblad-2026 --type preview
+ *   tsx scripts/agents/post-to-instagram.ts --event omloop-het-nieuwsblad-2026 --type preview [--stories]
  *   tsx scripts/agents/post-to-instagram.ts --event omloop-het-nieuwsblad-2026 --type results
  *
  * Requires in .env.local:
@@ -21,6 +21,7 @@ import { neon } from "@neondatabase/serverless";
 
 const args = process.argv.slice(2);
 const get = (flag: string) => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : null; };
+const isStories = args.includes("--stories");
 
 const ACCOUNT_ID = process.env.INSTAGRAM_ACCOUNT_ID!;
 const ACCESS_TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN;
@@ -84,8 +85,9 @@ async function cleanupStagedImage(imageUrl: string) {
 async function generateCard(eventSlug: string, type: string, gender: string): Promise<string> {
   const outPath = `/tmp/pcp-ig-${type}-${gender}-${Date.now()}.png`;
   console.log(`Generating ${gender} ${type} card for ${eventSlug}...`);
+  const storiesFlag = isStories ? " --stories" : "";
   execSync(
-    `node_modules/.bin/tsx scripts/agents/generate-instagram-card.tsx --event ${eventSlug} --type ${type} --gender ${gender} --out ${outPath}`,
+    `node_modules/.bin/tsx scripts/agents/generate-instagram-card.tsx --event ${eventSlug} --type ${type} --gender ${gender}${storiesFlag} --out ${outPath}`,
     { stdio: "inherit" }
   );
   return outPath;
@@ -165,10 +167,13 @@ async function publish(imagePath: string, caption: string) {
   console.log(`  URL: ${imageUrl}`);
 
   console.log("Creating media container...");
-  const container = await igPost(`${ACCOUNT_ID}/media`, {
-    image_url: imageUrl,
-    caption,
-  });
+  const mediaBody: Record<string, string> = { image_url: imageUrl };
+  if (isStories) {
+    mediaBody.media_type = "STORIES";
+  } else {
+    mediaBody.caption = caption;
+  }
+  const container = await igPost(`${ACCOUNT_ID}/media`, mediaBody);
   console.log(`  Container ID: ${container.id}`);
 
   // Wait for container to be ready (Instagram needs a moment to process)
