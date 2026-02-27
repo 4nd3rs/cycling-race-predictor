@@ -145,13 +145,33 @@ async function getEventCategories(eventId: string) {
 
 async function getTopPredictions(raceId: string, limit = 5) {
   try {
-    return await db
+    // Prefer AI predictions; fall back to ELO if none exist
+    const aiCheck = await db
+      .select({ id: predictions.id })
+      .from(predictions)
+      .where(and(eq(predictions.raceId, raceId), sqlFn`${predictions}.source = 'ai'`))
+      .limit(1);
+    const hasAi = aiCheck.length > 0;
+
+    const rows = await db
       .select({ prediction: predictions, rider: riders })
       .from(predictions)
       .innerJoin(riders, eq(predictions.riderId, riders.id))
-      .where(eq(predictions.raceId, raceId))
+      .where(
+        hasAi
+          ? and(eq(predictions.raceId, raceId), sqlFn`${predictions}.source = 'ai'`)
+          : eq(predictions.raceId, raceId)
+      )
       .orderBy(asc(predictions.predictedPosition))
       .limit(limit);
+
+    // Deduplicate by rider ID (safety net)
+    const seen = new Set<string>();
+    return rows.filter(r => {
+      if (seen.has(r.rider.id)) return false;
+      seen.add(r.rider.id);
+      return true;
+    });
   } catch { return []; }
 }
 
