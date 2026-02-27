@@ -3,23 +3,11 @@ import Link from "next/link";
 import { Header } from "@/components/header";
 import { Badge } from "@/components/ui/badge";
 import { getAuthUser } from "@/lib/auth";
-import { db, userFollows, userTelegram, riders, raceEvents } from "@/lib/db";
-import { eq, and } from "drizzle-orm";
+import { db, userFollows, userTelegram, riders, raceEvents, teams } from "@/lib/db";
+import { eq, and, inArray } from "drizzle-orm";
+import { getFlag } from "@/lib/country-flags";
 import { ConnectTelegramButton } from "@/components/connect-telegram-button";
 
-function countryToFlag(code?: string | null) {
-  if (!code) return "";
-  const c = code.toUpperCase();
-  const map: Record<string, string> = {
-    GER:"DE", USA:"US", RSA:"ZA", GBR:"GB", NED:"NL", DEN:"DK",
-    SUI:"CH", AUT:"AT", BEL:"BE", FRA:"FR", ITA:"IT", ESP:"ES",
-    POR:"PT", NOR:"NO", SWE:"SE", FIN:"FI", POL:"PL", CZE:"CZ",
-    AUS:"AU", NZL:"NZ", JPN:"JP", COL:"CO", ECU:"EC", SLO:"SI",
-    CRO:"HR", UKR:"UA", KAZ:"KZ", ERI:"ER", ETH:"ET", RWA:"RW",
-  };
-  const a2 = c.length === 2 ? c : (map[c] || c.slice(0, 2));
-  return String.fromCodePoint(...[...a2].map(ch => 0x1F1E6 + ch.charCodeAt(0) - 65));
-}
 
 export default async function ProfilePage() {
   const user = await getAuthUser();
@@ -59,6 +47,12 @@ export default async function ProfilePage() {
       return event || null;
     })
   );
+
+  const teamFollowIds = follows.filter((f) => f.followType === "team").map(f => f.entityId);
+  const teamDetails = teamFollowIds.length > 0
+    ? await db.select({ id: teams.id, name: teams.name, logoUrl: teams.logoUrl, country: teams.country, division: teams.division })
+        .from(teams).where(inArray(teams.id, teamFollowIds)).limit(30)
+    : [];
 
   const initials = (user.name || user.email || "U")
     .split(" ")
@@ -118,7 +112,7 @@ export default async function ProfilePage() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{rider!.name}</p>
                       {rider!.nationality && (
-                        <p className="text-xs text-muted-foreground">{countryToFlag(rider!.nationality)} {rider!.nationality}</p>
+                        <p className="text-xs text-muted-foreground">{getFlag(rider!.nationality)} {rider!.nationality}</p>
                       )}
                     </div>
                   </Link>
@@ -154,6 +148,36 @@ export default async function ProfilePage() {
               <p className="text-sm text-muted-foreground rounded-lg border border-border/50 bg-card/20 p-6 text-center">
                 No followed races yet.
               </p>
+            )}
+          </section>
+
+          {/* Followed Teams */}
+          <section>
+            <h2 className="text-lg font-bold mb-3">Followed Teams</h2>
+            {teamDetails.length > 0 ? (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {teamDetails.map((team) => (
+                  <Link key={team.id} href={`/teams/${team.id}`}
+                    className="flex items-center gap-3 rounded-lg border border-border/50 bg-card/30 p-3 hover:bg-card/60 transition-colors">
+                    {team.logoUrl ? (
+                      <img src={team.logoUrl} alt={team.name} className="h-8 w-8 object-contain shrink-0" />
+                    ) : (
+                      <span className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold shrink-0">
+                        {team.name.slice(0, 2).toUpperCase()}
+                      </span>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">{team.name}</p>
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                        {team.country && <span>{getFlag(team.country)}</span>}
+                        {team.division && <span className="font-mono">{team.division}</span>}
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground rounded-lg border border-border/50 bg-card/20 p-6 text-center">No followed teams yet.</p>
             )}
           </section>
 
