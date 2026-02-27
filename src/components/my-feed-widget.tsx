@@ -45,7 +45,7 @@ async function getMyFeed(clerkId: string) {
       eventMap.get(event.id)!.categories.push(cat);
     }
   }
-  const upcomingFollowedEvents = Array.from(eventMap.values()).slice(0, 5);
+  const upcomingFollowedEvents = Array.from(eventMap.values()).slice(0, 3);
 
   // 2. Upcoming races where followed riders are in startlist
   const riderRaceRows = riderFollowIds.length > 0
@@ -82,7 +82,7 @@ async function getMyFeed(clerkId: string) {
   const followedEventIds = new Set(upcomingFollowedEvents.map(e => e.id));
   const riderRaceList = Array.from(riderEventMap.values())
     .filter(r => !followedEventIds.has(r.event.id))
-    .slice(0, 5);
+    .slice(0, 3);
 
   return { empty: false, events: upcomingFollowedEvents, riderRaces: riderRaceList };
 }
@@ -156,37 +156,39 @@ export async function MyFeedWidget() {
   const total = feed.events.length + feed.riderRaces.length;
   if (total === 0) return null;
 
+  // Merge and take top 3 closest events
+  const allItems = [
+    ...feed.events.map(e => ({ type: "event" as const, event: e, riderNames: [] as typeof feed.riderRaces[0]["riderNames"] })),
+    ...feed.riderRaces.map(r => ({ type: "rider" as const, ...r })),
+  ].sort((a, b) => new Date(a.event.date).getTime() - new Date(b.event.date).getTime()).slice(0, 3);
+
+  if (allItems.length === 0) return null;
+
   return (
     <section className="border-b border-border/50">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-semibold tracking-tight">My Feed</h2>
-          <Link href="/profile" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-            Manage follows →
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-6">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold tracking-tight text-muted-foreground uppercase">My Schedule</h2>
+          <Link href="/my-schedule" className="text-xs text-primary hover:text-primary/80 transition-colors">
+            Full schedule &amp; results →
           </Link>
         </div>
 
         <div className="rounded-lg border border-border/40 divide-y divide-border/20 overflow-hidden bg-muted/5">
-          {/* Followed events */}
-          {feed.events.map(event => (
-            <EventRow key={event.id} event={event} />
-          ))}
-
-          {/* Races where followed riders are participating */}
-          {feed.riderRaces.map(({ event, riderNames }) => (
+          {allItems.map(({ event, riderNames }) => (
             <EventRow
               key={event.id}
               event={event}
-              extra={
-                <div className="flex items-center gap-1 flex-wrap justify-end max-w-[200px]">
-                  {riderNames.slice(0, 3).map(r => (
+              extra={riderNames.length > 0 ? (
+                <div className="flex items-center gap-1">
+                  {riderNames.slice(0, 2).map(r => (
                     <RiderChip key={r.id} name={r.name} photoUrl={r.photoUrl} nationality={r.nationality} />
                   ))}
-                  {riderNames.length > 3 && (
-                    <span className="text-[10px] text-muted-foreground">+{riderNames.length - 3}</span>
+                  {riderNames.length > 2 && (
+                    <span className="text-[10px] text-muted-foreground">+{riderNames.length - 2}</span>
                   )}
                 </div>
-              }
+              ) : undefined}
             />
           ))}
         </div>
