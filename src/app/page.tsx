@@ -19,6 +19,15 @@ import { RaceFollowButton } from "@/components/race-follow-button";
 // HYPE SCORING — only prestigious races on the homepage
 // ---------------------------------------------------------------------------
 
+function normalizeUciCategory(raw: string): string {
+  const map: Record<string, string> = {
+    "WorldTour": "WT", "1.Pro": "1.Pro", "WorldCup": "WC",
+    "Continental Series": "CS", "HC": "HC", "C1": "C1", "C2": "C2",
+    "CN": "CN", "WC": "WC", "CS": "CS", "1": "1.1", "2": "1.2", "3": "1.3",
+  };
+  return map[raw] ?? raw;
+}
+
 function getHypeScore(uciCategory: string | null | undefined): number {
   const cat = (uciCategory || "").toUpperCase().trim();
   if (cat === "WORLDTOUR" || cat === "1.UWT" || cat === "2.UWT") return 100;
@@ -490,7 +499,7 @@ function NextRaceHero({ event: ev }: { event: HomepageEvent }) {
               {getDisciplineLabel(ev.discipline)}{subLabel ? ` ${subLabel}` : ""}
             </Badge>
             {ev.uciCategory && (
-              <Badge variant="outline" className="text-xs">{ev.uciCategory}</Badge>
+              <Badge variant="outline" className="border-primary/50 text-primary font-mono font-semibold text-xs">{normalizeUciCategory(ev.uciCategory)}</Badge>
             )}
           </div>
 
