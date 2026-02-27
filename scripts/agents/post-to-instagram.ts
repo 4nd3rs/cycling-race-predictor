@@ -41,7 +41,8 @@ async function igPost(path: string, body: Record<string, string>) {
 }
 
 async function igGet(path: string) {
-  const url = `https://graph.instagram.com/v21.0/${path}?access_token=${ACCESS_TOKEN}`;
+  const sep = path.includes("?") ? "&" : "?";
+  const url = `https://graph.instagram.com/v21.0/${path}${sep}access_token=${ACCESS_TOKEN}`;
   const res = await fetch(url);
   const data = await res.json() as any;
   if (data.error) throw new Error(`Instagram API error: ${JSON.stringify(data.error)}`);
