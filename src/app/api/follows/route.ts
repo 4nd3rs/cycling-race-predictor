@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
-import { db, userFollows, riders, raceEvents } from "@/lib/db";
+import { db, userFollows, riders, raceEvents, userTelegram } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
+import { sendTelegramMessage } from "@/lib/telegram";
 
 export async function GET() {
   const user = await requireAuth();
@@ -43,10 +44,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "followType and entityId are required" }, { status: 400 });
   }
 
-  await db
+  const result = await db
     .insert(userFollows)
     .values({ userId: user.id, followType, entityId })
-    .onConflictDoNothing();
+    .onConflictDoNothing()
+    .returning();
+
+  // Only notify on a new follow (not a duplicate)
+  if (result.length > 0) {
+    // Fire-and-forget — don't block the response
+    sendFollowNotification(user.id, followType, entityId).catch((err) =>
+      console.error("Follow notification failed:", err)
+    );
+  }
 
   return NextResponse.json({ ok: true });
 }
@@ -70,4 +80,64 @@ export async function DELETE(req: NextRequest) {
     );
 
   return NextResponse.json({ ok: true });
+}
+
+async function sendFollowNotification(
+  userId: string,
+  followType: string,
+  entityId: string
+): Promise<void> {
+  // Check if user has Telegram connected
+  const [tg] = await db
+    .select({ telegramChatId: userTelegram.telegramChatId })
+    .from(userTelegram)
+    .where(eq(userTelegram.userId, userId))
+    .limit(1);
+
+  if (!tg?.telegramChatId) return;
+
+  // Look up entity name + link
+  let entityName: string | null = null;
+  let entityUrl: string | null = null;
+
+  if (followType === "rider") {
+    const [rider] = await db
+      .select({ name: riders.name })
+      .from(riders)
+      .where(eq(riders.id, entityId))
+      .limit(1);
+    if (rider) {
+      entityName = rider.name;
+      entityUrl = `https://procyclingpredictor.com/riders/${entityId}`;
+    }
+  } else if (followType === "race_event") {
+    const [event] = await db
+      .select({ name: raceEvents.name, slug: raceEvents.slug, discipline: raceEvents.discipline })
+      .from(raceEvents)
+      .where(eq(raceEvents.id, entityId))
+      .limit(1);
+    if (event) {
+      entityName = event.name;
+      entityUrl = event.slug
+        ? `https://procyclingpredictor.com/races/${event.discipline}/${event.slug}`
+        : `https://procyclingpredictor.com`;
+    }
+  }
+
+  if (!entityName) return;
+
+  const emoji = followType === "rider" ? "🚴" : "🏁";
+  const typeLabel = followType === "rider" ? "rider" : "race";
+
+  const message = [
+    `${emoji} <b>You're now following ${entityName}!</b>`,
+    ``,
+    `You'll get Telegram updates for this ${typeLabel} — predictions, results, and breaking news.`,
+    ``,
+    `👉 <a href="${entityUrl}">${entityName} on Pro Cycling Predictor</a>`,
+    ``,
+    `<i>Manage your follows at procyclingpredictor.com</i>`,
+  ].join("\n");
+
+  await sendTelegramMessage(tg.telegramChatId, message);
 }

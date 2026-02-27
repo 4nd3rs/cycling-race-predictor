@@ -25,7 +25,7 @@ const isStories = args.includes("--stories");
 
 const ACCOUNT_ID = process.env.INSTAGRAM_ACCOUNT_ID!;
 const ACCESS_TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN;
-const IMAGE_HOST = process.env.INSTAGRAM_IMAGE_HOST ?? "https://cycling-race-predictor.vercel.app";
+const IMAGE_HOST = process.env.INSTAGRAM_IMAGE_HOST ?? "https://procyclingpredictor.com";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 async function igPost(path: string, body: Record<string, string>) {

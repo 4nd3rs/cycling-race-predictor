@@ -271,7 +271,7 @@ function buildPreviewHtml(
   </div>
   ${intelHtml}
   <div class="footer">
-    <div class="site-url">cycling-race-predictor.vercel.app</div>
+    <div class="site-url">procyclingpredictor.com</div>
     <div class="brand">Pro<span>Cycling</span> Predictor</div>
   </div>
 </div>
@@ -361,7 +361,7 @@ function buildResultHtml(
     ${podiumHtml}
   </div>
   <div class="footer">
-    <div class="site-url">cycling-race-predictor.vercel.app</div>
+    <div class="site-url">procyclingpredictor.com</div>
     <div class="brand">Pro<span>Cycling</span> Predictor</div>
   </div>
 </div>

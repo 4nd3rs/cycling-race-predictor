@@ -234,7 +234,7 @@ ${p3}
 ${intelSection}
 
 🔮 Full predictions & startlist:
-cycling\\-race\\-predictor\\.vercel\\.app
+procyclingpredictor\.com
 
 \\#cycling \\#roadcycling \\#procycling \\#${escapeMd(hashtag)}`;
 }
@@ -288,7 +288,7 @@ ${p3Line}
 ${callItLine}
 
 📊 Updated rankings & ELO:
-cycling\\-race\\-predictor\\.vercel\\.app
+procyclingpredictor\.com
 
 \\#cycling \\#roadcycling \\#procycling`;
 }
