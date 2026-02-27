@@ -88,9 +88,9 @@ const STRADE_BIANCHE: RaceProfile = {
   raceCharacter: "Unique gravel classic through Tuscan countryside. The white roads eliminate any predictable race pattern — long attrition battles are common. The final 3km cobbled climb into Piazza del Campo in Siena is one of the most dramatic finishes in cycling.",
   firstEdition: 2007,
   pastWinners: [
-    { year: 2025, name: "Tadej Pogačar", team: "UAE Team Emirates" },
+    { year: 2025, name: "Tadej Pogačar", team: "UAE Team Emirates XRG" },
     { year: 2024, name: "Tadej Pogačar", team: "UAE Team Emirates" },
-    { year: 2023, name: "Tadej Pogačar", team: "UAE Team Emirates" },
+    { year: 2023, name: "Tom Pidcock", team: "Ineos Grenadiers" },
     { year: 2022, name: "Tadej Pogačar", team: "UAE Team Emirates" },
     { year: 2021, name: "Egan Bernal", team: "Ineos Grenadiers" },
   ],
@@ -109,7 +109,7 @@ const MILAN_SANREMO: RaceProfile = {
   raceCharacter: "La Classicissima — the longest one-day race. The early Ligurian climbs (Turchino, Capo Mele, Capo Cervo, Capo Berta) soften the legs before the Cipressa and decisive Poggio. Most editions end in a sprint but the fastest descenders can solo off the Poggio.",
   firstEdition: 1907,
   pastWinners: [
-    { year: 2025, name: "Tadej Pogačar", team: "UAE Team Emirates" },
+    { year: 2025, name: "Mathieu van der Poel", team: "Alpecin-Deceuninck" },
     { year: 2024, name: "Jasper Philipsen", team: "Alpecin-Deceuninck" },
     { year: 2023, name: "Mathieu van der Poel", team: "Alpecin-Deceuninck" },
     { year: 2022, name: "Mathieu van der Poel", team: "Alpecin-Deceuninck" },
@@ -133,7 +133,7 @@ const TOUR_OF_FLANDERS: RaceProfile = {
   raceCharacter: "The Flemish Monument. A war of attrition decided by the brutal final double-ascent of the Kwaremont and Paterberg with ~15km to go. Whoever survives that can solo to Oudenaarde. Suited to powerful punchy classics riders who can also climb.",
   firstEdition: 1913,
   pastWinners: [
-    { year: 2025, name: "Mathieu van der Poel", team: "Alpecin-Deceuninck" },
+    { year: 2025, name: "Tadej Pogačar", team: "UAE Team Emirates XRG" },
     { year: 2024, name: "Mathieu van der Poel", team: "Alpecin-Deceuninck" },
     { year: 2023, name: "Mathieu van der Poel", team: "Alpecin-Deceuninck" },
     { year: 2022, name: "Mathieu van der Poel", team: "Alpecin-Deceuninck" },
@@ -153,6 +153,7 @@ const PARIS_ROUBAIX: RaceProfile = {
   firstEdition: 1896,
   pastWinners: [
     { year: 2025, name: "Mathieu van der Poel", team: "Alpecin-Deceuninck" },
+    { year: 2025, name: "Mathieu van der Poel", team: "Alpecin-Deceuninck" },
     { year: 2024, name: "Mathieu van der Poel", team: "Alpecin-Deceuninck" },
     { year: 2023, name: "Mathieu van der Poel", team: "Alpecin-Deceuninck" },
     { year: 2022, name: "Dylan van Baarle", team: "Ineos Grenadiers" },
@@ -170,7 +171,7 @@ const AMSTEL_GOLD: RaceProfile = {
   raceCharacter: "Dutch monument through the rolling Limburg hills. The sheer volume of climbing (30+ hills) grinds the field down; the explosive Cauberg and Bemelerberg separate the strong. Often ends in a small-group sprint — pure classics riders prevail.",
   firstEdition: 1966,
   pastWinners: [
-    { year: 2025, name: "Tadej Pogačar", team: "UAE Team Emirates" },
+    { year: 2025, name: "Mattias Skjelmose", team: "Lidl-Trek" },
     { year: 2024, name: "Tadej Pogačar", team: "UAE Team Emirates" },
     { year: 2023, name: "Mathieu van der Poel", team: "Alpecin-Deceuninck" },
     { year: 2022, name: "Mathieu van der Poel", team: "Alpecin-Deceuninck" },
@@ -191,7 +192,7 @@ const LA_FLECHE_WALLONNE: RaceProfile = {
   raceCharacter: "The Arrow of Wallonia — one of the most predictable classics. The Mur de Huy wall (26% max gradient!) is climbed three times; the final ascent is the finish line. An explosive, diesel-free day: only the best uphill sprinters and puncheurs win here.",
   firstEdition: 1936,
   pastWinners: [
-    { year: 2025, name: "Remco Evenepoel", team: "Soudal QuickStep" },
+    { year: 2025, name: "Tadej Pogačar", team: "UAE Team Emirates XRG" },
     { year: 2024, name: "Remco Evenepoel", team: "Soudal QuickStep" },
     { year: 2023, name: "Remco Evenepoel", team: "Soudal QuickStep" },
     { year: 2022, name: "Julian Alaphilippe", team: "QuickStep Alpha Vinyl" },
@@ -214,7 +215,7 @@ const LBL: RaceProfile = {
   raceCharacter: "The Grand Old Lady. The longest and most demanding Monument features persistent Ardennes climbing. La Redoute at 60km to go begins the real selection; the Roche aux Faucons with 22km left is the launch pad. Best climber-classics riders dominate.",
   firstEdition: 1892,
   pastWinners: [
-    { year: 2025, name: "Remco Evenepoel", team: "Soudal QuickStep" },
+    { year: 2025, name: "Tadej Pogačar", team: "UAE Team Emirates XRG" },
     { year: 2024, name: "Tadej Pogačar", team: "UAE Team Emirates" },
     { year: 2023, name: "Remco Evenepoel", team: "Soudal QuickStep" },
     { year: 2022, name: "Remco Evenepoel", team: "QuickStep Alpha Vinyl" },
@@ -270,7 +271,7 @@ const TIRRENO_ADRIATICO: RaceProfile = {
   raceCharacter: "The Race of the Two Seas. A punchy week across the Italian peninsula with stages suited to both sprinters and climbers. The mountain stages reward complete GC riders; the coastal ITT is often the decider.",
   firstEdition: 1966,
   pastWinners: [
-    { year: 2025, name: "Tadej Pogačar", team: "UAE Team Emirates" },
+    { year: 2025, name: "Juan Ayuso", team: "UAE Team Emirates XRG" },
     { year: 2024, name: "Tadej Pogačar", team: "UAE Team Emirates" },
     { year: 2023, name: "Tadej Pogačar", team: "UAE Team Emirates" },
     { year: 2022, name: "Tadej Pogačar", team: "UAE Team Emirates" },
@@ -287,7 +288,7 @@ const CRITERIUM_DU_DAUPHINE: RaceProfile = {
   raceCharacter: "The ultimate Tour de France dress rehearsal. Eight days through the French Alps with summit finishes that mirror the Tour's hardest days. GC contenders use this to test their climbing form; the winner is almost always a Tour favourite.",
   firstEdition: 1947,
   pastWinners: [
-    { year: 2025, name: "Tadej Pogačar", team: "UAE Team Emirates" },
+    { year: 2025, name: "Tadej Pogačar", team: "UAE Team Emirates XRG" },
     { year: 2024, name: "Carlos Rodriguez", team: "Ineos Grenadiers" },
     { year: 2023, name: "Tao Geoghegan Hart", team: "Ineos Grenadiers" },
     { year: 2022, name: "Geraint Thomas", team: "Ineos Grenadiers" },
@@ -304,7 +305,7 @@ const TOUR_DE_SUISSE: RaceProfile = {
   raceCharacter: "One of the most prestigious pre-Tour stage races. The Swiss Alps provide spectacular and brutal terrain. The final weekend summit finishes are decisive; the time trial tests completeness.",
   firstEdition: 1933,
   pastWinners: [
-    { year: 2025, name: "Remco Evenepoel", team: "Soudal QuickStep" },
+    { year: 2025, name: "João Almeida", team: "UAE Team Emirates XRG" },
     { year: 2024, name: "Remco Evenepoel", team: "Soudal QuickStep" },
     { year: 2023, name: "Geraint Thomas", team: "Ineos Grenadiers" },
     { year: 2022, name: "Geraint Thomas", team: "Ineos Grenadiers" },
@@ -321,7 +322,7 @@ const DWARS_DOOR_VLAANDEREN: RaceProfile = {
   raceCharacter: "The Wednesday classic that opens Flemish week. Shorter and faster than Ronde, it suits the pure classics riders over the climbers. Used by teams to test form before the weekend's bigger objectives.",
   firstEdition: 1945,
   pastWinners: [
-    { year: 2025, name: "Mathieu van der Poel", team: "Alpecin-Deceuninck" },
+    { year: 2025, name: "Neilson Powless", team: "EF Education-EasyPost" },
     { year: 2024, name: "Mathieu van der Poel", team: "Alpecin-Deceuninck" },
     { year: 2023, name: "Wout van Aert", team: "Jumbo-Visma" },
     { year: 2022, name: "Christophe Laporte", team: "Jumbo-Visma" },
@@ -342,8 +343,8 @@ const GENT_WEVELGEM: RaceProfile = {
   raceCharacter: "In the Shadows of WWI battlefields. Coastal crosswinds in the first 100km can shatter the peloton; the Kemmelberg is the real selector. If a sprinter survives the climbs, Wevelgem often ends in a bunch sprint — but the wind makes it unpredictable.",
   firstEdition: 1934,
   pastWinners: [
-    { year: 2025, name: "Jasper Philipsen", team: "Alpecin-Deceuninck" },
-    { year: 2024, name: "Mads Pedersen", team: "Lidl-Trek" },
+    { year: 2025, name: "Mads Pedersen", team: "Lidl-Trek" },
+    { year: 2024, name: "Christophe Laporte", team: "Visma-Lease a Bike" },
     { year: 2023, name: "Christophe Laporte", team: "Jumbo-Visma" },
     { year: 2022, name: "Biniam Girmay", team: "Intermarché" },
     { year: 2021, name: "Wout van Aert", team: "Jumbo-Visma" },
@@ -378,7 +379,7 @@ const GIRO_DITALIA: RaceProfile = {
   raceCharacter: "The most scenic and unpredictable Grand Tour. Italian roads are narrower and more technical; the cold mountain stages can arrive suddenly. The race often comes alive in the second week with dramatic high-altitude battles.",
   firstEdition: 1909,
   pastWinners: [
-    { year: 2025, name: "Primož Roglič", team: "Red Bull-Bora-Hansgrohe" },
+    { year: 2025, name: "Simon Yates", team: "Team Visma-Lease a Bike" },
     { year: 2024, name: "Tadej Pogačar", team: "UAE Team Emirates" },
     { year: 2023, name: "Primož Roglič", team: "Jumbo-Visma" },
     { year: 2022, name: "Jai Hindley", team: "Bora-Hansgrohe" },
