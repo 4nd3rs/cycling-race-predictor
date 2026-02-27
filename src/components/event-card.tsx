@@ -340,7 +340,7 @@ export function EventListRow({
       </div>
 
       {/* Name + Country flag */}
-      <div className="flex-1 min-w-0 flex items-center gap-2">
+      <div className="flex-1 min-w-0 overflow-hidden flex items-center gap-2">
         {country && <span className="text-base shrink-0 leading-none">{getFlag(country)}</span>}
         <Link href={eventUrl} className="font-medium text-sm hover:text-primary transition-colors truncate">
           {name}
