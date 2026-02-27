@@ -443,7 +443,7 @@ export default async function MyRaceHubPage({ searchParams }: { searchParams: Pr
                     </div>
                     {data.telegram?.connectedAt && <span className="text-xs font-medium text-green-400 bg-green-500/10 border border-green-500/20 px-2 py-0.5 rounded">Connected</span>}
                   </div>
-                  {!data.telegram?.connectedAt && <ConnectTelegramButton />}
+                  <ConnectTelegramButton connected={!!data.telegram?.connectedAt} />
                 </div>
                 <div className="rounded-lg border border-border/50 bg-card/20 p-4">
                   <div className="flex items-center justify-between mb-2">
