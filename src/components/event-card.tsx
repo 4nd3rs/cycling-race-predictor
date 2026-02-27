@@ -349,15 +349,6 @@ export function EventListRow({
 
 
 
-      {/* Follow button */}
-      <RaceFollowButton
-        eventId={id}
-        eventName={name}
-        categories={categories}
-        size="sm"
-        className="hidden sm:flex"
-      />
-
       {/* Category pills */}
       <div className="hidden md:flex items-center gap-1 shrink-0">
         {sortedCats.slice(0, 5).map((c) => (
@@ -377,8 +368,18 @@ export function EventListRow({
 
 
 
-      {/* Status */}
-      <div className="shrink-0">{statusEl}</div>
+      {/* Status / Follow swap on hover */}
+      <div className="shrink-0 flex items-center justify-end min-w-[80px]">
+        <div className="group-hover:hidden flex items-center">{statusEl}</div>
+        <div className="hidden group-hover:flex">
+          <RaceFollowButton
+            eventId={id}
+            eventName={name}
+            categories={categories}
+            size="sm"
+          />
+        </div>
+      </div>
     </div>
   );
 }

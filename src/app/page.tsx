@@ -497,6 +497,7 @@ function NextRaceHero({ event: ev }: { event: HomepageEvent }) {
             eventName={ev.name}
             categories={ev.categories}
             size="default"
+            className="border-white/20 hover:border-white/40"
           />
           <Button asChild size="lg">
             <Link href={url}>View Predictions &rarr;</Link>
