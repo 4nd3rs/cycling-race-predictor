@@ -4,6 +4,7 @@ import { Header } from "@/components/header";
 import { Badge } from "@/components/ui/badge";
 import { TelegramSubscribeButton } from "@/components/telegram-subscribe-button";
 import { RaceLinksSection } from "@/components/race-links";
+import { FollowButton } from "@/components/follow-button";
 import {
   db,
   races,
@@ -304,7 +305,10 @@ export default async function EventPage({ params }: PageProps) {
                 </div>
 
                 <div>
-                  <h1 className="text-3xl font-black tracking-tight">{event.name}</h1>
+                  <div className="flex items-center gap-3">
+                    <h1 className="text-3xl font-black tracking-tight">{event.name}</h1>
+                    <FollowButton followType="race_event" entityId={event.id} entityName={event.name} />
+                  </div>
                   <p className="text-muted-foreground mt-1 flex items-center gap-2">
                     {event.country && <span>{countryToFlag(event.country)}</span>}
                     <span>{format(eventDate, "EEEE, MMMM d, yyyy")}</span>

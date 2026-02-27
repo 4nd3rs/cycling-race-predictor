@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { FollowButton } from "@/components/follow-button";
 import {
   db,
   riders,
@@ -304,10 +305,13 @@ export default async function RiderDetailPage({ params }: PageProps) {
                   ))}
                 </div>
 
-                <h1 className="text-3xl font-black tracking-tight">
-                  {rider.nationality && <span className="mr-2">{countryToFlag(rider.nationality)}</span>}
-                  {rider.name}
-                </h1>
+                <div className="flex items-center gap-3">
+                  <h1 className="text-3xl font-black tracking-tight">
+                    {rider.nationality && <span className="mr-2">{countryToFlag(rider.nationality)}</span>}
+                    {rider.name}
+                  </h1>
+                  <FollowButton followType="rider" entityId={rider.id} entityName={rider.name} />
+                </div>
 
                 <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                   {age && <span>{age} years old</span>}

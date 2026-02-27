@@ -452,6 +452,37 @@ export const eloHistory = pgTable(
 );
 
 // ============================================================================
+// USER FOLLOWS & TELEGRAM
+// ============================================================================
+
+// User follows (rider or race_event)
+export const userFollows = pgTable(
+  "user_follows",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+    followType: varchar("follow_type", { length: 20 }).notNull(), // "rider" | "race_event"
+    entityId: uuid("entity_id").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    unique("user_follows_unique").on(table.userId, table.followType, table.entityId),
+    index("idx_user_follows_user").on(table.userId),
+    index("idx_user_follows_entity").on(table.followType, table.entityId),
+  ]
+);
+
+// Telegram connection per user
+export const userTelegram = pgTable("user_telegram", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull().unique(),
+  telegramChatId: varchar("telegram_chat_id", { length: 50 }),
+  connectToken: varchar("connect_token", { length: 64 }).unique(),
+  connectedAt: timestamp("connected_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ============================================================================
 // RELATIONS
 // ============================================================================
 
@@ -693,3 +724,7 @@ export type EloHistory = typeof eloHistory.$inferSelect;
 export type NewEloHistory = typeof eloHistory.$inferInsert;
 export type UciSyncRun = typeof uciSyncRuns.$inferSelect;
 export type NewUciSyncRun = typeof uciSyncRuns.$inferInsert;
+export type UserFollow = typeof userFollows.$inferSelect;
+export type NewUserFollow = typeof userFollows.$inferInsert;
+export type UserTelegram = typeof userTelegram.$inferSelect;
+export type NewUserTelegram = typeof userTelegram.$inferInsert;

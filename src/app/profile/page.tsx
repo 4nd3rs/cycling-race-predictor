@@ -1,0 +1,176 @@
+import { redirect } from "next/navigation";
+import Link from "next/link";
+import { Header } from "@/components/header";
+import { Badge } from "@/components/ui/badge";
+import { getAuthUser } from "@/lib/auth";
+import { db, userFollows, userTelegram, riders, raceEvents } from "@/lib/db";
+import { eq, and } from "drizzle-orm";
+import { ConnectTelegramButton } from "@/components/connect-telegram-button";
+
+function countryToFlag(code?: string | null) {
+  if (!code) return "";
+  const c = code.toUpperCase();
+  const map: Record<string, string> = {
+    GER:"DE", USA:"US", RSA:"ZA", GBR:"GB", NED:"NL", DEN:"DK",
+    SUI:"CH", AUT:"AT", BEL:"BE", FRA:"FR", ITA:"IT", ESP:"ES",
+    POR:"PT", NOR:"NO", SWE:"SE", FIN:"FI", POL:"PL", CZE:"CZ",
+    AUS:"AU", NZL:"NZ", JPN:"JP", COL:"CO", ECU:"EC", SLO:"SI",
+    CRO:"HR", UKR:"UA", KAZ:"KZ", ERI:"ER", ETH:"ET", RWA:"RW",
+  };
+  const a2 = c.length === 2 ? c : (map[c] || c.slice(0, 2));
+  return String.fromCodePoint(...[...a2].map(ch => 0x1F1E6 + ch.charCodeAt(0) - 65));
+}
+
+export default async function ProfilePage() {
+  const user = await getAuthUser();
+  if (!user) redirect("/sign-in");
+
+  // Fetch follows, telegram status in parallel
+  const [follows, telegramRows] = await Promise.all([
+    db.select().from(userFollows).where(eq(userFollows.userId, user.id)),
+    db.select().from(userTelegram).where(eq(userTelegram.userId, user.id)).limit(1),
+  ]);
+
+  const telegram = telegramRows[0] || null;
+
+  const riderFollows = follows.filter((f) => f.followType === "rider");
+  const raceFollows = follows.filter((f) => f.followType === "race_event");
+
+  // Fetch rider details
+  const riderDetails = await Promise.all(
+    riderFollows.map(async (f) => {
+      const [rider] = await db
+        .select({ id: riders.id, name: riders.name, nationality: riders.nationality, photoUrl: riders.photoUrl })
+        .from(riders)
+        .where(eq(riders.id, f.entityId))
+        .limit(1);
+      return rider || null;
+    })
+  );
+
+  // Fetch race event details
+  const raceDetails = await Promise.all(
+    raceFollows.map(async (f) => {
+      const [event] = await db
+        .select({ id: raceEvents.id, name: raceEvents.name, discipline: raceEvents.discipline, date: raceEvents.date, slug: raceEvents.slug })
+        .from(raceEvents)
+        .where(eq(raceEvents.id, f.entityId))
+        .limit(1);
+      return event || null;
+    })
+  );
+
+  const initials = (user.name || user.email || "U")
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
+  return (
+    <div className="min-h-screen flex flex-col">
+      <Header />
+      <main className="flex-1">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl py-8 space-y-8">
+
+          {/* User header */}
+          <div className="flex items-center gap-4">
+            {user.avatarUrl ? (
+              <img
+                src={user.avatarUrl}
+                alt={user.name || "Avatar"}
+                className="w-16 h-16 rounded-full border border-border/50"
+              />
+            ) : (
+              <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center text-xl font-bold text-primary">
+                {initials}
+              </div>
+            )}
+            <div>
+              <h1 className="text-2xl font-black tracking-tight">{user.name || "User"}</h1>
+              <p className="text-sm text-muted-foreground">{user.email}</p>
+              <Badge variant="outline" className="mt-1 capitalize">{user.tier}</Badge>
+            </div>
+          </div>
+
+          {/* Followed Riders */}
+          <section>
+            <h2 className="text-lg font-bold mb-3">Followed Riders</h2>
+            {riderDetails.filter(Boolean).length > 0 ? (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {riderDetails.filter(Boolean).map((rider) => (
+                  <Link
+                    key={rider!.id}
+                    href={`/riders/${rider!.id}`}
+                    className="flex items-center gap-3 rounded-lg border border-border/50 bg-card/30 p-3 hover:bg-card/60 transition-colors"
+                  >
+                    {rider!.photoUrl ? (
+                      <img
+                        src={rider!.photoUrl}
+                        alt={rider!.name}
+                        className="w-10 h-10 rounded-full object-cover object-top border border-border/30"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-sm font-bold">
+                        {rider!.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{rider!.name}</p>
+                      {rider!.nationality && (
+                        <p className="text-xs text-muted-foreground">{countryToFlag(rider!.nationality)} {rider!.nationality}</p>
+                      )}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground rounded-lg border border-border/50 bg-card/20 p-6 text-center">
+                No followed riders yet.
+              </p>
+            )}
+          </section>
+
+          {/* Followed Races */}
+          <section>
+            <h2 className="text-lg font-bold mb-3">Followed Races</h2>
+            {raceDetails.filter(Boolean).length > 0 ? (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {raceDetails.filter(Boolean).map((event) => (
+                  <Link
+                    key={event!.id}
+                    href={`/races/${event!.discipline}/${event!.slug}`}
+                    className="flex flex-col rounded-lg border border-border/50 bg-card/30 p-3 hover:bg-card/60 transition-colors"
+                  >
+                    <p className="text-sm font-medium truncate">{event!.name}</p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                      <span className="capitalize">{event!.discipline}</span>
+                      <span>{event!.date}</span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground rounded-lg border border-border/50 bg-card/20 p-6 text-center">
+                No followed races yet.
+              </p>
+            )}
+          </section>
+
+          {/* Telegram Alerts */}
+          <section>
+            <h2 className="text-lg font-bold mb-3">Telegram Alerts</h2>
+            <div className="rounded-lg border border-border/50 bg-card/20 p-4">
+              {telegram?.connectedAt ? (
+                <p className="text-sm text-green-400 font-medium">Telegram connected</p>
+              ) : (
+                <ConnectTelegramButton />
+              )}
+            </div>
+          </section>
+
+        </div>
+      </main>
+    </div>
+  );
+}

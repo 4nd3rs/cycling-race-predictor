@@ -68,12 +68,25 @@ export function Header() {
           {isLoaded && (
             <>
               {isSignedIn ? (
-                <UserButton
-                  afterSignOutUrl="/"
-                  appearance={{
-                    elements: { avatarBox: "h-8 w-8" },
-                  }}
-                />
+                <div className="flex items-center gap-2">
+                  <Link
+                    href="/profile"
+                    className={cn(
+                      "px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
+                      pathname === "/profile"
+                        ? "text-foreground bg-white/10"
+                        : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                    )}
+                  >
+                    Profile
+                  </Link>
+                  <UserButton
+                    afterSignOutUrl="/"
+                    appearance={{
+                      elements: { avatarBox: "h-8 w-8" },
+                    }}
+                  />
+                </div>
               ) : (
                 <div className="flex items-center gap-2">
                   <SignInButton mode="modal">
