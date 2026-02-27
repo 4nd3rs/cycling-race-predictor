@@ -44,7 +44,7 @@ export function Header() {
             <circle cx="162" cy="170" r="5.5" fill="#0D0D0D"/>
             <text x="100" y="100" fontFamily="'Barlow Condensed','Arial Narrow',Impact,sans-serif" fontWeight="800" fontSize="122" fill="#C8102E" textAnchor="middle" dominantBaseline="middle" transform="rotate(180,100,100)">13</text>
           </svg>
-          <div className="hidden sm:flex flex-col leading-none">
+          <div className="flex flex-col leading-none">
             <span className="font-display text-[11px] font-semibold uppercase tracking-[0.12em] text-foreground">Pro Cycling</span>
             <span className="font-display text-[19px] font-extrabold uppercase tracking-tight text-primary leading-none">Predictor</span>
           </div>
