@@ -12,7 +12,7 @@ config({ path: ".env.local" });
 
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
-import { eq, gte, and, isNotNull, ilike, or } from "drizzle-orm";
+import { eq, gte, lte, and, isNotNull, ilike, or, asc } from "drizzle-orm";
 import * as schema from "../../src/lib/db/schema";
 import * as cheerio from "cheerio";
 import { chromium } from "playwright";
@@ -24,6 +24,8 @@ const db = drizzle(sql, { schema });
 // Parse args
 const args = process.argv.slice(2);
 const raceIdArg = args[args.indexOf("--race-id") + 1] || null;
+const limitArg = parseInt(args[args.indexOf("--limit") + 1] || "8", 10);
+const daysAheadArg = parseInt(args[args.indexOf("--days") + 1] || "30", 10);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -332,17 +334,20 @@ async function main() {
       where: eq(schema.races.id, raceIdArg),
     });
   } else {
-    // All active upcoming races (next 30 days) with a pcsUrl
-    const thirtyDaysOut = new Date();
-    thirtyDaysOut.setDate(thirtyDaysOut.getDate() + 30);
-    const maxDate = thirtyDaysOut.toISOString().split("T")[0];
+    // Upcoming races within daysAheadArg, ordered by date, capped at limitArg
+    const maxDateObj = new Date();
+    maxDateObj.setDate(maxDateObj.getDate() + daysAheadArg);
+    const maxDate = maxDateObj.toISOString().split("T")[0];
 
     races = await db.query.races.findMany({
       where: and(
         eq(schema.races.status, "active"),
         gte(schema.races.date, today),
+        lte(schema.races.date, maxDate),
         isNotNull(schema.races.pcsUrl)
       ),
+      orderBy: (r, { asc }) => [asc(r.date)],
+      limit: limitArg,
     });
   }
 
