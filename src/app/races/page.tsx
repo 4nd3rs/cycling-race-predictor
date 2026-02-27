@@ -43,21 +43,32 @@ interface GroupedEvent {
 // ─── Country name helper ──────────────────────────────────────────────────────
 function getCountryName(code: string): string {
   const map: Record<string, string> = {
-    BEL: "Belgium", ITA: "Italy", FRA: "France", ESP: "Spain", GER: "Germany",
-    NED: "Netherlands", GBR: "Great Britain", SUI: "Switzerland", CHE: "Switzerland", AUT: "Austria",
-    DEN: "Denmark", NOR: "Norway", SWE: "Sweden", FIN: "Finland", POL: "Poland",
-    CZE: "Czech Republic", SVK: "Slovakia", HUN: "Hungary", POR: "Portugal",
-    USA: "United States", CAN: "Canada", MEX: "Mexico", BRA: "Brazil",
-    ARG: "Argentina", COL: "Colombia", CHI: "Chile", ECU: "Ecuador",
-    AUS: "Australia", NZL: "New Zealand", JPN: "Japan", CHN: "China",
-    KOR: "South Korea", RSA: "South Africa", MAR: "Morocco", AND: "Andorra",
-    LUX: "Luxembourg", IRL: "Ireland", GRE: "Greece", TUR: "Turkey",
-    UKR: "Ukraine", SLO: "Slovenia", CRO: "Croatia", SRB: "Serbia",
-    ROU: "Romania", BUL: "Bulgaria", LAT: "Latvia", LTU: "Lithuania",
-    EST: "Estonia", KAZ: "Kazakhstan", ERI: "Eritrea", RWA: "Rwanda",
-    ETH: "Ethiopia", URU: "Uruguay", PER: "Peru",
+    // Western Europe
+    AND: "Andorra", AUT: "Austria", BEL: "Belgium", CHE: "Switzerland",
+    CYP: "Cyprus", DEU: "Germany", GER: "Germany", DNK: "Denmark", DEN: "Denmark",
+    ESP: "Spain", EST: "Estonia", FIN: "Finland", FRA: "France",
+    GBR: "Great Britain", GRC: "Greece", GRE: "Greece", HUN: "Hungary",
+    IRL: "Ireland", ISL: "Iceland", ITA: "Italy", LTU: "Lithuania",
+    LUX: "Luxembourg", LVA: "Latvia", LAT: "Latvia", MLT: "Malta",
+    NLD: "Netherlands", NED: "Netherlands", NOR: "Norway", POL: "Poland",
+    PRT: "Portugal", POR: "Portugal", ROU: "Romania", SWE: "Sweden",
+    SVK: "Slovakia", SVN: "Slovenia", SLO: "Slovenia", SUI: "Switzerland",
+    TUR: "Turkey", UKR: "Ukraine",
+    // Balkans / Eastern Europe
+    BIH: "Bosnia", BUL: "Bulgaria", BGR: "Bulgaria", CRO: "Croatia", HRV: "Croatia",
+    KAZ: "Kazakhstan", RUS: "Russia", SRB: "Serbia",
+    // Americas
+    ARG: "Argentina", BRA: "Brazil", CAN: "Canada", CHI: "Chile", CHL: "Chile",
+    COL: "Colombia", ECU: "Ecuador", MEX: "Mexico", PER: "Peru",
+    URU: "Uruguay", USA: "United States",
+    // Africa
+    ERI: "Eritrea", ETH: "Ethiopia", MAR: "Morocco", NAM: "Namibia",
+    RSA: "South Africa", RWA: "Rwanda",
+    // Asia / Pacific
+    AUS: "Australia", CHN: "China", IND: "India", ISR: "Israel",
+    JPN: "Japan", KOR: "South Korea", NZL: "New Zealand", THA: "Thailand",
   };
-  return map[code] || code;
+  return map[code] ?? code;
 }
 
 // ─── Data fetching ────────────────────────────────────────────────────────────
