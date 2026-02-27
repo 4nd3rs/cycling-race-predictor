@@ -52,30 +52,40 @@ async function igGet(path: string) {
 // Instagram requires a publicly accessible image URL for container creation.
 // We upload to Vercel Blob or a temp S3 URL, then delete after publish.
 async function uploadImageForInstagram(imagePath: string): Promise<string> {
-  // Option 1: Use Vercel Blob (preferred — files are CDN-served)
+  // Option 1: Vercel Blob
   if (process.env.BLOB_READ_WRITE_TOKEN) {
     const { put } = await import("@vercel/blob");
     const imageBuffer = require("fs").readFileSync(imagePath);
     const filename = `ig-post-${Date.now()}.png`;
-    const blob = await put(filename, imageBuffer, {
-      access: "public",
-      contentType: "image/png",
-    });
+    const blob = await put(filename, imageBuffer, { access: "public", contentType: "image/png" });
     return blob.url;
   }
-  
-  // Option 2: Use a pre-signed public path (requires manual hosting)
-  // For dev/test: copy to public dir and use Vercel URL
+
+  // Option 2: GitHub raw CDN — commit to public/ and use raw.githubusercontent.com
   const filename = `ig-${Date.now()}.png`;
   const destPath = join(process.cwd(), "public", filename);
   require("fs").copyFileSync(imagePath, destPath);
-  console.log(`  Image staged at: ${IMAGE_HOST}/${filename}`);
-  console.log(`  (Will be removed after publish)`);
-  return `${IMAGE_HOST}/${filename}`;
+  const { execSync } = await import("child_process");
+  execSync(`git add public/${filename} && git commit -m "chore: stage IG image ${filename}" && git push`, { stdio: "pipe" });
+  const url = `https://raw.githubusercontent.com/4nd3rs/cycling-race-predictor/main/public/${filename}`;
+  console.log(`  Hosted at: ${url}`);
+  // Wait a moment for GitHub CDN to propagate
+  await new Promise(r => setTimeout(r, 8000));
+  return url;
 }
 
 async function cleanupStagedImage(imageUrl: string) {
-  if (imageUrl.includes("vercel-storage") || imageUrl.includes("blob.vercel")) return; // Blob handles its own lifecycle
+  if (imageUrl.includes("vercel-storage") || imageUrl.includes("blob.vercel")) return;
+  if (imageUrl.includes("raw.githubusercontent.com")) {
+    const filename = imageUrl.split("/").pop()!;
+    const localPath = join(process.cwd(), "public", filename);
+    const { execSync } = await import("child_process");
+    try {
+      execSync(`git rm public/${filename} && git commit -m "chore: remove staged IG image" && git push`, { stdio: "pipe" });
+    } catch { /* best effort */ }
+    if (existsSync(localPath)) unlinkSync(localPath);
+    return;
+  }
   const filename = imageUrl.split("/").pop()!;
   const localPath = join(process.cwd(), "public", filename);
   if (existsSync(localPath)) unlinkSync(localPath);
