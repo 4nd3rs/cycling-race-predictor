@@ -26,7 +26,8 @@ interface RaceFollowButtonProps {
   categories: RaceCategory[];
   className?: string;
   size?: "sm" | "default";
-  compact?: boolean; // icon-only bell indicator, no text, no toggle on click
+  compact?: boolean;
+  initialFollowing?: boolean; // server-provided initial state, skips API check
 }
 
 type FollowState = "idle" | "loading" | "toggling";
@@ -54,15 +55,19 @@ export function RaceFollowButton({
   className,
   size = "sm",
   compact = false,
+  initialFollowing,
 }: RaceFollowButtonProps) {
   const { isSignedIn, isLoaded } = useUser();
   const router = useRouter();
 
-  const [state, setState] = useState<FollowState>("loading");
+  const [state, setState] = useState<FollowState>(initialFollowing !== undefined ? "idle" : "loading");
   const [open, setOpen] = useState(false);
 
   // followingMap: key = "race_event:{id}" or "race:{id}", value = boolean
-  const [followingMap, setFollowingMap] = useState<Record<string, boolean>>({});
+  const initMap = initialFollowing !== undefined
+    ? { [`race_event:${eventId}`]: initialFollowing }
+    : {};
+  const [followingMap, setFollowingMap] = useState<Record<string, boolean>>(initMap);
 
   const isFollowingAll = !!followingMap[`race_event:${eventId}`];
   const isFollowingAny =
@@ -76,14 +81,20 @@ export function RaceFollowButton({
       return;
     }
 
-    const keys = [
-      { type: "race_event", id: eventId },
-      ...categories.map((c) => ({ type: "race", id: c.id })),
-    ];
+    // If initialFollowing provided, only check per-category follows (skip event-level check)
+    const keys = initialFollowing !== undefined
+      ? categories.map((c) => ({ type: "race", id: c.id }))
+      : [
+          { type: "race_event", id: eventId },
+          ...categories.map((c) => ({ type: "race", id: c.id })),
+        ];
+
+    if (keys.length === 0) { setState("idle"); return; }
 
     Promise.all(keys.map((k) => checkFollow(k.type, k.id).then((v) => ({ key: `${k.type}:${k.id}`, v }))))
       .then((results) => {
         const map: Record<string, boolean> = {};
+        if (initialFollowing !== undefined) map[`race_event:${eventId}`] = initialFollowing;
         results.forEach(({ key, v }) => { map[key] = v; });
         setFollowingMap(map);
         setState("idle");
@@ -117,7 +128,6 @@ export function RaceFollowButton({
 
   // Compact: icon-only bell, no text, click still toggles
   if (compact) {
-    if (state === "loading") return null;
     return (
       <button
         onClick={categories.length === 1 ? () => toggleCategory(categories[0].id) : toggleAll}

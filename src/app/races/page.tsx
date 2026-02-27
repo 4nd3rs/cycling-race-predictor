@@ -2,8 +2,9 @@ import { Suspense } from "react";
 import { Header } from "@/components/header";
 import { EventListView } from "@/components/event-card";
 import { RaceFilters } from "@/components/race-filters";
-import { db, races, raceEvents } from "@/lib/db";
+import { db, races, raceEvents, userFollows, users } from "@/lib/db";
 import { desc, eq, gte, lt, and, sql, inArray } from "drizzle-orm";
+import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import {
@@ -72,6 +73,20 @@ function getCountryName(code: string): string {
 }
 
 // ─── Data fetching ────────────────────────────────────────────────────────────
+
+async function getFollowedEventIds(): Promise<Set<string>> {
+  try {
+    const { userId } = await auth();
+    if (!userId) return new Set();
+    const [user] = await db.select({ id: users.id }).from(users).where(eq(users.clerkId, userId)).limit(1);
+    if (!user) return new Set();
+    const follows = await db.select({ entityId: userFollows.entityId })
+      .from(userFollows)
+      .where(and(eq(userFollows.userId, user.id), eq(userFollows.followType, "race_event")));
+    return new Set(follows.map(f => f.entityId));
+  } catch { return new Set(); }
+}
+
 async function getEvents(
   discipline: string | null,
   upcoming: boolean,
@@ -212,13 +227,16 @@ async function EventsSection({
 }: {
   discipline: string; tab: string; gender: string; country: string; cat: string;
 }) {
-  const events = await getEvents(
-    discipline === "all" ? null : discipline,
-    tab === "upcoming",
-    gender === "all" ? null : gender,
-    country || null,
-    cat && cat !== "all" ? cat : null
-  );
+  const [events, followedEventIds] = await Promise.all([
+    getEvents(
+      discipline === "all" ? null : discipline,
+      tab === "upcoming",
+      gender === "all" ? null : gender,
+      country || null,
+      cat && cat !== "all" ? cat : null
+    ),
+    getFollowedEventIds(),
+  ]);
 
   const parts = [];
   if (discipline !== "all") parts.push(getDisciplineLabel(discipline as Discipline));
@@ -230,7 +248,7 @@ async function EventsSection({
     ? `No upcoming ${label} events found.`
     : `No recent ${label} events found.`;
 
-  return <EventListView events={events} emptyMessage={emptyMsg} />;
+  return <EventListView events={events} followedEventIds={followedEventIds} emptyMessage={emptyMsg} />;
 }
 
 // ─── Skeleton ──────────────────────────────────────────────────────────────────

@@ -290,8 +290,8 @@ function LinkIcon({ href, title, className, children }: { href: string; title: s
 
 export function EventListRow({
   id, name, slug, date, endDate, country, discipline, subDiscipline,
-  uciCategory, externalLinks, categories,
-}: EventCardProps) {
+  uciCategory, externalLinks, categories, initialFollowing,
+}: EventCardProps & { initialFollowing?: boolean }) {
   const startDate = new Date(date + "T12:00:00");
   const isEventToday = isToday(startDate);
   const isCompleted = isPast(new Date((endDate ?? date) + "T23:59:59"));
@@ -368,25 +368,16 @@ export function EventListRow({
 
 
 
-      {/* Status + Follow bell */}
+      {/* Status + Bell — bell always visible */}
       <div className="shrink-0 flex items-center gap-2 justify-end">
-        <div className="group-hover:hidden flex items-center gap-1.5">
-          {statusEl}
-          <RaceFollowButton
-            eventId={id}
-            eventName={name}
-            categories={categories}
-            compact
-          />
-        </div>
-        <div className="hidden group-hover:flex items-center h-6">
-          <RaceFollowButton
-            eventId={id}
-            eventName={name}
-            categories={categories}
-            size="sm"
-          />
-        </div>
+        {statusEl}
+        <RaceFollowButton
+          eventId={id}
+          eventName={name}
+          categories={categories}
+          compact
+          initialFollowing={initialFollowing}
+        />
       </div>
     </div>
   );
@@ -395,7 +386,8 @@ export function EventListRow({
 export function EventListView({
   events,
   emptyMessage = "No events found",
-}: EventListProps) {
+  followedEventIds,
+}: EventListProps & { followedEventIds?: Set<string> }) {
   if (events.length === 0) {
     return (
       <div className="text-center py-12 text-muted-foreground">{emptyMessage}</div>
@@ -428,6 +420,7 @@ export function EventListView({
           uciCategory={event.uciCategory}
           externalLinks={event.externalLinks}
           categories={event.categories}
+          initialFollowing={followedEventIds?.has(event.id) ?? false}
         />
       ))}
     </div>
