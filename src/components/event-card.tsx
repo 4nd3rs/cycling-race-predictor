@@ -261,9 +261,12 @@ export function EventList({
 // ─── List row variant ────────────────────────────────────────────────────────
 
 function catAbbr(ageCategory: string, gender: string): string {
-  const age = { elite: "E", u23: "U23", junior: "J", masters: "M" }[ageCategory] ?? ageCategory.toUpperCase().slice(0, 2);
-  const g = gender === "men" ? "M" : "W";
-  return `${age}${g}`;
+  const g = gender === "men" ? "M" : "F";
+  if (ageCategory === "elite") return g;
+  if (ageCategory === "u23") return `${g}U23`;
+  if (ageCategory === "junior") return `${g}J`;
+  if (ageCategory === "masters") return `${g}Mst`;
+  return `${g}${ageCategory.toUpperCase().slice(0, 2)}`;
 }
 
 const DISC_COLORS: Record<string, string> = {

@@ -220,7 +220,8 @@ function getCountryName(code: string): string {
 async function getFilteredCalendarEvents(
   discipline: string | null,
   gender: string | null,
-  country: string | null
+  country: string | null,
+  cat: string | null = null
 ) {
   const today = new Date().toISOString().split("T")[0];
   try {
@@ -244,6 +245,11 @@ async function getFilteredCalendarEvents(
     const eventsMap = new Map<string, HomepageEvent>();
     for (const { race, event, startlistCount } of rows) {
       if (gender && gender !== "all" && race.gender !== gender) continue;
+      if (cat && cat !== "all") {
+        const [catAge, catGender] = cat.split("-");
+        if ((race.ageCategory || "elite") !== catAge) continue;
+        if ((race.gender || "men") !== catGender) continue;
+      }
       if (!eventsMap.has(event.id)) {
         eventsMap.set(event.id, {
           id: event.id, name: event.name, slug: event.slug, date: event.date,
@@ -278,21 +284,22 @@ async function getUpcomingCountries() {
 // ---------------------------------------------------------------------------
 
 interface HomePageProps {
-  searchParams: Promise<{ d?: string; gender?: string; country?: string }>;
+  searchParams: Promise<{ d?: string; gender?: string; country?: string; cat?: string }>;
 }
 
 export default async function Home({ searchParams }: HomePageProps) {
-  const { d, gender: genderParam, country: countryParam } = await searchParams;
+  const { d, gender: genderParam, country: countryParam, cat: catParam } = await searchParams;
   const filterDiscipline = d && d !== "all" ? d : null;
   const filterGender = genderParam && genderParam !== "all" ? genderParam : null;
   const filterCountry = countryParam || null;
-  const hasFilters = !!(filterDiscipline || filterGender || filterCountry);
+  const filterCat = catParam && catParam !== "all" ? catParam : null;
+  const hasFilters = !!(filterDiscipline || filterGender || filterCountry || filterCat);
 
   const [{ hero: nextRace, calendar: highHypeRaces }, latestIntel, recentResults, filteredRaces, calendarCountries] = await Promise.all([
     getHighHypeRaces(),
     getLatestIntel(),
     getRecentResults(),
-    hasFilters ? getFilteredCalendarEvents(filterDiscipline, filterGender, filterCountry) : Promise.resolve([]),
+    hasFilters ? getFilteredCalendarEvents(filterDiscipline, filterGender, filterCountry, filterCat) : Promise.resolve([]),
     getUpcomingCountries(),
   ]);
   const upcomingRaces = hasFilters ? filteredRaces : highHypeRaces;

@@ -65,7 +65,8 @@ async function getEvents(
   discipline: string | null,
   upcoming: boolean,
   gender: string | null,
-  country: string | null
+  country: string | null,
+  cat: string | null = null
 ): Promise<GroupedEvent[]> {
   const today = new Date().toISOString().split("T")[0];
 
@@ -103,6 +104,12 @@ async function getEvents(
     for (const { race, event, startlistCount, resultCount } of eventRaces) {
       // Gender filter: skip races that don't match
       if (gender && gender !== "all" && race.gender !== gender) continue;
+      // Category filter: "elite-men", "elite-women", "u23-men" etc.
+      if (cat && cat !== "all") {
+        const [catAge, catGender] = cat.split("-");
+        if ((race.ageCategory || "elite") !== catAge) continue;
+        if ((race.gender || "men") !== catGender) continue;
+      }
 
       if (!eventsMap.has(event.id)) {
         eventsMap.set(event.id, {
@@ -159,14 +166,15 @@ async function getCountries(upcoming: boolean): Promise<Array<{ code: string; na
 }
 
 // ─── Tab links ─────────────────────────────────────────────────────────────────
-function TabLinks({ activeTab, discipline, gender, country }: {
-  activeTab: string; discipline: string; gender: string; country: string;
+function TabLinks({ activeTab, discipline, gender, country, cat }: {
+  activeTab: string; discipline: string; gender: string; country: string; cat?: string;
 }) {
   const buildHref = (t: string) => {
     const params = new URLSearchParams();
     if (discipline && discipline !== "all") params.set("d", discipline);
     if (gender && gender !== "all") params.set("gender", gender);
     if (country) params.set("country", country);
+    if (cat && cat !== "all") params.set("cat", cat);
     params.set("tab", t);
     return `/races?${params.toString()}`;
   };
@@ -189,15 +197,16 @@ function TabLinks({ activeTab, discipline, gender, country }: {
 
 // ─── Event section ─────────────────────────────────────────────────────────────
 async function EventsSection({
-  discipline, tab, gender, country
+  discipline, tab, gender, country, cat
 }: {
-  discipline: string; tab: string; gender: string; country: string;
+  discipline: string; tab: string; gender: string; country: string; cat: string;
 }) {
   const events = await getEvents(
     discipline === "all" ? null : discipline,
     tab === "upcoming",
     gender === "all" ? null : gender,
-    country || null
+    country || null,
+    cat && cat !== "all" ? cat : null
   );
 
   const parts = [];
@@ -231,16 +240,17 @@ function ListSkeleton() {
 
 // ─── Page ──────────────────────────────────────────────────────────────────────
 interface PageProps {
-  searchParams: Promise<{ d?: string; tab?: string; gender?: string; country?: string }>;
+  searchParams: Promise<{ d?: string; tab?: string; gender?: string; country?: string; cat?: string }>;
 }
 
 export default async function RacesPage({ searchParams }: PageProps) {
-  const { d, tab: tabParam, gender: genderParam, country: countryParam } = await searchParams;
+  const { d, tab: tabParam, gender: genderParam, country: countryParam, cat: catParam } = await searchParams;
 
   const discipline = VALID_DISCIPLINES.includes(d as Discipline) ? (d as string) : "all";
   const tab = tabParam === "recent" ? "recent" : "upcoming";
   const gender = ["men", "women"].includes(genderParam || "") ? genderParam! : "all";
   const country = countryParam || "";
+  const cat = catParam || "all";
 
   const countries = await getCountries(tab === "upcoming");
 
@@ -260,12 +270,12 @@ export default async function RacesPage({ searchParams }: PageProps) {
         {/* ── Filters ── */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
           <RaceFilters countries={countries} />
-          <TabLinks activeTab={tab} discipline={discipline} gender={gender} country={country} />
+          <TabLinks activeTab={tab} discipline={discipline} gender={gender} country={country} cat={cat} />
         </div>
 
         {/* ── Event list ── */}
         <Suspense fallback={<ListSkeleton />}>
-          <EventsSection discipline={discipline} tab={tab} gender={gender} country={country} />
+          <EventsSection discipline={discipline} tab={tab} gender={gender} country={country} cat={cat} />
         </Suspense>
 
       </main>
