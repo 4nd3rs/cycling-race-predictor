@@ -695,14 +695,14 @@ export default async function EventPage({ params }: PageProps) {
                   const hasResults = race.status === "completed" || resultCount > 0;
                   const topResults = otherResultsPerRace[idx] ?? [];
                   const topPicks = otherPredictionsPerRace[idx] ?? [];
-                  const categoryLabel = formatCategoryDisplay(race.ageCategory || "elite", race.gender || "men");
+                  const categoryLabel = getCategoryLabel(race.categorySlug, race.ageCategory, race.gender);
 
                   return (
                     <div key={race.id} className="rounded-xl border border-border/50 bg-card/20 overflow-hidden flex flex-col">
                       {/* Card header */}
                       <div className="flex items-center justify-between px-4 py-3 border-b border-border/30 bg-muted/20">
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-sm">{categoryLabel}</span>
+                          <span className="font-bold text-sm whitespace-nowrap">{categoryLabel}</span>
                           {riderCount > 0 && (
                             <Badge variant="outline" className="text-xs">{riderCount} riders</Badge>
                           )}
