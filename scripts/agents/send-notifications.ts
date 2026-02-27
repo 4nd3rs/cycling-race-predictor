@@ -148,52 +148,66 @@ async function main() {
       const chatId = telegramRows[0].telegram_chat_id as string;
 
       // Build message
-      const lines: string[] = [];
-      lines.push(`<b>${(race.event_name as string).toUpperCase()}</b>`);
-      lines.push(`${race.country ? `📍 ${race.country}` : ""} | ${race.event_discipline} | ${race.uci_category || "Race"} | ${race.event_date}`);
-      lines.push("");
-
-      // If user follows specific riders
-      if (data.riderIds.length > 0) {
-        const followedRiders = await sql`
-          SELECT r.id, r.name FROM riders r WHERE r.id = ANY(${data.riderIds})
-        `;
-        const riderNameMap = new Map(followedRiders.map((r: { id: string; name: string }) => [r.id, r.name]));
-
-        lines.push("🏃 <b>Your followed riders in this race:</b>");
-        for (const riderId of data.riderIds) {
-          const riderName = riderNameMap.get(riderId) || "Unknown";
-          // Check if rider has a prediction
-          const pred = await sql`
-            SELECT predicted_position, win_probability FROM predictions
-            WHERE race_id = ${race.race_id} AND rider_id = ${riderId}
-            LIMIT 1
-          `;
-          if (pred.length > 0) {
-            const pos = pred[0].predicted_position;
-            const wp = pred[0].win_probability ? (parseFloat(pred[0].win_probability as string) * 100).toFixed(1) : "—";
-            lines.push(`  • ${riderName} — Predicted #${pos} (${wp}% win)`);
-          } else {
-            lines.push(`  • ${riderName}`);
-          }
-        }
-        lines.push("");
-      }
-
-      // Top prediction
-      if (topPredictions.length > 0) {
-        lines.push("🏆 <b>Top prediction:</b>");
-        const top = topPredictions[0];
-        const wp = top.win_probability ? (parseFloat(top.win_probability as string) * 100).toFixed(1) : "—";
-        lines.push(`  ${top.rider_name} — ${wp}% win probability`);
-        lines.push("");
-      }
-
-      // Link
       const raceUrl = `https://procyclingpredictor.com/races/${race.event_discipline}/${race.event_slug}${race.category_slug ? `/${race.category_slug}` : ""}`;
-      lines.push(`📊 <a href="${raceUrl}">View full predictions</a>`);
 
-      const message = lines.join("\n");
+      // Format date: "Saturday 28 Feb"
+      const rawDate = race.event_date ? (typeof race.event_date === "string" ? race.event_date : (race.event_date as Date).toISOString()) : null;
+      const raceDate = rawDate ? new Date(rawDate.split("T")[0] + "T12:00:00Z") : null;
+      const dateStr = raceDate
+        ? raceDate.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short", timeZone: "UTC" })
+        : "";
+      const meta = [dateStr, race.uci_category, race.country].filter(Boolean).join(" · ");
+
+      // Get followed rider predictions
+      let followedRiderSummary = "";
+      if (data.riderIds.length > 0) {
+        const followedPreds = await sql`
+          SELECT r.name, p.predicted_position, p.win_probability
+          FROM riders r
+          LEFT JOIN predictions p ON p.race_id = ${race.race_id} AND p.rider_id = r.id
+          WHERE r.id = ANY(${data.riderIds})
+          ORDER BY p.win_probability DESC NULLS LAST
+        `;
+        const ordinal = (n: number) => {
+          const s = ["th","st","nd","rd"], v = n % 100;
+          return n + (s[(v-20)%10] || s[v] || s[0]);
+        };
+        const parts = followedPreds.map((r: { name: string; predicted_position: number | null }) =>
+          r.predicted_position ? `${r.name} (${ordinal(r.predicted_position)})` : r.name
+        );
+        if (parts.length > 0) followedRiderSummary = parts.join(", ");
+      }
+
+      // Build Telegram message (HTML)
+      const tgLines: string[] = [];
+      tgLines.push(`<b>${(race.event_name as string).toUpperCase()}</b>`);
+      if (meta) tgLines.push(meta);
+      tgLines.push("");
+
+      if (topPredictions.length > 0) {
+        tgLines.push("<b>Top predictions</b>");
+        topPredictions.forEach((p: { rider_name: string; win_probability: string | null }, i: number) => {
+          const wp = p.win_probability ? (parseFloat(p.win_probability) * 100).toFixed(1) + "%" : "—";
+          tgLines.push(`${i + 1}. ${p.rider_name} — ${wp}`);
+        });
+        tgLines.push("");
+      }
+
+      if (followedRiderSummary) {
+        tgLines.push(`You follow: ${followedRiderSummary}`);
+        tgLines.push("");
+      }
+
+      tgLines.push(`<a href="${raceUrl}">${raceUrl.replace("https://", "")}</a>`);
+
+      const telegramMessage = tgLines.join("\n");
+
+      // WhatsApp: plain text version
+      const waLines = tgLines
+        .map(l => l.replace(/<[^>]+>/g, ""))
+        .join("\n");
+
+      const message = telegramMessage;
 
       if (DRY_RUN) {
         console.log(`  [DRY RUN] Would send to user ${userId} (chat ${chatId}):`);
@@ -210,7 +224,7 @@ async function main() {
         `;
         const waPhone = waRows.length > 0 ? (waRows[0].phone_number as string) : null;
         if (waPhone) {
-          const waText = message.replace(/<[^>]+>/g, "");
+          const waText = waLines;
           const ok = await sendWhatsAppMessage(waPhone, waText);
           console.log(`  ${ok ? "✅" : "❌"} WhatsApp → ${waPhone}`);
         }
