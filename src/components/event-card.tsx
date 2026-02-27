@@ -312,18 +312,18 @@ export function EventListRow({
   const totalRiders = categories.reduce((s, c) => s + (c.riderCount || 0), 0);
 
   const statusEl = isEventToday ? (
-    <span className="rounded px-1.5 py-0.5 text-xs font-bold bg-red-500 text-white animate-pulse">LIVE</span>
+    <span className="rounded px-1.5 py-0.5 text-xs font-bold bg-red-500 text-white animate-pulse shrink-0">LIVE</span>
   ) : isCompleted ? (
-    <span className="rounded px-1.5 py-0.5 text-xs text-muted-foreground bg-muted/40">Done</span>
+    <span className="rounded px-1.5 py-0.5 text-xs text-muted-foreground bg-muted/40 shrink-0">Done</span>
   ) : (
-    <span className="rounded px-1.5 py-0.5 text-xs text-green-400 bg-green-500/10 border border-green-500/20 whitespace-nowrap">
+    <span className="rounded px-1.5 py-0.5 text-xs text-green-400 bg-green-500/10 border border-green-500/20 whitespace-nowrap shrink-0 tabular-nums">
       {formatDistanceToNow(startDate, { addSuffix: true })}
     </span>
   );
 
   return (
     <div className={cn(
-      "flex items-center gap-3 py-2.5 px-3 border-b border-border/30 hover:bg-muted/20 transition-colors group",
+      "flex items-center gap-3 py-2.5 px-3 border-b border-border/30 hover:bg-muted/20 transition-colors group overflow-hidden",
       isEventToday && "bg-red-500/5 border-l-2 border-l-red-500"
     )}>
       {/* Date */}
@@ -369,7 +369,7 @@ export function EventListRow({
 
 
       {/* Status + Bell — bell always visible */}
-      <div className="shrink-0 flex items-center gap-2 justify-end">
+      <div className="shrink-0 flex items-center gap-1.5 justify-end">
         {statusEl}
         <RaceFollowButton
           eventId={id}
