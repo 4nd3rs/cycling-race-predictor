@@ -14,6 +14,24 @@ import {
   getSubDisciplineShortLabel,
 } from "@/lib/url-utils";
 
+
+// 3-letter → flag emoji
+function countryFlag(code: string | null | undefined): string {
+  if (!code) return "";
+  const map: Record<string, string> = {
+    BEL:"BE",FRA:"FR",ESP:"ES",ITA:"IT",GER:"DE",NED:"NL",GBR:"GB",SUI:"CH",CHE:"CH",
+    AUT:"AT",DEN:"DK",NOR:"NO",SWE:"SE",FIN:"FI",POL:"PL",CZE:"CZ",SVK:"SK",HUN:"HU",
+    POR:"PT",USA:"US",CAN:"CA",MEX:"MX",BRA:"BR",ARG:"AR",COL:"CO",CHI:"CL",ECU:"EC",
+    AUS:"AU",NZL:"NZ",JPN:"JP",CHN:"CN",KOR:"KR",RSA:"ZA",MAR:"MA",AND:"AD",LUX:"LU",
+    IRL:"IE",GRE:"GR",TUR:"TR",UKR:"UA",SLO:"SI",CRO:"HR",SRB:"RS",ROU:"RO",BUL:"BG",
+    LAT:"LV",LTU:"LT",EST:"EE",KAZ:"KZ",ERI:"ER",RWA:"RW",ETH:"ET",URU:"UY",PER:"PE",
+  };
+  const c = code.toUpperCase();
+  const a2 = c.length === 2 ? c : (map[c] || c.slice(0, 2));
+  try { return String.fromCodePoint(...[...a2].map(ch => 0x1F1E6 + ch.charCodeAt(0) - 65)); }
+  catch { return ""; }
+}
+
 interface RaceCategory {
   id: string;
   ageCategory: string;
@@ -333,15 +351,15 @@ export function EventListRow({
         )}
       </div>
 
-      {/* Name */}
-      <Link href={eventUrl} className="flex-1 min-w-0 font-medium text-sm hover:text-primary transition-colors truncate">
-        {name}
-      </Link>
+      {/* Name + Country flag */}
+      <div className="flex-1 min-w-0 flex items-center gap-2">
+        <Link href={eventUrl} className="font-medium text-sm hover:text-primary transition-colors truncate">
+          {name}
+        </Link>
+        {country && <span className="text-sm shrink-0 opacity-80">{countryFlag(country)}</span>}
+      </div>
 
-      {/* Country */}
-      {country && (
-        <span className="hidden lg:block text-xs text-muted-foreground shrink-0 w-8 font-mono">{country}</span>
-      )}
+
 
       {/* Category pills */}
       <div className="hidden md:flex items-center gap-1 shrink-0">
@@ -357,35 +375,10 @@ export function EventListRow({
 
       {/* Riders count */}
       <span className="hidden lg:block text-xs text-muted-foreground shrink-0 w-14 text-right tabular-nums">
-        {totalRiders > 0 ? `${totalRiders} 🚴` : ""}
+        {totalRiders > 0 ? `${totalRiders}` : ""}
       </span>
 
-      {/* External links */}
-      {externalLinks && (
-        <div className="hidden sm:flex items-center gap-2 shrink-0 w-16 justify-end">
-          {externalLinks.website && (
-            <LinkIcon href={externalLinks.website} title="Website">
-              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                <circle cx={12} cy={12} r={10}/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-              </svg>
-            </LinkIcon>
-          )}
-          {externalLinks.twitter && (
-            <LinkIcon href={externalLinks.twitter} title="X / Twitter">
-              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.213 5.567 5.951-5.567zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-              </svg>
-            </LinkIcon>
-          )}
-          {externalLinks.liveStream && externalLinks.liveStream.length > 0 && (
-            <LinkIcon href={externalLinks.liveStream[0].url} title={`Watch: ${externalLinks.liveStream.map(s => s.name).join(", ")}`} className="hover:text-red-400">
-              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                <rect x={2} y={7} width={20} height={15} rx={2}/><polyline points="17 2 12 7 7 2"/>
-              </svg>
-            </LinkIcon>
-          )}
-        </div>
-      )}
+
 
       {/* Status */}
       <div className="shrink-0">{statusEl}</div>
@@ -410,10 +403,8 @@ export function EventListView({
         <span className="w-12 shrink-0">Date</span>
         <span className="hidden sm:block w-28 shrink-0">Type</span>
         <span className="flex-1">Event</span>
-        <span className="hidden lg:block w-8">Ctry</span>
         <span className="hidden md:block w-24">Categories</span>
         <span className="hidden lg:block w-14 text-right">Riders</span>
-        <span className="hidden sm:block w-16 text-right">Links</span>
         <span className="w-20 text-right">Status</span>
       </div>
       {events.map((event) => (

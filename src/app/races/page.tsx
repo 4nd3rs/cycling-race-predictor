@@ -44,7 +44,7 @@ interface GroupedEvent {
 function getCountryName(code: string): string {
   const map: Record<string, string> = {
     BEL: "Belgium", ITA: "Italy", FRA: "France", ESP: "Spain", GER: "Germany",
-    NED: "Netherlands", GBR: "Great Britain", SUI: "Switzerland", AUT: "Austria",
+    NED: "Netherlands", GBR: "Great Britain", SUI: "Switzerland", CHE: "Switzerland", AUT: "Austria",
     DEN: "Denmark", NOR: "Norway", SWE: "Sweden", FIN: "Finland", POL: "Poland",
     CZE: "Czech Republic", SVK: "Slovakia", HUN: "Hungary", POR: "Portugal",
     USA: "United States", CAN: "Canada", MEX: "Mexico", BRA: "Brazil",

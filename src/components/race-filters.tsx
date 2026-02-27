@@ -9,14 +9,19 @@ const STORAGE_KEY = "pcp_race_filters";
 function saveFilters(d: string, gender: string, country: string) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ d, gender, country })); } catch {}
 }
-
 function loadFilters(): { d: string; gender: string; country: string } | null {
   try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
 }
 
 interface Country { code: string; name: string; }
 
-export function RaceFilters({ countries }: { countries: Country[] }) {
+export function RaceFilters({
+  countries,
+  basePath = "/races",
+}: {
+  countries: Country[];
+  basePath?: string;
+}) {
   const router = useRouter();
   const sp = useSearchParams();
 
@@ -24,7 +29,6 @@ export function RaceFilters({ countries }: { countries: Country[] }) {
   const [gender, setGender] = useState(sp.get("gender") || "all");
   const [country, setCountry] = useState(sp.get("country") || "");
 
-  // On mount: if no URL filters, restore from localStorage
   useEffect(() => {
     if (sp.get("d") || sp.get("gender") || sp.get("country")) return;
     const saved = loadFilters();
@@ -33,22 +37,24 @@ export function RaceFilters({ countries }: { countries: Country[] }) {
     const g = saved.gender || "all";
     const c = saved.country || "";
     setDiscipline(d); setGender(g); setCountry(c);
-    const params = buildParams(d, g, c, sp.get("tab") || "upcoming");
-    if (d !== "all" || g !== "all" || c) router.replace(`/races?${params.toString()}`);
+    if (d !== "all" || g !== "all" || c) {
+      router.replace(`${basePath}?${buildParams(d, g, c).toString()}`);
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function buildParams(d: string, g: string, c: string, tab: string) {
+  function buildParams(d: string, g: string, c: string) {
     const params = new URLSearchParams();
     if (d && d !== "all") params.set("d", d);
     if (g && g !== "all") params.set("gender", g);
     if (c) params.set("country", c);
-    params.set("tab", tab);
+    const tab = sp.get("tab");
+    if (tab) params.set("tab", tab);
     return params;
   }
 
   function applyFilters(d: string, g: string, c: string) {
     saveFilters(d, g, c);
-    router.push(`/races?${buildParams(d, g, c, sp.get("tab") || "upcoming").toString()}`);
+    router.push(`${basePath}?${buildParams(d, g, c).toString()}`);
   }
 
   const seg = (active: boolean) =>
@@ -57,7 +63,6 @@ export function RaceFilters({ countries }: { countries: Country[] }) {
 
   return (
     <div className="flex flex-wrap items-center gap-3">
-      {/* Discipline */}
       <div className="flex items-center gap-0.5 bg-muted/30 rounded-lg p-1">
         {(["all", "road", "mtb"] as const).map((k) => (
           <button key={k} onClick={() => { setDiscipline(k); applyFilters(k, gender, country); }} className={seg(discipline === k)}>
@@ -66,7 +71,6 @@ export function RaceFilters({ countries }: { countries: Country[] }) {
         ))}
       </div>
 
-      {/* Gender */}
       <div className="flex items-center gap-0.5 bg-muted/30 rounded-lg p-1">
         {(["all", "men", "women"] as const).map((k) => (
           <button key={k} onClick={() => { setGender(k); applyFilters(discipline, k, country); }} className={seg(gender === k)}>
@@ -75,7 +79,6 @@ export function RaceFilters({ countries }: { countries: Country[] }) {
         ))}
       </div>
 
-      {/* Country dropdown */}
       <div className="relative">
         <select
           value={country}
@@ -90,7 +93,6 @@ export function RaceFilters({ countries }: { countries: Country[] }) {
         <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">▾</span>
       </div>
 
-      {/* Clear */}
       {(discipline !== "all" || gender !== "all" || country) && (
         <button
           onClick={() => { setDiscipline("all"); setGender("all"); setCountry(""); applyFilters("all", "all", ""); }}
