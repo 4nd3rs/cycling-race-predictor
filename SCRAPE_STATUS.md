@@ -1,6 +1,11 @@
 # SCRAPE_STATUS.md — Pipeline Status
 
-_Last updated: 2026-02-27 12:24:59 (Stockholm)_
+_Last updated: 2026-02-27 13:26:30 (Stockholm)_
+
+## 📅 Race Calendar
+- **Last run:** 2026-02-27 13:26:30
+- **Status:** ✅ OK
+- Road (PCS): 19 found, 1 new, 18 existed. MTB (XCOdata): 81 found, 0 new, 81 existed.
 
 ## 📋 Startlists
 - **Last run:** 2026-02-27 12:06:29
@@ -17,13 +22,13 @@ _Last updated: 2026-02-27 12:24:59 (Stockholm)_
 | Paris-Nice - Elite Men | 2026-03-08 | 62 | ✅ +2 new | 2026-02-27 12:06:29 |
 
 ## 🏁 Results
-- **Last run:** 2026-02-27 12:24:59
+- **Last run:** 2026-02-27 13:25:01
 - **Status:** ✅ OK
 - 0 results imported across 1 race(s). 1 race(s) need LLM fallback (no pcsUrl).
 
 | Race | Date | Results | Status | Scraped |
 |------|------|---------|--------|---------|
-| AMS UCC India #1 - Elite Women | 2026-02-26 | 0 | ⏭️ no pcsUrl | 2026-02-27 12:24:59 |
+| AMS UCC India #1 - Elite Women | 2026-02-26 | 0 | ⏭️ no pcsUrl | 2026-02-27 13:25:01 |
 
 ---
 <!-- STATUS_JSON
@@ -88,10 +93,16 @@ _Last updated: 2026-02-27 12:24:59 (Stockholm)_
         "date": "2026-02-26",
         "count": 0,
         "status": "⏭️ no pcsUrl",
-        "scrapedAt": "2026-02-27 12:24:59"
+        "scrapedAt": "2026-02-27 13:25:01"
       }
     ],
-    "updatedAt": "2026-02-27 12:24:59"
+    "updatedAt": "2026-02-27 13:25:01"
+  },
+  "calendar": {
+    "component": "calendar",
+    "status": "ok",
+    "summary": "Road (PCS): 19 found, 1 new, 18 existed. MTB (XCOdata): 81 found, 0 new, 81 existed.",
+    "updatedAt": "2026-02-27 13:26:30"
   }
 }
 STATUS_JSON -->

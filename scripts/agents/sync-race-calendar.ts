@@ -73,6 +73,14 @@ const MIN_ROAD_CATS = new Set([
   "1.1",
 ]);
 
+
+/** PCS slugs that are known duplicates/aliases — never import these */
+const BLOCKED_PCS_SLUGS = new Set([
+  "omloop-het-nieuwsblad",   // canonical slug — we store it as omloop-het-nieuwsblad-2026
+  "omloop-nieuwsblad",       // alias, creates duplicate
+  "omloop-nieuwsblad-me",    // alias, creates duplicate
+]);
+
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
 interface ScrapedRace {
@@ -225,6 +233,11 @@ async function upsertRace(race: ScrapedRace): Promise<"inserted" | "existed" | "
 
     // Generate unique event slug
     const baseSlug = generateEventSlug(race.name);
+    // Skip known duplicate/alias slugs  
+    if (BLOCKED_PCS_SLUGS.has(baseSlug)) {
+      console.log(`  ⊘ Skipped blocked slug: ${baseSlug} (${race.name})`);
+      continue;
+    }
     const existingSlugs = await db
       .select({ slug: schema.raceEvents.slug })
       .from(schema.raceEvents)
