@@ -272,6 +272,7 @@ export const users = pgTable("users", {
   tipAccuracyScore: decimal("tip_accuracy_score", { precision: 5, scale: 4 }).default("0.5"),
   tipsSubmitted: integer("tips_submitted").default(0),
   tipsVerified: integer("tips_verified").default(0),
+  notificationFrequency: varchar("notification_frequency", { length: 20 }).default("daily"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

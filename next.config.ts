@@ -25,7 +25,9 @@ const nextConfig: NextConfig = {
 
   // Redirect procyclingpredictions.com → procyclingpredictor.com
   async redirects() {
-    return [
+      return [
+        { source: "/profile", destination: "/my-race-hub?tab=following", permanent: true },
+        { source: "/my-schedule", destination: "/my-race-hub?tab=schedule", permanent: true },
       {
         source: "/:path*",
         has: [{ type: "host" as const, value: "procyclingpredictions.com" }],

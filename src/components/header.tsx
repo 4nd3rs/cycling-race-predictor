@@ -48,10 +48,10 @@ export function Header() {
         {/* My Race Hub — primary CTA, always visible when signed in */}
         {isLoaded && isSignedIn && (
           <Link
-            href="/profile"
+            href="/my-race-hub"
             className={cn(
               "px-3 py-1.5 text-sm font-semibold rounded-md transition-colors whitespace-nowrap",
-              pathname === "/profile" || pathname === "/my-schedule"
+              pathname.startsWith("/my-race-hub")
                 ? "text-foreground bg-white/10"
                 : "text-muted-foreground hover:text-foreground hover:bg-white/5"
             )}
