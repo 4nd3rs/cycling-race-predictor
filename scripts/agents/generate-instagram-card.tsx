@@ -182,92 +182,101 @@ function PreviewCard({ event, race, preds }: any) {
   const uci = race?.uci_category ?? "";
   const discipline = (event.discipline ?? "").toUpperCase();
   const metaParts = [country, discipline, uci].filter(Boolean).join("  ·  ");
-  const nameFontSize = event.name.length > 40 ? 72 : event.name.length > 30 ? 88 : event.name.length > 20 ? 104 : 126;
-  const displayPreds = isStories ? preds : preds.slice(0, 3);
-  const rowGap = isStories ? 22 : 16;
-  const avatarSize = isStories ? 68 : 56;
-  const nameFontSizeRow = isStories ? 38 : 32;
-  const pctFontSize = isStories ? 34 : 28;
+  const nameLen = String(event.name).length;
+  const nameFontSizeFeed = nameLen > 30 ? 64 : nameLen > 20 ? 72 : 88;
+  const nameFontSizeStory = nameLen > 35 ? 88 : nameLen > 24 ? 104 : 126;
 
-  const content = (
-    <div style={{ display: "flex", flexDirection: "column", width: "100%" }}>
-      {/* Eyebrow */}
-      <span style={{ fontSize: 20, fontWeight: 700, color: RED, letterSpacing: "0.18em", fontFamily: "Inter", marginBottom: isStories ? 28 : 20 }}>
-        {gender === "women" ? "WOMEN  ·  RACE PREVIEW" : "RACE PREVIEW"}
-      </span>
-      {/* Race name */}
-      <span style={{ fontSize: nameFontSize, fontWeight: 800, color: WHITE, textTransform: "uppercase", lineHeight: 0.9, letterSpacing: "-0.01em", marginBottom: isStories ? 64 : 44 }}>
-        {event.name.toUpperCase()}
-      </span>
-      {/* Meta */}
-      <span style={{ fontSize: 24, fontWeight: 700, color: RED, letterSpacing: "0.1em", fontFamily: "Inter", marginBottom: 10 }}>
-        {metaParts}
-      </span>
-      <span style={{ fontSize: isStories ? 28 : 24, fontWeight: 700, color: RED, fontFamily: "Inter", marginBottom: isStories ? 48 : 36 }}>
-        {race?.date ? fmtDate(race.date) : ""}
-      </span>
-      {/* Divider */}
-      <div style={{ width: "100%", height: 1, background: DIMMED, marginBottom: isStories ? 44 : 32 }} />
-      {/* Predictions */}
-      {displayPreds.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column" }}>
-          <span style={{ fontSize: 18, fontWeight: 700, color: WHITE, letterSpacing: "0.14em", fontFamily: "Inter", marginBottom: isStories ? 32 : 24 }}>
-            TOP PREDICTIONS
-          </span>
-          <div style={{ display: "flex", flexDirection: "column", gap: rowGap }}>
-            {displayPreds.map((p: any, i: number) => {
+  if (isStories) {
+    // ── STORIES (1080×1920) — content centered vertically ──
+    const nameFontSize = nameFontSizeStory;
+    return (
+      <div style={{ width: W, height: H, background: BLACK, display: "flex", flexDirection: "column", fontFamily: "Barlow Condensed", position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 8, background: RED }} />
+        <div style={{ position: "absolute", left: 0, top: 8, bottom: 0, width: 8, background: RED }} />
+        <div style={{ display: "flex", flex: 1, alignItems: "center", justifyContent: "center", padding: "80px 96px" }}>
+          <div style={{ display: "flex", flexDirection: "column", width: "100%" }}>
+            <span style={{ fontSize: 20, fontWeight: 700, color: RED, letterSpacing: "0.18em", fontFamily: "Inter", marginBottom: 28, flexShrink: 0 }}>
+              {gender === "women" ? "WOMEN  ·  RACE PREVIEW" : "RACE PREVIEW"}
+            </span>
+            <span style={{ fontSize: nameFontSize, fontWeight: 800, color: WHITE, textTransform: "uppercase", lineHeight: 0.9, letterSpacing: "-0.01em", marginBottom: 64, flexShrink: 0 }}>
+              {String(event.name).toUpperCase()}
+            </span>
+            <span style={{ fontSize: 24, fontWeight: 700, color: RED, letterSpacing: "0.1em", fontFamily: "Inter", marginBottom: 10, flexShrink: 0 }}>{metaParts}</span>
+            <span style={{ fontSize: 28, fontWeight: 700, color: RED, fontFamily: "Inter", marginBottom: 48, flexShrink: 0 }}>{race?.date ? fmtDate(race.date) : ""}</span>
+            <div style={{ height: 1, background: DIMMED, marginBottom: 44, flexShrink: 0 }} />
+            <span style={{ fontSize: 18, fontWeight: 700, color: WHITE, letterSpacing: "0.14em", fontFamily: "Inter", marginBottom: 32, flexShrink: 0 }}>TOP PREDICTIONS</span>
+            {preds.map((p: any, i: number) => {
               const pct = Math.round(Number(p.win_probability) * 100);
               return (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                  <span style={{ fontSize: 20, fontWeight: 700, color: WHITE, width: 24, flexShrink: 0, fontFamily: "Inter" }}>{i + 1}</span>
-                  <RiderAvatar photoDataUri={p._photoDataUri ?? null} name={p.rider_name} size={avatarSize} />
-                  <div style={{ display: "flex", flexDirection: "column", gap: 7, flex: 1 }}>
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 22, flexShrink: 0 }}>
+                  <span style={{ fontSize: 22, fontWeight: 700, color: WHITE, width: 28, flexShrink: 0, fontFamily: "Inter" }}>{i + 1}</span>
+                  <RiderAvatar photoDataUri={p._photoDataUri ?? null} name={p.rider_name} size={68} />
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-                      <span style={{ fontSize: nameFontSizeRow, fontWeight: 800, color: i === 0 ? WHITE : "#C8C0B8", letterSpacing: "0.01em", lineHeight: 1 }}>
-                        {p.rider_name}
-                      </span>
-                      <span style={{ fontSize: pctFontSize, fontWeight: 800, color: i === 0 ? RED : "#8A3020", lineHeight: 1, marginLeft: 16 }}>
-                        {pct}%
-                      </span>
+                      <span style={{ fontSize: 38, fontWeight: 800, color: i === 0 ? WHITE : "#C8C0B8", lineHeight: 1 }}>{p.rider_name}</span>
+                      <span style={{ fontSize: 34, fontWeight: 800, color: i === 0 ? RED : "#8A3020", lineHeight: 1, marginLeft: 16 }}>{pct}%</span>
                     </div>
-                    <ProbBar pct={pct} width={isStories ? 700 : 520} />
+                    <ProbBar pct={pct} width={700} />
                   </div>
                 </div>
               );
             })}
-          </div>
-        </div>
-      )}
-      {/* Brand inline for stories */}
-      {isStories && (
-        <div style={{ display: "flex", marginTop: 60, paddingTop: 36, borderTop: `1px solid ${DIMMED}` }}>
-          <BrandBar />
-        </div>
-      )}
-    </div>
-  );
-
-  return (
-    <div style={{ width: W, height: H, background: BLACK, display: "flex", flexDirection: "column", fontFamily: "Barlow Condensed", position: "relative", overflow: "hidden" }}>
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 8, background: RED }} />
-      <div style={{ position: "absolute", left: 0, top: 8, bottom: 0, width: 8, background: RED }} />
-
-      {isStories ? (
-        /* Stories: content centered vertically */
-        <div style={{ display: "flex", flex: 1, alignItems: "center", justifyContent: "center", padding: "80px 96px" }}>
-          {content}
-        </div>
-      ) : (
-        /* Feed: content fills top, brand bar at bottom */
-        <>
-          <div style={{ display: "flex", flexDirection: "column", padding: "68px 88px 0 88px", flex: 1 }}>
-            {content}
-          </div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "24px 88px 44px 88px", borderTop: `1px solid ${DIMMED}` }}>
+            <div style={{ height: 1, background: DIMMED, marginTop: 40, marginBottom: 36, flexShrink: 0 }} />
             <BrandBar />
           </div>
-        </>
-      )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── FEED (1080×1080) — flat structure, flexShrink:0 on everything ──
+  const nameFontSize = nameFontSizeFeed;
+  return (
+    <div style={{ width: 1080, height: 1080, background: BLACK, display: "flex", flexDirection: "column", overflow: "hidden", fontFamily: "Barlow Condensed" }}>
+      {/* Top red border — in flow so it takes up real space */}
+      <div style={{ height: 8, background: RED, flexShrink: 0 }} />
+      {/* Left red bar — absolute */}
+      <div style={{ position: "absolute", left: 0, top: 8, bottom: 0, width: 8, background: RED }} />
+      {/* Main content */}
+      <div style={{ display: "flex", flexDirection: "column", padding: "52px 88px 0 96px", flex: 1, minHeight: 0 }}>
+        <span style={{ fontSize: 18, fontWeight: 700, color: RED, letterSpacing: "0.18em", fontFamily: "Inter", marginBottom: 16, flexShrink: 0 }}>
+          {gender === "women" ? "WOMEN  ·  RACE PREVIEW" : "RACE PREVIEW"}
+        </span>
+        <span style={{ fontSize: nameFontSize, fontWeight: 800, color: WHITE, textTransform: "uppercase", lineHeight: 0.9, letterSpacing: "-0.01em", marginBottom: 32, flexShrink: 0 }}>
+          {String(event.name).toUpperCase()}
+        </span>
+        <span style={{ fontSize: 20, fontWeight: 700, color: RED, letterSpacing: "0.1em", fontFamily: "Inter", marginBottom: 8, flexShrink: 0 }}>{metaParts}</span>
+        <span style={{ fontSize: 22, fontWeight: 700, color: RED, fontFamily: "Inter", marginBottom: 28, flexShrink: 0 }}>{race?.date ? fmtDate(race.date) : ""}</span>
+        <div style={{ height: 1, background: DIMMED, marginBottom: 24, flexShrink: 0 }} />
+        <span style={{ fontSize: 16, fontWeight: 700, color: WHITE, letterSpacing: "0.14em", fontFamily: "Inter", marginBottom: 18, flexShrink: 0 }}>TOP PREDICTIONS</span>
+        {preds.slice(0, 3).map((p: any, i: number) => {
+          const pct = Math.round(Number(p.win_probability) * 100);
+          return (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14, flexShrink: 0 }}>
+              <span style={{ fontSize: 18, fontWeight: 700, color: WHITE, width: 22, flexShrink: 0, fontFamily: "Inter" }}>{i + 1}</span>
+              <RiderAvatar photoDataUri={p._photoDataUri ?? null} name={p.rider_name} size={52} />
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: 30, fontWeight: 800, color: i === 0 ? WHITE : "#C8C0B8", lineHeight: 1 }}>{p.rider_name}</span>
+                  <span style={{ fontSize: 26, fontWeight: 800, color: i === 0 ? RED : "#8A3020", lineHeight: 1, marginLeft: 12 }}>{pct}%</span>
+                </div>
+                <ProbBar pct={pct} width={520} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {/* Brand bar */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 88px 40px 96px", borderTop: `1px solid ${DIMMED}`, flexShrink: 0 }}>
+        <span style={{ fontSize: 18, color: WHITE, fontFamily: "Inter" }}>procyclingpredictor.com</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: WHITE, letterSpacing: "0.1em" }}>PRO CYCLING</span>
+            <span style={{ fontSize: 20, fontWeight: 800, color: RED }}>PREDICTOR</span>
+          </div>
+          <BibIcon size={52} />
+        </div>
+      </div>
     </div>
   );
 }
@@ -366,7 +375,8 @@ async function main() {
     ],
   });
 
-  const png = new Resvg(svg, { fitTo: { mode: "width", value: W * 2 } }).render().asPng();
+  const renderWidth = isStories ? W * 2 : W; // feed at 1x (1080), stories at 2x (2160)
+  const png = new Resvg(svg, { fitTo: { mode: "width", value: renderWidth } }).render().asPng();
   writeFileSync(outPath, png);
   console.log(`Saved: ${outPath}`);
 }
