@@ -133,21 +133,25 @@ export function RaceFollowButton({
   // Single category — simple toggle, no popup
   if (categories.length <= 1) {
     return (
-      <Button
-        variant={isFollowingAny ? "secondary" : "outline"}
-        size="sm"
+      <button
         onClick={categories.length === 1 ? () => toggleCategory(categories[0].id) : toggleAll}
         disabled={state !== "idle"}
-        className={cn("shrink-0 h-7 px-2.5 text-xs gap-1 border-white/40 text-white bg-white/10 hover:bg-white/20 hover:border-white/60", isFollowingAny && "bg-primary/20 border-primary/60 text-primary hover:bg-primary/30", className)}
+        className={cn(
+          "inline-flex items-center gap-1 h-6 px-2 rounded text-xs font-medium border transition-colors shrink-0",
+          isFollowingAny
+            ? "border-primary text-primary bg-primary/15 hover:bg-primary/25"
+            : "border-white/30 text-white/80 bg-white/8 hover:bg-white/15 hover:border-white/50",
+          className
+        )}
       >
         {state === "loading" || state === "toggling" ? (
           <Loader2 className="h-3 w-3 animate-spin" />
         ) : isFollowingAny ? (
-          <><Bell className="h-3 w-3 fill-current" />Following</>
+          <><Bell className="h-3 w-3 fill-current" /><span>Following</span></>
         ) : (
-          <><Bell className="h-3 w-3" />Follow</>
+          <><Bell className="h-3 w-3" /><span>Follow</span></>
         )}
-      </Button>
+      </button>
     );
   }
 
@@ -155,11 +159,15 @@ export function RaceFollowButton({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button
-          variant={isFollowingAny ? "secondary" : "outline"}
-          size="sm"
+        <button
           disabled={state === "loading"}
-          className={cn("shrink-0 h-7 px-2.5 text-xs gap-1 border-white/40 text-white bg-white/10 hover:bg-white/20 hover:border-white/60", isFollowingAny && "bg-primary/20 border-primary/60 text-primary hover:bg-primary/30", className)}
+          className={cn(
+            "inline-flex items-center gap-1 h-6 px-2 rounded text-xs font-medium border transition-colors shrink-0",
+            isFollowingAny
+              ? "border-primary text-primary bg-primary/15 hover:bg-primary/25"
+              : "border-white/30 text-white/80 bg-white/8 hover:bg-white/15 hover:border-white/50",
+            className
+          )}
           onClick={(e) => {
             if (!isSignedIn) { e.preventDefault(); handleNotSignedIn(); return; }
           }}
@@ -167,11 +175,11 @@ export function RaceFollowButton({
           {state === "loading" ? (
             <Loader2 className="h-3 w-3 animate-spin" />
           ) : isFollowingAny ? (
-            <><Bell className="h-3 w-3 fill-current" />Following<ChevronDown className="h-3 w-3" /></>
+            <><Bell className="h-3 w-3 fill-current" /><span>Following</span><ChevronDown className="h-3 w-3" /></>
           ) : (
-            <><Bell className="h-3 w-3" />Follow<ChevronDown className="h-3 w-3" /></>
+            <><Bell className="h-3 w-3" /><span>Follow</span><ChevronDown className="h-3 w-3" /></>
           )}
-        </Button>
+        </button>
       </PopoverTrigger>
       <PopoverContent className="w-56 p-2" align="end">
         <p className="text-xs text-muted-foreground font-medium px-2 py-1 mb-1">

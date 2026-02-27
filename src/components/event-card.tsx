@@ -379,7 +379,7 @@ export function EventListRow({
             compact
           />
         </div>
-        <div className="hidden group-hover:flex items-center h-7">
+        <div className="hidden group-hover:flex items-center h-6">
           <RaceFollowButton
             eventId={id}
             eventName={name}
