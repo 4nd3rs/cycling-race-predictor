@@ -209,12 +209,10 @@ export async function scrapeWorldCupStandings(
 ): Promise<WorldCupRider[]> {
   const categoryCode = mapToWorldCupCategory(ageCategory, gender);
   if (!categoryCode) {
-    console.log(`No World Cup category for ${ageCategory} ${gender}`);
     return [];
   }
 
   const categoryLabel = CATEGORY_LABELS[categoryCode];
-  console.log(`Fetching World Cup ${categoryLabel} standings for ${season}...`);
 
   const url = `https://www.ucimtbworldseries.com/standings?series=xco&category=${categoryCode}&season=${season}`;
 
@@ -223,9 +221,7 @@ export async function scrapeWorldCupStandings(
     const riders = parseWorldCupMarkdown(markdown, categoryLabel);
 
     if (riders.length === 0) {
-      console.log(`No standings available for ${categoryLabel}`);
     } else {
-      console.log(`Found ${riders.length} riders in World Cup standings`);
     }
 
     return riders;

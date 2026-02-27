@@ -38,6 +38,12 @@ const CATEGORY_MAP: Record<string, { ageCategory: string; gender: string; pdfCat
 };
 
 export async function POST(request: NextRequest) {
+  // Admin-only: require CRON_SECRET
+  const authHeader = request.headers.get("authorization");
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   try {
     const body = await request.json();
     const validation = createCopaCatalanaSchema.safeParse(body);
@@ -66,26 +72,21 @@ export async function POST(request: NextRequest) {
     let pdfDate: string | null = null; // Date extracted from PDF
 
     for (const url of allPdfUrls) {
-      console.log(`Parsing Copa Catalana PDF: ${url}`);
       const parsed = await parseCopaCatalanaPdfUrl(url);
 
       if (parsed && parsed.results.length > 0) {
-        console.log(`Found ${parsed.results.length} results in PDF`);
         // Add source URL to each result
         allResults.push(...parsed.results.map(r => ({ ...r, sourceUrl: url })));
         // Use the date from the PDF if available
         if (parsed.date && !pdfDate) {
           pdfDate = parsed.date;
-          console.log(`Extracted date from PDF: ${pdfDate}`);
         }
       } else {
-        console.log(`No results found in PDF: ${url}`);
       }
     }
 
     // Prefer the date from PDF over the request date
     const date = pdfDate || requestDate;
-    console.log(`Using date: ${date} (from ${pdfDate ? 'PDF' : 'request'})`);
 
     if (allResults.length === 0) {
       return NextResponse.json(
@@ -93,8 +94,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-
-    console.log(`Total results from ${allPdfUrls.length} PDFs: ${allResults.length}`);
 
     // Generate unique slug for the event
     const baseSlug = generateEventSlug(name);
@@ -123,8 +122,6 @@ export async function POST(request: NextRequest) {
       sourceType: "copa_catalana",
     }).returning();
 
-    console.log(`Created event: ${event.id} with slug: ${eventSlug}`);
-
     const createdRaces: Array<{ id: string; name: string; category: string; resultsCount: number }> = [];
 
     // Create races and import results for each selected category
@@ -142,7 +139,6 @@ export async function POST(request: NextRequest) {
       );
 
       if (categoryResults.length === 0) {
-        console.log(`No results for ${catKey}`);
         continue;
       }
 
@@ -167,8 +163,6 @@ export async function POST(request: NextRequest) {
         raceEventId: event.id,
         startlistUrl: categorySourceUrl, // Store the correct PDF URL for this category
       }).returning();
-
-      console.log(`Created race: ${race.id} with ${categoryResults.length} results`);
 
       // Import results
       let ridersCreated = 0;

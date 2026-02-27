@@ -32,16 +32,11 @@ export async function syncSupercupForRace(
   const ageCategory = race.ageCategory || "elite";
   const gender = race.gender || "men";
 
-  console.log(`[SuperCup Sync] Fetching SuperCup standings for ${ageCategory} ${gender}...`);
-
   // Fetch standings from SuperCup PDF
   const standings = await scrapeSupercupStandings(ageCategory, gender);
   if (standings.length === 0) {
-    console.log("[SuperCup Sync] No standings fetched");
     return { synced: 0, notFound: 0, skipped: 0 };
   }
-
-  console.log(`[SuperCup Sync] Fetched ${standings.length} riders from SuperCup standings`);
 
   // Get all riders in this race's startlist
   const startlist = await db.query.raceStartlist.findMany({
@@ -50,8 +45,6 @@ export async function syncSupercupForRace(
       rider: true,
     },
   });
-
-  console.log(`[SuperCup Sync] Race has ${startlist.length} riders in startlist`);
 
   let synced = 0;
   let notFound = 0;
@@ -106,12 +99,9 @@ export async function syncSupercupForRace(
       }
 
       synced++;
-      console.log(`  ✓ ${rider.name} → SuperCup #${match.rank} (${match.totalPoints} pts)`);
     } else {
       notFound++;
     }
   }
-
-  console.log(`[SuperCup Sync] Complete: ${synced} matched, ${notFound} not found, ${skipped} skipped`);
   return { synced, notFound, skipped };
 }

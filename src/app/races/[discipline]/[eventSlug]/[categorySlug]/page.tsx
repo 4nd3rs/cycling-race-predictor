@@ -21,27 +21,8 @@ import {
   parseCategorySlug,
   buildCategoryUrl,
   generateCategorySlug,
-} from "@/lib/url-utils";
+  normalizeUciCategory } from "@/lib/url-utils";
 
-
-function normalizeUciCategory(raw: string): string {
-  const map: Record<string, string> = {
-    "WorldTour": "WT",
-    "1.Pro": "1.Pro",
-    "WorldCup": "WC",
-    "Continental Series": "CS",
-    "HC": "HC",
-    "C1": "C1",
-    "C2": "C2",
-    "CN": "CN",
-    "WC": "WC",
-    "CS": "CS",
-    "1": "1.1",
-    "2": "1.2",
-    "3": "1.3",
-  };
-  return map[raw] ?? raw;
-}
 
 // ── Weather ────────────────────────────────────────────────────────────────
 
@@ -292,7 +273,8 @@ async function getRaceStartlist(raceId: string, race?: typeof races.$inferSelect
             )
       )
       .where(eq(raceStartlist.raceId, raceId))
-      .orderBy(raceStartlist.bibNumber);
+      .orderBy(raceStartlist.bibNumber)
+      .limit(150);
 
     // Deduplicate: for U23 with elite fallback, prefer the row with UCI points
     const uniqueByEntry = new Map<string, (typeof results)[number]>();
@@ -503,8 +485,6 @@ async function generatePredictionsIfNeeded(race: typeof races.$inferSelect, star
         }))
       );
     }
-
-    console.log(`Generated ${result.predictions.length} predictions for race ${race.id}`);
   } catch (error) {
     console.error("Error generating predictions:", error);
   }
@@ -1079,7 +1059,6 @@ export default async function CategoryPage({ params }: PageProps) {
                       <div key={teamName}>
                         {/* Team header */}
                         <div className="flex items-center gap-2 px-3 py-2 bg-muted/30 text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                          <span>🚴</span>
                           <span className="truncate">{teamName}</span>
                           <span className="ml-auto shrink-0 font-normal normal-case">{teamRiders.length} riders</span>
                         </div>

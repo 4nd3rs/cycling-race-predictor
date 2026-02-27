@@ -23,7 +23,6 @@ export async function POST(request: Request, context: RouteContext) {
   const { id: raceId } = await context.params;
 
   try {
-    console.log(`Syncing UCI rankings for race ${raceId}...`);
     const result = await syncUciRankingsForRace(raceId);
 
     // Delete existing predictions so they regenerate with new data
@@ -32,7 +31,6 @@ export async function POST(request: Request, context: RouteContext) {
         .delete(predictions)
         .where(eq(predictions.raceId, raceId))
         .returning({ id: predictions.id });
-      console.log(`Deleted ${deleted.length} old predictions for regeneration`);
     }
 
     const cleanedMsg = result.cleaned > 0 ? ` Removed ${result.cleaned} misclassified rider(s).` : "";

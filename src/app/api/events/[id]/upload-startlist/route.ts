@@ -117,7 +117,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
       }
 
       const buffer = Buffer.from(await file.arrayBuffer());
-      console.log(`[Upload-Startlist] Parsing file: ${file.name} (${buffer.length} bytes)`);
 
       const text = await extractPdfText(buffer);
       if (!text || text.trim().length < 50) {
@@ -186,7 +185,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
 
       if (!race) {
-        console.log(`[Upload-Startlist] No race found for ${categoryKey}, skipping`);
         continue;
       }
 
@@ -228,9 +226,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
           }
         } else {
           notFoundCount++;
-          console.log(
-            `[Upload-Startlist] No match for: ${pdfEntry.firstName} ${pdfEntry.lastName} (bib ${pdfEntry.bibNumber}) in ${categoryKey}`
-          );
         }
       }
 
@@ -244,10 +239,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
         notFound: notFoundCount,
         total: entries.length,
       });
-
-      console.log(
-        `[Upload-Startlist] ${displayName}: ${matched}/${entries.length} matched, ${notFoundCount} not found`
-      );
     }
 
     return NextResponse.json({

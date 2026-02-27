@@ -45,7 +45,6 @@ export async function extractPdfText(
   const { mode = "table", outputMode = "layout_preserving" } = options;
 
   try {
-    console.log(`[LLMWhisperer] Extracting PDF: ${pdfUrl}`);
     const startTime = Date.now();
 
     // Start the whisper operation
@@ -101,7 +100,6 @@ export async function extractPdfText(
                           (typeof extraction === 'object' && extraction !== null
                             ? (extraction.result_text || extraction.extracted_text)
                             : (typeof extraction === 'string' ? extraction : "")) || "";
-    console.log(`[LLMWhisperer] Extracted ${extractedText.length} chars in ${processingTime}ms`);
 
     return {
       text: extractedText,

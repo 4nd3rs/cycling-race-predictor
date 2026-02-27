@@ -61,8 +61,6 @@ export async function POST(request: NextRequest) {
       const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
-      console.log(`[PDF-Upload] Parsing uploaded file: ${file.name} (${buffer.length} bytes)`);
-
       // Extract text from PDF
       const text = await extractPdfText(buffer);
 
@@ -72,8 +70,6 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-
-      console.log(`[PDF-Upload] Extracted ${text.length} chars from PDF`);
 
       // Parse text directly (no AI needed)
       parsedData = await parseStartlistTextWithAI(text);
@@ -87,8 +83,6 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-
-      console.log(`[PDF-Upload] Downloading PDF from: ${pdfUrl}`);
       const pdfResponse = await fetch(pdfUrl);
       if (!pdfResponse.ok) {
         return NextResponse.json(
@@ -98,7 +92,6 @@ export async function POST(request: NextRequest) {
       }
       const pdfBuffer = Buffer.from(await pdfResponse.arrayBuffer());
       const text = await extractPdfText(pdfBuffer);
-      console.log(`[PDF-Upload] Extracted ${text.length} chars from downloaded PDF`);
       parsedData = await parseStartlistTextWithAI(text);
     }
 

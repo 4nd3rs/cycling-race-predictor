@@ -35,8 +35,6 @@ export async function POST(request: NextRequest, { params }: PageProps) {
       );
     }
 
-    console.log(`Re-importing results for race ${raceId} from ${pdfUrl}`);
-
     // Parse the PDF
     const parsed = await parseCopaCatalanaPdfUrl(pdfUrl);
     if (!parsed || parsed.results.length === 0) {
@@ -59,8 +57,6 @@ export async function POST(request: NextRequest, { params }: PageProps) {
       if (!mapped) return false;
       return mapped.ageCategory === raceCategory && mapped.gender === raceGender;
     });
-
-    console.log(`Found ${categoryResults.length} results for ${raceCategory} ${raceGender}`);
 
     // Import results
     let imported = 0;

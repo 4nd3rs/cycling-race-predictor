@@ -44,7 +44,6 @@ export async function POST(
     }
 
     // Parse PDF
-    console.log(`Parsing PDF: ${pdfUrl}`);
     const parsed = await parseCopaCatalanaPdfUrl(pdfUrl);
 
     if (!parsed) {
@@ -54,8 +53,6 @@ export async function POST(
       );
     }
 
-    console.log(`Parsed ${parsed.results.length} results from ${parsed.eventName}`);
-    console.log(`Categories found: ${parsed.categories.join(", ")}`);
 
     // Filter results for the race's category
     const raceCategory = mapCopaCatalanaCategory(
@@ -67,8 +64,6 @@ export async function POST(
       if (!cat || !raceCategory) return false;
       return cat.ageCategory === raceCategory.ageCategory;
     });
-
-    console.log(`${relevantResults.length} results match race category (${race.ageCategory})`);
 
     // Process results
     const processedResults: Array<{
@@ -109,7 +104,6 @@ export async function POST(
     if (existingResults.length > 0) {
       // Delete existing results to replace
       await db.delete(raceResults).where(eq(raceResults.raceId, raceId));
-      console.log(`Deleted ${existingResults.length} existing results`);
     }
 
     // Insert new results

@@ -66,7 +66,6 @@ async function findChampionshipPdfUrls(): Promise<
   Array<{ label: string; url: string }>
 > {
   const pageUrl = "https://supercupmtb.com/en/results/";
-  console.log(`[SuperCup] Fetching results page: ${pageUrl}`);
 
   const response = await fetch(pageUrl, {
     headers: {
@@ -100,8 +99,6 @@ async function findChampionshipPdfUrls(): Promise<
       results.push({ label: text, url: fullUrl });
     }
   });
-
-  console.log(`[SuperCup] Found ${results.length} championship PDF links`);
   return results;
 }
 
@@ -196,7 +193,6 @@ function extractTotalPoints(trailingDigits: string, raceCount: number): number {
 function parseStandingsFromText(text: string): SuperCupStanding[] {
   const standings: SuperCupStanding[] = [];
   const raceCount = detectRaceCount(text);
-  console.log(`[SuperCup] Detected ${raceCount} race column(s) in PDF`);
 
   // Pre-process: join continuation lines (lines that don't start with a rank number)
   // into the previous line, to handle wrapped team names + scores
@@ -309,29 +305,20 @@ export async function scrapeSupercupStandings(
 ): Promise<SuperCupStanding[]> {
   const key = `${ageCategory}_${gender}`;
   if (!SUPERCUP_LINK_MAPPING[key]) {
-    console.log(`[SuperCup] No category mapping for ${key}`);
     return [];
   }
-
-  console.log(`[SuperCup] Scraping standings for ${ageCategory} ${gender}`);
 
   // Find championship PDF URLs
   const pdfs = await findChampionshipPdfUrls();
   if (pdfs.length === 0) {
-    console.log("[SuperCup] No championship PDFs found");
     return [];
   }
 
   // Find the right PDF for this category
   const pdfUrl = findPdfForCategory(pdfs, ageCategory, gender);
   if (!pdfUrl) {
-    console.log(
-      `[SuperCup] No championship PDF found for ${key}. Available: ${pdfs.map((p) => p.label).join(", ")}`
-    );
     return [];
   }
-
-  console.log(`[SuperCup] Downloading PDF: ${pdfUrl}`);
 
   // Download and parse PDF
   const pdfResponse = await fetch(pdfUrl);
@@ -343,24 +330,13 @@ export async function scrapeSupercupStandings(
   const data = await pdfParse(buffer);
 
   if (!data.text || data.text.length < 50) {
-    console.log("[SuperCup] PDF has no extractable text");
     return [];
   }
 
-  console.log(
-    `[SuperCup] Extracted ${data.text.length} chars from PDF`
-  );
-
   // Parse standings from text
   const standings = parseStandingsFromText(data.text);
-  console.log(
-    `[SuperCup] Parsed ${standings.length} riders from standings`
-  );
 
   if (standings.length > 0) {
-    console.log(
-      `[SuperCup] Top 3: ${standings.slice(0, 3).map((s) => `#${s.rank} ${s.name} (${s.totalPoints}pts)`).join(", ")}`
-    );
   }
 
   return standings;

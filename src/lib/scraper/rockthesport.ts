@@ -480,19 +480,15 @@ export async function scrapeRockthesportEvent(url: string): Promise<Rockthesport
   try {
     const baseEventUrl = getBaseEventUrl(url);
     const participantListUrl = normalizeParticipantListUrl(url);
-    console.log(`Scraping Rockthesport event from: ${baseEventUrl}`);
 
     // First, fetch the main event page to get proper metadata (name, date)
     let metadata: { name: string; date: string; country: string };
 
     try {
-      console.log("Fetching main event page for metadata...");
       const mainPageHtml = await customFetch(baseEventUrl);
       const $ = cheerio.load(mainPageHtml);
       metadata = extractMetadataFromMainPage($, baseEventUrl);
-      console.log(`Extracted from main page - Name: ${metadata.name}, Date: ${metadata.date}`);
     } catch (mainPageError) {
-      console.log("Failed to fetch main page, using URL-based metadata:", mainPageError);
       // Fallback to extracting metadata from URL
       const urlMatch = url.match(/\/event\/([^\/]+)/);
       const name = urlMatch
@@ -506,10 +502,7 @@ export async function scrapeRockthesportEvent(url: string): Promise<Rockthesport
       };
     }
 
-    console.log(`Event: ${metadata.name}, Date: ${metadata.date}`);
-
     // Use custom scraper to fetch ALL pages (Firecrawl doesn't handle ASP.NET pagination)
-    console.log("Fetching all pages with custom scraper...");
     const rawEntries = await fetchAllPagesWithCustomScraper(participantListUrl);
 
     // Deduplicate entries by firstName + lastName + category
@@ -524,12 +517,10 @@ export async function scrapeRockthesportEvent(url: string): Promise<Rockthesport
     });
 
     if (allEntries.length < rawEntries.length) {
-      console.log(`Removed ${rawEntries.length - allEntries.length} duplicate entries`);
     }
 
     // Extract unique categories
     const categories = [...new Set(allEntries.map((e) => e.category))].filter(Boolean);
-    console.log(`Total entries: ${allEntries.length}, Categories: ${categories.join(", ")}`);
 
     return {
       name: metadata.name,
@@ -558,13 +549,11 @@ async function fetchAllPagesWithCustomScraper(baseUrl: string): Promise<Rockthes
 
   try {
     // Fetch first page to get form fields and initial entries
-    console.log("Fetching page 1...");
     const firstPageHtml = await customFetch(baseUrl);
     const $ = cheerio.load(firstPageHtml);
 
     // Extract entries from first page
     const firstPageEntries = extractEntriesFromHtml($);
-    console.log(`Page 1: Found ${firstPageEntries.length} entries`);
     allEntries.push(...firstPageEntries);
 
     // Get total pages from the page if available
@@ -573,7 +562,6 @@ async function fetchAllPagesWithCustomScraper(baseUrl: string): Promise<Rockthes
     const totalMatch = paginationText.match(/\/\s*(\d+)\s*(?:páginas|pages)?/i);
     if (totalMatch) {
       totalPages = parseInt(totalMatch[1], 10);
-      console.log(`Detected ${totalPages} total pages`);
     }
 
     // If only 1 page or can't determine, try fetching more until empty
@@ -590,7 +578,6 @@ async function fetchAllPagesWithCustomScraper(baseUrl: string): Promise<Rockthes
 
     // Fetch remaining pages
     for (let page = 2; page <= Math.min(totalPages, MAX_PAGES); page++) {
-      console.log(`Fetching page ${page}/${totalPages}...`);
 
       try {
         const formData = new URLSearchParams();
@@ -617,11 +604,9 @@ async function fetchAllPagesWithCustomScraper(baseUrl: string): Promise<Rockthes
 
         const $page: CheerioAPI = cheerio.load(pageHtml);
         const pageEntries = extractEntriesFromHtml($page);
-        console.log(`Page ${page}: Found ${pageEntries.length} entries`);
 
         // Stop if we got no entries (end of data)
         if (pageEntries.length === 0) {
-          console.log(`No more entries found, stopping pagination`);
           break;
         }
 

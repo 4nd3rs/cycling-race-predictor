@@ -258,3 +258,22 @@ export function makeSlugUnique(
 
   return newSlug;
 }
+
+export function normalizeUciCategory(raw: string): string {
+  const map: Record<string, string> = {
+    "WorldTour": "WT", "1.Pro": "1.Pro", "WorldCup": "WC",
+    "Continental Series": "CS", "HC": "HC", "C1": "C1", "C2": "C2",
+    "CN": "CN", "WC": "WC", "CS": "CS", "1": "1.1", "2": "1.2", "3": "1.3",
+  };
+  return map[raw] ?? raw;
+}
+
+export function getDisciplineColor(discipline: string): string {
+  const colors: Record<string, string> = {
+    road: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+    mtb: "bg-green-500/20 text-green-400 border-green-500/30",
+    gravel: "bg-orange-500/20 text-orange-400 border-orange-500/30",
+    cyclocross: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+  };
+  return colors[discipline] ?? "bg-zinc-500/20 text-zinc-400";
+}

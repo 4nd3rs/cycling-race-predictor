@@ -107,7 +107,6 @@ async function callHaiku<T>(prompt: string): Promise<T | null> {
 export async function parseRacePdfWithAI(pdfUrl: string): Promise<ParsedRaceData | null> {
   try {
     // Step 1: Extract text using LLMWhisperer
-    console.log("[AI-Parser] Extracting PDF text...");
     const extracted = await extractPdfText(pdfUrl, { mode: "table" });
 
     if (!extracted || !extracted.text) {
@@ -115,10 +114,7 @@ export async function parseRacePdfWithAI(pdfUrl: string): Promise<ParsedRaceData
       return null;
     }
 
-    console.log(`[AI-Parser] Extracted ${extracted.text.length} chars`);
-
     // Step 2: Get metadata and categories
-    console.log("[AI-Parser] Getting metadata and categories...");
     const metadata = await callHaiku<{
       eventName: string | null;
       date: string | null;
@@ -131,19 +127,15 @@ export async function parseRacePdfWithAI(pdfUrl: string): Promise<ParsedRaceData
       return null;
     }
 
-    console.log(`[AI-Parser] Found ${metadata.categories.length} categories: ${metadata.categories.join(", ")}`);
-
     // Step 3: Extract results for each category in parallel
     const allResults: RaceResult[] = [];
 
     const categoryPromises = metadata.categories.map(async (category) => {
-      console.log(`[AI-Parser] Extracting ${category}...`);
       const prompt = CATEGORY_PROMPT.replace(/\{CATEGORY\}/g, category) + extracted.text;
 
       const results = await callHaiku<Array<Omit<RaceResult, "category">>>(prompt);
 
       if (results && Array.isArray(results)) {
-        console.log(`[AI-Parser] Got ${results.length} riders for ${category}`);
         return results.map((r) => ({ ...r, category }));
       }
       return [];
@@ -153,8 +145,6 @@ export async function parseRacePdfWithAI(pdfUrl: string): Promise<ParsedRaceData
     for (const results of categoryResults) {
       allResults.push(...results);
     }
-
-    console.log(`[AI-Parser] Total: ${allResults.length} results across ${metadata.categories.length} categories`);
 
     return {
       eventName: metadata.eventName,

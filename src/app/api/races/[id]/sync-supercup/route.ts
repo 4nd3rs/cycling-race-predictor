@@ -23,7 +23,6 @@ export async function POST(request: Request, context: RouteContext) {
   const { id: raceId } = await context.params;
 
   try {
-    console.log(`Syncing SuperCup standings for race ${raceId}...`);
     const result = await syncSupercupForRace(raceId);
 
     // Delete existing predictions so they regenerate with new data
@@ -32,7 +31,6 @@ export async function POST(request: Request, context: RouteContext) {
         .delete(predictions)
         .where(eq(predictions.raceId, raceId))
         .returning({ id: predictions.id });
-      console.log(`Deleted ${deleted.length} old predictions for regeneration`);
     }
 
     return NextResponse.json({

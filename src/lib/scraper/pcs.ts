@@ -785,7 +785,6 @@ export async function scrapeRacePage(raceUrl: string): Promise<{
     try {
       startlist = await scrapeStartlist(startlistUrl);
     } catch (e) {
-      console.log("Could not fetch startlist, may not be available yet");
     }
 
     return {

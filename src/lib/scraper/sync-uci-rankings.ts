@@ -69,20 +69,14 @@ export async function syncUciRankingsForRace(
   const category = toUCICategory(gender, ageCategory);
 
   if (!category) {
-    console.log(`No UCI ranking category for ${ageCategory} ${gender}`);
     return { synced: 0, notFound: 0, skipped: 0, cleaned: 0 };
   }
-
-  console.log(`Fetching UCI ${ageCategory} ${gender} rankings for race ${race.name}...`);
 
   // Fetch UCI rankings from DataRide API
   const uciRankings = await fetchAllUCIRankings(category);
   if (uciRankings.length === 0) {
-    console.log("No rankings fetched from UCI DataRide");
     return { synced: 0, notFound: 0, skipped: 0, cleaned: 0 };
   }
-
-  console.log(`Fetched ${uciRankings.length} riders from UCI rankings`);
 
   // Get all riders in this race's startlist
   const startlist = await db.query.raceStartlist.findMany({
@@ -91,8 +85,6 @@ export async function syncUciRankingsForRace(
       rider: true,
     },
   });
-
-  console.log(`Race has ${startlist.length} riders in startlist`);
 
   let synced = 0;
   let notFound = 0;
@@ -178,7 +170,6 @@ export async function syncUciRankingsForRace(
       }
 
       synced++;
-      console.log(`  ✓ ${rider.name} → UCI #${match.rank} (${match.points} pts)`);
     } else {
       notFound++;
       // Create basic stats for unranked riders
@@ -215,7 +206,6 @@ export async function syncUciRankingsForRace(
   const oppositeCategory = toUCICategory(oppositeGender, ageCategory);
 
   if (oppositeCategory) {
-    console.log(`\nChecking for misclassified riders (checking ${oppositeGender} rankings)...`);
     const oppositeRankings = await fetchAllUCIRankings(oppositeCategory);
 
     if (oppositeRankings.length > 0) {
@@ -234,7 +224,6 @@ export async function syncUciRankingsForRace(
         const wrongGenderMatch = findRiderInRankings(rider, oppositeRankings);
         if (wrongGenderMatch) {
           idsToRemove.push(entry.id);
-          console.log(`  ✗ Removing ${rider.name} (found in ${oppositeGender} rankings #${wrongGenderMatch.rank})`);
         }
       }
 
@@ -246,8 +235,6 @@ export async function syncUciRankingsForRace(
       }
     }
   }
-
-  console.log(`\nSync complete: ${synced} matched, ${notFound} not found, ${skipped} skipped, ${cleaned} cleaned`);
   return { synced, notFound, skipped, cleaned };
 }
 
@@ -263,14 +250,10 @@ export async function syncUciRankingsForCategory(
     return { total: 0, synced: 0 };
   }
 
-  console.log(`Fetching complete ${ageCategory} ${gender} rankings...`);
-
   const rankings = await fetchAllUCIRankings(category);
   if (rankings.length === 0) {
     return { total: 0, synced: 0 };
   }
-
-  console.log(`Got ${rankings.length} riders, syncing to database...`);
 
   let synced = 0;
 
@@ -361,7 +344,5 @@ export async function syncUciRankingsForCategory(
 
     synced++;
   }
-
-  console.log(`Synced ${synced} riders for ${ageCategory} ${gender}`);
   return { total: rankings.length, synced };
 }

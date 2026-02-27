@@ -78,15 +78,12 @@ export async function syncUciDatabase(options: {
       let categoryRidersUpdated = 0;
 
       try {
-        console.log(`[sync] Fetching ${category} rankings from UCI DataRide...`);
         const rankings = await fetchAllUCIRankings(category);
 
         if (rankings.length === 0) {
           result.errors.push(`No rankings found for ${category}`);
           continue;
         }
-
-        console.log(`[sync] Processing ${rankings.length} riders for ${category}`);
 
         for (const ranking of rankings) {
           try {
@@ -182,9 +179,6 @@ export async function syncUciDatabase(options: {
         }
 
         const categoryDuration = Date.now() - categoryStart;
-        console.log(
-          `[sync] ${category}: ${rankings.length} entries, ${categoryRidersCreated} created, ${categoryRidersUpdated} updated (${categoryDuration}ms)`
-        );
 
         result.categoryDetails.push({
           category,
@@ -214,7 +208,6 @@ export async function syncUciDatabase(options: {
           lt(riderDisciplineStats.updatedAt, syncStartedAt)
         )
       );
-    console.log(`[sync] Zeroed UCI points for stats not updated during this sync`);
 
     result.status = "completed";
   } catch (error) {
@@ -241,10 +234,6 @@ export async function syncUciDatabase(options: {
       categoryDetails: result.categoryDetails,
     })
     .where(eq(uciSyncRuns.id, syncRun.id));
-
-  console.log(
-    `[sync] Complete: ${result.totalEntries} entries, ${result.ridersCreated} created, ${result.ridersUpdated} updated (${result.durationMs}ms)`
-  );
 
   return result;
 }

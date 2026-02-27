@@ -286,15 +286,11 @@ export async function fetchAllUCIRankings(
 ): Promise<UCIRankingRider[]> {
   const categoryId = CATEGORY_IDS[category];
 
-  console.log(`[uci-api] Fetching ${category} rankings...`);
-
   // Step 1: Get current season
   const season = await fetchCurrentSeason();
-  console.log(`[uci-api] Season: ${season.year} (id=${season.id})`);
 
   // Step 2: Discover momentId
   const { rankingId, momentId } = await fetchMomentId(season.id, categoryId);
-  console.log(`[uci-api] ${category}: rankingId=${rankingId}, momentId=${momentId}`);
 
   // Step 3: Paginate through all riders
   // Note: TotalObjectRanking from discovery can be 0 even when riders exist,
@@ -317,7 +313,6 @@ export async function fetchAllUCIRankings(
     // Use actual total from response
     if (total === Infinity) {
       total = response.total || 0;
-      console.log(`[uci-api] ${category}: total riders = ${total}`);
     }
 
     if (!response.data || response.data.length === 0) break;
@@ -326,13 +321,9 @@ export async function fetchAllUCIRankings(
       riders.push(transformRider(raw));
     }
 
-    console.log(`[uci-api] ${category}: fetched ${riders.length}/${total} riders`);
-
     skip += PAGE_SIZE;
     page++;
   }
-
-  console.log(`[uci-api] ${category}: complete — ${riders.length} riders`);
   return riders;
 }
 

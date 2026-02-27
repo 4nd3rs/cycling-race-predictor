@@ -104,8 +104,6 @@ async function addFromRockthesport(
     return mapped.ageCategory === race.ageCategory && mapped.gender === race.gender;
   });
 
-  console.log(`Found ${matchingEntries.length} entries matching ${race.ageCategory} ${race.gender}`);
-
   if (matchingEntries.length === 0) {
     return {
       success: false,

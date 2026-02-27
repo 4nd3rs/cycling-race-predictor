@@ -81,7 +81,6 @@ export async function POST(
 
     if (resultsPageUrl) {
       // UCI results page flow: discover PDFs from page, parse each with UCI parser
-      console.log(`Discovering result PDFs from: ${resultsPageUrl}`);
       const discoveredPdfs = await scrapeResultsPageUrls(resultsPageUrl);
 
       if (discoveredPdfs.length === 0) {
@@ -92,11 +91,9 @@ export async function POST(
       }
 
       for (const pdf of discoveredPdfs) {
-        console.log(`Parsing UCI PDF: ${pdf.filename} (${pdf.ageCategory}/${pdf.gender})`);
         const parsed = await parseUciResultsPdfUrl(pdf.pdfUrl);
 
         if (!parsed || parsed.results.length === 0) {
-          console.log(`No results found in PDF: ${pdf.filename}`);
           continue;
         }
 
@@ -119,12 +116,10 @@ export async function POST(
     } else if (pdfUrls) {
       // Direct PDF URLs flow: try UCI parser first, fall back to Copa Catalana
       for (const url of pdfUrls) {
-        console.log(`Parsing PDF: ${url}`);
 
         // Try UCI parser first
         const uciParsed = await parseUciResultsPdfUrl(url);
         if (uciParsed && uciParsed.results.length > 0) {
-          console.log(`Parsed as UCI format: ${uciParsed.results.length} results (${uciParsed.ageCategory}/${uciParsed.gender})`);
           for (const result of uciParsed.results) {
             const name = normalizeName(`${result.lastName} ${result.firstName}`);
             allParsedResults.push({
@@ -146,11 +141,8 @@ export async function POST(
         // Fall back to Copa Catalana parser
         const parsed = await parseCopaCatalanaPdfUrl(url);
         if (!parsed || parsed.results.length === 0) {
-          console.log(`No results found in PDF: ${url}`);
           continue;
         }
-
-        console.log(`Found ${parsed.results.length} results in PDF from categories: ${parsed.categories.join(", ")}`);
         for (const result of parsed.results) {
           const mapped = mapCopaCatalanaCategory(result.category);
           if (!mapped) continue;
@@ -201,11 +193,8 @@ export async function POST(
     for (const [categoryKey, categoryResults] of resultsByCategory) {
       const race = raceLookup.get(categoryKey);
       if (!race) {
-        console.log(`No matching race for category ${categoryKey}, skipping ${categoryResults.length} results`);
         continue;
       }
-
-      console.log(`Importing ${categoryResults.length} results for ${race.name}`);
 
       // Delete existing results for this race (idempotent reimport)
       await db.delete(raceResults).where(eq(raceResults.raceId, race.id));

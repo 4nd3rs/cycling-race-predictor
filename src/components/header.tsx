@@ -42,8 +42,27 @@ export function Header() {
           </div>
         </Link>
 
+        {/* Desktop nav — visible md+ */}
+        <nav className="hidden md:flex items-center gap-1 mx-4">
+          {navigation.map((item) => {
+            const active = pathname === item.href || pathname.startsWith(item.href + "/");
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
+                  active ? "text-foreground bg-white/10" : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                )}
+              >
+                {item.name}
+              </Link>
+            );
+          })}
+        </nav>
+
         {/* Spacer */}
-        <div className="flex-1" />
+        <div className="flex-1 md:hidden" />
 
         {/* My Race Hub — primary CTA, always visible when signed in */}
         {isLoaded && isSignedIn && (
@@ -82,8 +101,8 @@ export function Header() {
           </div>
         )}
 
-        {/* Burger menu */}
-        <div className="relative" ref={menuRef}>
+        {/* Burger menu — mobile only */}
+        <div className="relative md:hidden" ref={menuRef}>
           <button
             onClick={() => setMenuOpen(o => !o)}
             aria-label="Menu"

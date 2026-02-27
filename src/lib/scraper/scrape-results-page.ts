@@ -102,7 +102,6 @@ function mapFilenameToCategory(
 export async function scrapeResultsPageUrls(
   pageUrl: string
 ): Promise<DiscoveredResultPdf[]> {
-  console.log(`[Results-Scraper] Fetching page: ${pageUrl}`);
 
   const response = await fetch(pageUrl);
   if (!response.ok) {
@@ -148,10 +147,6 @@ export async function scrapeResultsPageUrls(
       filename,
     });
   });
-
-  console.log(
-    `[Results-Scraper] Discovered ${discovered.length} result PDFs: ${discovered.map((d) => `${d.ageCategory}/${d.gender}`).join(", ")}`
-  );
 
   return discovered;
 }

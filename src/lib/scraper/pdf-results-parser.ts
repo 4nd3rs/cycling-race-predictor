@@ -216,18 +216,11 @@ export async function parseUciResultsPdf(
     const data = await pdfParse(buffer);
     const text: string = data.text;
 
-    console.log(`[UCI-Results] Parsing PDF, ${text.length} chars of text`);
-
     // Detect category and gender from header
     const categoryInfo = detectCategoryFromHeader(text);
     if (!categoryInfo) {
-      console.log("[UCI-Results] Could not detect category from header");
       return null;
     }
-
-    console.log(
-      `[UCI-Results] Detected: ${categoryInfo.ageCategory} ${categoryInfo.gender}`
-    );
 
     // Filter out header/empty lines
     const lines = text.split("\n").filter((l) => !isHeaderLine(l));
@@ -310,10 +303,6 @@ export async function parseUciResultsPdf(
 
       i += 3;
     }
-
-    console.log(
-      `[UCI-Results] Parsed ${results.length} results (${results.filter((r) => r.dnf).length} DNF, ${results.filter((r) => r.dns).length} DNS)`
-    );
 
     return {
       ageCategory: categoryInfo.ageCategory,

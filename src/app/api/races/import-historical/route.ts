@@ -343,6 +343,12 @@ async function updateRiderElo(
 }
 
 export async function POST(request: Request) {
+  // Admin-only: require CRON_SECRET
+  const authHeader = request.headers.get("authorization");
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   // Rate limit (very strict for scraping)
   const rateLimitResponse = await withRateLimit(request, "scrape");
   if (rateLimitResponse) return rateLimitResponse;

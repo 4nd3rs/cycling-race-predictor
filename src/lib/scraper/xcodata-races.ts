@@ -129,8 +129,6 @@ export async function scrapeXCOdataRacesList(
   // We filter by checking if the race has winners listed
   const url = `https://www.xcodata.com/races/?year=${year}&series=&country=`;
 
-  console.log(`Fetching XCOdata races list...`);
-
   const markdown = await fetchWithFirecrawl(url);
   const races: XCOdataRace[] = [];
 
@@ -194,8 +192,6 @@ export async function scrapeXCOdataRacesList(
       });
     }
   }
-
-  console.log(`Found ${races.length} races with results`);
   return races;
 }
 
@@ -207,8 +203,6 @@ export async function scrapeXCOdataRaceResults(
 ): Promise<XCOdataRaceResults | null> {
   const url = `https://www.xcodata.com/race/${raceId}/`;
 
-  console.log(`Fetching race results for ${raceId}...`);
-
   const markdown = await fetchWithFirecrawl(url);
 
   // Parse race info from the header
@@ -218,7 +212,6 @@ export async function scrapeXCOdataRaceResults(
   const classMatch = markdown.match(/\b(WCh|WC|HC|CS|C1|C2|C3|NC|CC|JO)\b/i);
 
   if (!nameMatch) {
-    console.log(`Could not parse race ${raceId}`);
     return null;
   }
 
@@ -388,13 +381,6 @@ export async function scrapeXCOdataRaceResults(
     }
   }
 
-  console.log(
-    `  Parsed ${categories.length} categories with ${categories.reduce(
-      (sum, c) => sum + c.results.length,
-      0
-    )} total results`
-  );
-
   return { race, categories };
 }
 
@@ -410,7 +396,6 @@ export async function scrapeAllRacesForYear(
   const allResults: XCOdataRaceResults[] = [];
 
   const racesToProcess = races.slice(0, maxRaces);
-  console.log(`Processing ${racesToProcess.length} races...`);
 
   for (const race of racesToProcess) {
     try {

@@ -176,12 +176,8 @@ function detectSections(text: string): SectionInfo[] {
  * Parse startlist from extracted PDF text (direct parsing, no AI)
  */
 export function parseStartlistText(text: string): ParsedStartlistData {
-  console.log(`[PDF-Startlist] Parsing ${text.length} chars of text (direct parser)...`);
 
   const sectionStarts = detectSections(text);
-  console.log(
-    `[PDF-Startlist] Found ${sectionStarts.length} sections: ${sectionStarts.map((s) => `${s.category}(${s.gender || "?"})`).join(", ")}`
-  );
 
   // Extract each section's text
   const sectionData: Array<{ category: string; gender: "M" | "W" | null; text: string }> = [];
@@ -221,11 +217,8 @@ export function parseStartlistText(text: string): ParsedStartlistData {
     const genderLabel = section.gender === "W" ? "Women" : section.gender === "M" ? "Men" : "?";
     if (categoryCount > 0) {
       foundCategories.push(section.category);
-      console.log(`[PDF-Startlist] ${section.category} ${genderLabel}: ${categoryCount} riders`);
     }
   }
-
-  console.log(`[PDF-Startlist] Total: ${allEntries.length} entries across ${foundCategories.length} categories`);
 
   return {
     eventName: null,

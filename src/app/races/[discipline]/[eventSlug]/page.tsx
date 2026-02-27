@@ -25,7 +25,7 @@ import {
   getSubDisciplineShortLabel,
   buildCategoryUrl,
   generateCategorySlug,
-} from "@/lib/url-utils";
+  normalizeUciCategory } from "@/lib/url-utils";
 import { formatCategoryDisplay } from "@/lib/category-utils";
 
 interface PageProps {
@@ -93,15 +93,6 @@ function wmoToEmoji(code: number): { emoji: string; desc: string } {
 
 // ── Data fetchers ─────────────────────────────────────────────────────────────
 
-
-function normalizeUciCategory(raw: string): string {
-  const map: Record<string, string> = {
-    "WorldTour": "WT", "1.Pro": "1.Pro", "WorldCup": "WC",
-    "Continental Series": "CS", "HC": "HC", "C1": "C1", "C2": "C2",
-    "CN": "CN", "WC": "WC", "CS": "CS", "1": "1.1", "2": "1.2", "3": "1.3",
-  };
-  return map[raw] ?? raw;
-}
 
 async function getEventBySlug(discipline: string, slug: string) {
   try {

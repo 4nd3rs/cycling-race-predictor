@@ -9,7 +9,7 @@ import { desc, eq, gte, lt, and, sql, isNotNull } from "drizzle-orm";
 import { format, formatDistanceToNow, differenceInDays } from "date-fns";
 import { toRaceDate, toDateStr } from "@/lib/utils";
 import { getFlag } from "@/lib/country-flags";
-import { buildEventUrl, buildRaceUrl, getDisciplineShortLabel } from "@/lib/url-utils";
+import { buildEventUrl, buildRaceUrl, getDisciplineShortLabel, normalizeUciCategory, getDisciplineColor } from "@/lib/url-utils";
 import { RaceLinksSection } from "@/components/race-links";
 import { EventListView } from "@/components/event-card";
 import { MyFeedWidget } from "@/components/my-feed-widget";
@@ -20,14 +20,6 @@ import { RaceFollowButton } from "@/components/race-follow-button";
 // HYPE SCORING — only prestigious races on the homepage
 // ---------------------------------------------------------------------------
 
-function normalizeUciCategory(raw: string): string {
-  const map: Record<string, string> = {
-    "WorldTour": "WT", "1.Pro": "1.Pro", "WorldCup": "WC",
-    "Continental Series": "CS", "HC": "HC", "C1": "C1", "C2": "C2",
-    "CN": "CN", "WC": "WC", "CS": "CS", "1": "1.1", "2": "1.2", "3": "1.3",
-  };
-  return map[raw] ?? raw;
-}
 
 function getHypeScore(uciCategory: string | null | undefined): number {
   const cat = (uciCategory || "").toUpperCase().trim();
@@ -190,16 +182,6 @@ async function getRecentResults() {
 // ---------------------------------------------------------------------------
 // HELPERS
 // ---------------------------------------------------------------------------
-
-function getDisciplineColor(discipline: string) {
-  switch (discipline) {
-    case "road": return "bg-blue-500/20 text-blue-400 border-blue-500/30";
-    case "mtb": return "bg-green-500/20 text-green-400 border-green-500/30";
-    case "cyclocross": return "bg-orange-500/20 text-orange-400 border-orange-500/30";
-    case "gravel": return "bg-amber-500/20 text-amber-400 border-amber-500/30";
-    default: return "bg-muted text-muted-foreground";
-  }
-}
 
 function getDisciplineLabel(discipline: string) {
   switch (discipline) {
@@ -429,13 +411,21 @@ export default async function Home({ searchParams }: HomePageProps) {
         </div>
       </main>
 
-        {/* ── FOLLOW ON WHATSAPP ──────────────────────────────────────── */}
-        <section className="border-t border-border/50">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-10">
-            <div className="flex items-center justify-between mb-4">
+        {/* ── VALUE PROP / CTA ─────────────────────────────────────────── */}
+        <section className="border-t border-border/50 bg-muted/5">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-12">
+            <div className="grid gap-8 md:grid-cols-3 text-center md:text-left">
               <div>
-                <h2 className="text-xl font-bold tracking-tight">Get Predictions on WhatsApp</h2>
-                <p className="text-sm text-muted-foreground mt-1">Follow our channels for race previews and results delivered straight to WhatsApp</p>
+                <h3 className="font-bold text-sm uppercase tracking-wide text-primary mb-2">TrueSkill Predictions</h3>
+                <p className="text-sm text-muted-foreground">ELO-based rankings across road and MTB. Know who's hot before the race starts.</p>
+              </div>
+              <div>
+                <h3 className="font-bold text-sm uppercase tracking-wide text-primary mb-2">Race Intelligence</h3>
+                <p className="text-sm text-muted-foreground">Weather analysis, TV schedules, rider intel, and startlists — all in one place.</p>
+              </div>
+              <div>
+                <h3 className="font-bold text-sm uppercase tracking-wide text-primary mb-2">Your Personal Feed</h3>
+                <p className="text-sm text-muted-foreground">Follow the races and riders you care about. Get alerts via Telegram or WhatsApp.</p>
               </div>
             </div>
           </div>
