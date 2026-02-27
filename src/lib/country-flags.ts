@@ -39,9 +39,27 @@ export const countryFlags: Record<string, string> = {
   ARG: "\u{1F1E6}\u{1F1F7}",
   MEX: "\u{1F1F2}\u{1F1FD}",
   CHI: "\u{1F1E8}\u{1F1F1}",
+  EST: "\u{1F1EA}\u{1F1EA}",
+  LAT: "\u{1F1F1}\u{1F1FB}",
+  LTU: "\u{1F1F1}\u{1F1F9}",
+  SVK: "\u{1F1F8}\u{1F1F0}",
+  HUN: "\u{1F1ED}\u{1F1FA}",
+  SRB: "\u{1F1F7}\u{1F1F8}",
+  ROU: "\u{1F1F7}\u{1F1F4}",
+  BUL: "\u{1F1E7}\u{1F1EC}",
+  GRE: "\u{1F1EC}\u{1F1F7}",
+  TUR: "\u{1F1F9}\u{1F1F7}",
+  MAR: "\u{1F1F2}\u{1F1E6}",
+  URU: "\u{1F1FA}\u{1F1FE}",
+  PER: "\u{1F1F5}\u{1F1EA}",
+  CHL: "\u{1F1E8}\u{1F1F1}",
+  KOR: "\u{1F1F0}\u{1F1F7}",
+  CHN: "\u{1F1E8}\u{1F1F3}",
+  SVN: "\u{1F1F8}\u{1F1EE}",
+  HRV: "\u{1F1ED}\u{1F1F7}",
 };
 
 export function getFlag(countryCode: string | null | undefined): string {
-  if (!countryCode) return "\u{1F3F3}\u{FE0F}";
-  return countryFlags[countryCode.toUpperCase()] ?? "\u{1F3F3}\u{FE0F}";
+  if (!countryCode) return "";
+  return countryFlags[countryCode.toUpperCase()] ?? "";
 }
