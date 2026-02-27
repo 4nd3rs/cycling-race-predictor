@@ -31,7 +31,7 @@ export function IntelCard({
   const intelType = getIntelType(score);
 
   return (
-    <Card className="border-border/50 hover:border-border transition-colors">
+    <Card className="border-border/50 hover:border-border transition-colors overflow-hidden w-full">
       <CardContent className="p-4">
         <div className="flex items-start gap-3">
           <span className="text-lg mt-0.5 shrink-0">
@@ -50,7 +50,7 @@ export function IntelCard({
               </Badge>
             </div>
             {summary && (
-              <p className="text-sm text-muted-foreground line-clamp-2">
+              <p className="text-sm text-muted-foreground line-clamp-2 break-words overflow-hidden">
                 {summary}
               </p>
             )}
