@@ -70,7 +70,7 @@ const OMLOOP: RaceProfile = {
   raceCharacter: "The traditional season opener for Belgian classics. A relentlessly punchy course through the Flemish Ardennes rewards attackers — the Muur with 12km to go is the decisive moment. Often animated by crosswind echelons on the open roads early on.",
   firstEdition: 1945,
   pastWinners: [
-    { year: 2025, name: "Mathieu van der Poel", team: "Alpecin-Deceuninck" },
+    { year: 2025, name: "Søren Wærenskjold", team: "Uno-X Mobility" },
     { year: 2024, name: "Mathieu van der Poel", team: "Alpecin-Deceuninck" },
     { year: 2023, name: "Wout van Aert", team: "Jumbo-Visma" },
     { year: 2022, name: "Christophe Laporte", team: "Jumbo-Visma" },
