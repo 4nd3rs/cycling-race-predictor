@@ -236,7 +236,7 @@ async function upsertRace(race: ScrapedRace): Promise<"inserted" | "existed" | "
     // Skip known duplicate/alias slugs  
     if (BLOCKED_PCS_SLUGS.has(baseSlug)) {
       console.log(`  ⊘ Skipped blocked slug: ${baseSlug} (${race.name})`);
-      continue;
+      return "existed";
     }
     const existingSlugs = await db
       .select({ slug: schema.raceEvents.slug })
