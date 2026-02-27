@@ -34,6 +34,19 @@ async function getScheduleData(clerkId: string) {
         .orderBy(desc(raceEvents.date)).limit(10)
     : [];
 
+  // Individual race category follows (follow_type = "race")
+  const raceFollowIds = follows.filter(f => f.followType === "race").map(f => f.entityId);
+  const followedRaceCategories = raceFollowIds.length > 0
+    ? await db.select({
+        race: races,
+        event: raceEvents,
+      })
+      .from(races)
+      .innerJoin(raceEvents, eq(races.raceEventId, raceEvents.id))
+      .where(and(inArray(races.id, raceFollowIds), gte(raceEvents.date, today)))
+      .orderBy(raceEvents.date).limit(20)
+    : [];
+
   // Rider races (upcoming, next 60 days)
   const sixtyDaysAhead = new Date(Date.now() + 60 * 86400000).toISOString().split("T")[0];
   const riderRaceRows = riderIds.length > 0

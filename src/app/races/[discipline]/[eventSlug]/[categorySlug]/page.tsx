@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Header } from "@/components/header";
 import { PredictionList } from "@/components/prediction-card";
 import { TelegramSubscribeButton } from "@/components/telegram-subscribe-button";
+import { FollowButton } from "@/components/follow-button";
 import { RaceLinksSection } from "@/components/race-links";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -736,6 +737,7 @@ export default async function CategoryPage({ params }: PageProps) {
                       View source PDF ↗
                     </a>
                   )}
+                  <FollowButton followType="race" entityId={race.id} entityName={`${event.name} – ${race.gender === "men" ? "M" : "F"}${race.ageCategory === "elite" ? "" : race.ageCategory === "u23" ? " U23" : race.ageCategory === "junior" ? " Junior" : ""}`} />
                   <TelegramSubscribeButton />
                 </div>
 
