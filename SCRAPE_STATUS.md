@@ -1,6 +1,6 @@
 # SCRAPE_STATUS.md — Pipeline Status
 
-_Last updated: 2026-02-27 20:29:14 (Stockholm)_
+_Last updated: 2026-02-27 22:29:16 (Stockholm)_
 
 ## 📅 Race Calendar
 - **Last run:** 2026-02-27 19:30:00
@@ -22,7 +22,7 @@ _Last updated: 2026-02-27 20:29:14 (Stockholm)_
 | Paris-Nice - Elite Men | 2026-03-08 | 84 | ✅ up to date | 2026-02-27 20:06:39 |
 
 ## 🏁 Results
-- **Last run:** 2026-02-27 20:29:14
+- **Last run:** 2026-02-27 22:29:16
 - **Status:** ✅ OK
 - No races needing results
 
@@ -83,7 +83,7 @@ _Last updated: 2026-02-27 20:29:14 (Stockholm)_
     "component": "results",
     "status": "ok",
     "summary": "No races needing results",
-    "updatedAt": "2026-02-27 20:29:14"
+    "updatedAt": "2026-02-27 22:29:16"
   },
   "calendar": {
     "component": "calendar",

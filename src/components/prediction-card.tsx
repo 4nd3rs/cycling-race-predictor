@@ -37,6 +37,9 @@ interface PredictionRowProps {
   uciPoints?: number;
   supercupPoints?: number;
   eloScore?: number;
+  winProbability?: number;
+  reasoning?: string;
+  source?: string;
   hasEnoughData?: boolean;
   showSupercup?: boolean;
 }
@@ -58,6 +61,9 @@ function PredictionRow({
   uciPoints,
   supercupPoints,
   eloScore,
+  winProbability,
+  reasoning,
+  source,
   hasEnoughData,
   showSupercup,
 }: PredictionRowProps) {
@@ -86,7 +92,7 @@ function PredictionRow({
         </div>
       )}
 
-      {/* Name, Flag & Team */}
+      {/* Name, Flag, Team & Reasoning */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span className="font-medium truncate hover:underline">{riderName}</span>
@@ -104,13 +110,25 @@ function PredictionRow({
         {teamName && (
           <div className="text-xs text-muted-foreground truncate">{teamName}</div>
         )}
+        {reasoning && source === "ai" && (
+          <div className="text-xs text-muted-foreground/70 truncate mt-0.5 italic">{reasoning}</div>
+        )}
       </div>
 
-      {/* UCI Points */}
-      <div className="w-14 text-right shrink-0">
-        <div className="text-xs text-muted-foreground">UCI</div>
-        <div className="font-semibold text-sm">{uciPoints ? uciPoints : "—"}</div>
-      </div>
+      {/* Win probability (AI) or UCI points (ELO) */}
+      {source === "ai" ? (
+        <div className="w-14 text-right shrink-0">
+          <div className="text-xs text-muted-foreground">Win</div>
+          <div className="font-semibold text-sm text-[#C8102E]">
+            {winProbability ? `${(winProbability * 100).toFixed(0)}%` : "—"}
+          </div>
+        </div>
+      ) : (
+        <div className="w-14 text-right shrink-0">
+          <div className="text-xs text-muted-foreground">UCI</div>
+          <div className="font-semibold text-sm">{uciPoints ? uciPoints : "—"}</div>
+        </div>
+      )}
 
       {/* SuperCup Points */}
       {showSupercup && (
@@ -120,13 +138,15 @@ function PredictionRow({
         </div>
       )}
 
-      {/* ELO Score */}
-      <div className="w-14 text-right shrink-0">
-        <div className="text-xs text-muted-foreground">ELO</div>
-        <div className="font-semibold text-sm">
-          {eloScore !== undefined ? Math.round(eloScore) : "—"}
+      {/* ELO Score — hide for AI predictions */}
+      {source !== "ai" && (
+        <div className="w-14 text-right shrink-0">
+          <div className="text-xs text-muted-foreground">ELO</div>
+          <div className="font-semibold text-sm">
+            {eloScore !== undefined ? Math.round(eloScore) : "—"}
+          </div>
         </div>
-      </div>
+      )}
     </Link>
   );
 }
@@ -144,6 +164,7 @@ interface PredictionListProps {
     podiumProbability: number;
     top10Probability: number;
     reasoning?: string;
+    source?: string;
     uciPoints?: number;
     uciRank?: number | null;
     supercupPoints?: number;
@@ -207,57 +228,31 @@ export function PredictionList({
 
   const displayPredictions = maxItems ? positioned.slice(0, maxItems) : positioned;
 
+  const isAiPowered = predictions.some(p => p.source === "ai");
+
   return (
     <div>
-      {/* Sort toggle */}
-      <div className="flex items-center gap-1 mb-3 p-1 bg-muted rounded-lg w-fit">
-        <button
-          onClick={() => setSortMode("predicted")}
-          className={cn(
-            "px-3 py-1 text-sm rounded-md transition-colors",
-            sortMode === "predicted"
-              ? "bg-background shadow-sm font-medium"
-              : "text-muted-foreground hover:text-foreground"
+      {/* AI badge */}
+      {isAiPowered && (
+        <div className="flex items-center gap-2 mb-3">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-[#C8102E]/10 text-[#C8102E] border border-[#C8102E]/20">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#C8102E] animate-pulse inline-block" />
+            AI Predictions
+          </span>
+          <span className="text-xs text-muted-foreground">Based on terrain, form & race news</span>
+        </div>
+      )}
+      {/* Sort toggle — hidden for AI predictions */}
+      {!isAiPowered && (
+        <div className="flex items-center gap-1 mb-3 p-1 bg-muted rounded-lg w-fit">
+          <button onClick={() => setSortMode("predicted")} className={cn("px-3 py-1 text-sm rounded-md transition-colors", sortMode === "predicted" ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:text-foreground")}>Predicted</button>
+          <button onClick={() => setSortMode("elo")} className={cn("px-3 py-1 text-sm rounded-md transition-colors", sortMode === "elo" ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:text-foreground")}>ELO Rating</button>
+          <button onClick={() => setSortMode("uci")} className={cn("px-3 py-1 text-sm rounded-md transition-colors", sortMode === "uci" ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:text-foreground")}>UCI Points</button>
+          {isSuperCup && (
+            <button onClick={() => setSortMode("supercup")} className={cn("px-3 py-1 text-sm rounded-md transition-colors", sortMode === "supercup" ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:text-foreground")}>SuperCup</button>
           )}
-        >
-          Predicted
-        </button>
-        <button
-          onClick={() => setSortMode("elo")}
-          className={cn(
-            "px-3 py-1 text-sm rounded-md transition-colors",
-            sortMode === "elo"
-              ? "bg-background shadow-sm font-medium"
-              : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          ELO Rating
-        </button>
-        <button
-          onClick={() => setSortMode("uci")}
-          className={cn(
-            "px-3 py-1 text-sm rounded-md transition-colors",
-            sortMode === "uci"
-              ? "bg-background shadow-sm font-medium"
-              : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          UCI Points
-        </button>
-        {isSuperCup && (
-          <button
-            onClick={() => setSortMode("supercup")}
-            className={cn(
-              "px-3 py-1 text-sm rounded-md transition-colors",
-              sortMode === "supercup"
-                ? "bg-background shadow-sm font-medium"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            SuperCup
-          </button>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="border rounded-lg divide-y">
         {displayPredictions.map((pred, index) => (
@@ -273,6 +268,9 @@ export function PredictionList({
             uciPoints={pred.uciPoints}
             supercupPoints={pred.supercupPoints}
             eloScore={pred.eloScore}
+            winProbability={pred.winProbability}
+            reasoning={pred.reasoning}
+            source={pred.source}
             hasEnoughData={pred.hasEnoughData}
             showSupercup={isSuperCup}
           />

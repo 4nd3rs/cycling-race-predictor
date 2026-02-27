@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { db, races, predictions, riders, raceStartlist, riderDisciplineStats, raceResults, riderRumours, teams, raceEvents, raceNews } from "@/lib/db";
-import { eq, desc, and, or, gte, ne, inArray, isNull } from "drizzle-orm";
+import { eq, desc, and, or, gte, ne, inArray, isNull, sql } from "drizzle-orm";
 import { format, formatDistanceToNow } from "date-fns";
 import { generateRacePredictions, calculateForm, type RiderPredictionInput, type RecentResult, RACE_CATEGORY_WEIGHTS, type ProfileType } from "@/lib/prediction";
 import { formatCategoryDisplay } from "@/lib/category-utils";
@@ -193,6 +193,14 @@ async function getRacePredictions(raceId: string, race: typeof races.$inferSelec
     const ageCategories = ageCategory === "u23" ? ["u23", "elite"] : [ageCategory];
 
     // Get predictions with rider and stats
+    // Prefer AI predictions — if any exist, only return those
+    const aiCheck = await db
+      .select({ id: predictions.id })
+      .from(predictions)
+      .where(and(eq(predictions.raceId, raceId), sql`source = 'ai'`))
+      .limit(1);
+    const hasAi = aiCheck.length > 0;
+
     const results = await db
       .select({
         prediction: predictions,
@@ -214,7 +222,11 @@ async function getRacePredictions(raceId: string, race: typeof races.$inferSelec
               eq(riderDisciplineStats.discipline, race.discipline)
             )
       )
-      .where(eq(predictions.raceId, raceId));
+      .where(
+        hasAi
+          ? and(eq(predictions.raceId, raceId), sql`${predictions}.source = 'ai'`)
+          : eq(predictions.raceId, raceId)
+      );
 
     // Get team info from startlist separately
     const startlistTeams = await db
@@ -602,9 +614,16 @@ export default async function CategoryPage({ params }: PageProps) {
   // Get sibling races
   const siblingRaces = await getSiblingRaces(event.id, race.id, discipline, eventSlug);
 
-  // Generate predictions if needed
+  // Generate ELO predictions only if no AI predictions exist
   if (startlist.length > 0 && !isCompleted) {
-    await generatePredictionsIfNeeded(race, startlist.length);
+    const aiExists = await db
+      .select({ id: predictions.id })
+      .from(predictions)
+      .where(and(eq(predictions.raceId, race.id), sql`source = 'ai'`))
+      .limit(1);
+    if (aiExists.length === 0) {
+      await generatePredictionsIfNeeded(race, startlist.length);
+    }
   }
 
   // Get race intel (rumours for riders on the startlist) + weather in parallel
@@ -637,6 +656,7 @@ export default async function CategoryPage({ params }: PageProps) {
         podiumProbability: hasEnoughData ? parseFloat(prediction.podiumProbability || "0") : 0,
         top10Probability: hasEnoughData ? parseFloat(prediction.top10Probability || "0") : 0,
         reasoning: prediction.reasoning || undefined,
+        source: (prediction as any).source || 'elo',
         uciPoints: stats?.uciPoints ? parseInt(String(stats.uciPoints)) : 0,
         uciRank: stats?.uciRank || null,
         supercupPoints: stats?.supercupPoints ? parseInt(String(stats.supercupPoints)) : 0,

@@ -146,12 +146,14 @@ async function main() {
 
     if (followRows.length === 0) { console.log("  No followers."); continue; }
 
-    // Top 5 predictions
+    // Top 5 predictions — prefer AI source
+    const aiFlag = await sql`SELECT 1 FROM predictions WHERE race_id = ${race.race_id} AND source = 'ai' LIMIT 1`;
+    const hasAi = (aiFlag as any[]).length > 0;
     const topPreds = await sql`
-      SELECT p.predicted_position, p.win_probability, r.name as rider_name
+      SELECT p.predicted_position, p.win_probability, r.name as rider_name, p.reasoning
       FROM predictions p JOIN riders r ON p.rider_id = r.id
-      WHERE p.race_id = ${race.race_id}
-      ORDER BY p.win_probability DESC NULLS LAST LIMIT 5
+      WHERE p.race_id = ${race.race_id} AND (${hasAi} = false OR p.source = 'ai')
+      ORDER BY p.predicted_position ASC NULLS LAST LIMIT 5
     `;
 
     // Recent news
