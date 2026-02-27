@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { db, users, userFollows, raceEvents, races, raceStartlist, riders, raceResults } from "@/lib/db";
+import { teams } from "@/lib/db";
 import { eq, and, gte, lte, lt, inArray, desc } from "drizzle-orm";
 import Link from "next/link";
 import { Header } from "@/components/header";
@@ -59,12 +60,18 @@ async function getScheduleData(clerkId: string) {
   }
   const riderRaces = Array.from(riderEventMap.values()).sort((a, b) => new Date(a.event.date).getTime() - new Date(b.event.date).getTime());
 
+  const teamIds = follows.filter(f => f.followType === "team").map(f => f.entityId);
+  const followedTeams = teamIds.length > 0
+    ? await db.select({ id: teams.id, name: teams.name, logoUrl: teams.logoUrl, country: teams.country, division: teams.division })
+        .from(teams).where(inArray(teams.id, teamIds)).limit(30)
+    : [];
+
   const followedRiders = riderIds.length > 0
     ? await db.select({ id: riders.id, name: riders.name, photoUrl: riders.photoUrl, nationality: riders.nationality })
         .from(riders).where(inArray(riders.id, riderIds)).limit(50)
     : [];
 
-  return { upcomingEvents: upcomingEvents.map(r => r.event), pastEvents: pastEvents.map(r => r.event), riderRaces, followedRiders, riderCount: riderIds.length, eventCount: raceEventIds.length };
+  return { upcomingEvents: upcomingEvents.map(r => r.event), pastEvents: pastEvents.map(r => r.event), riderRaces, followedRiders, followedTeams, riderCount: riderIds.length, eventCount: raceEventIds.length, teamCount: teamIds.length };
 }
 
 function EventRow({ event, riders: riderList }: {
@@ -128,7 +135,7 @@ export default async function MySchedulePage() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold">My Schedule</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            {data.eventCount} followed {data.eventCount === 1 ? "race" : "races"} · {data.riderCount} followed {data.riderCount === 1 ? "rider" : "riders"}
+            {data.eventCount} followed {data.eventCount === 1 ? "race" : "races"} · {data.riderCount} followed {data.riderCount === 1 ? "rider" : "riders"}{data.teamCount > 0 ? ` · ${data.teamCount} followed ${data.teamCount === 1 ? "team" : "teams"}` : ""}
           </p>
         </div>
 
@@ -183,7 +190,30 @@ export default async function MySchedulePage() {
             </div>
           )}
 
-          {data.eventCount === 0 && data.riderCount === 0 && (
+          {/* Followed teams */}
+          {data.followedTeams.length > 0 && (
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3">Followed teams</h2>
+              <div className="flex flex-wrap gap-2">
+                {data.followedTeams.map(t => (
+                  <Link key={t.id} href={`/teams/${t.id}`} className="flex items-center gap-2 rounded-full border border-border/40 px-3 py-1.5 text-sm hover:bg-muted/20 transition-colors">
+                    {t.logoUrl ? (
+                      <img src={t.logoUrl} alt={t.name} className="h-5 w-5 object-contain" />
+                    ) : (
+                      <span className="h-5 w-5 rounded-full bg-muted flex items-center justify-center text-[9px] font-bold">
+                        {t.name.slice(0, 2).toUpperCase()}
+                      </span>
+                    )}
+                    <span className="truncate max-w-[180px]">{t.name}</span>
+                    {t.country && <span className="text-base">{getFlag(t.country)}</span>}
+                    {t.division && <span className="text-[10px] text-muted-foreground font-mono">{t.division}</span>}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {data.eventCount === 0 && data.riderCount === 0 && data.teamCount === 0 && (
             <div className="text-center py-16">
               <p className="text-muted-foreground mb-4">You haven&apos;t followed any races or riders yet.</p>
               <div className="flex gap-3 justify-center">
