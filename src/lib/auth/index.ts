@@ -51,9 +51,14 @@ export async function getAuthUser(): Promise<AuthUser | null> {
     user = newUser;
   }
 
-  // Determine role from Clerk metadata
-  const clerkUser = await currentUser();
-  const role = (clerkUser?.publicMetadata?.role as UserRole) || "free";
+  // Determine role from Clerk metadata (best-effort — don't fail if Clerk is slow)
+  let role: UserRole = "free";
+  try {
+    const clerkUser = await currentUser();
+    role = (clerkUser?.publicMetadata?.role as UserRole) || "free";
+  } catch {
+    // Clerk dev rate limits or network error — default to free
+  }
 
   return {
     id: user.id,

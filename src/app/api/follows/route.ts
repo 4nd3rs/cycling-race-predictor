@@ -51,6 +51,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  try {
   const user = await requireAuth();
   const { followType, entityId } = await req.json();
 
@@ -73,9 +74,15 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ ok: true });
+  } catch (e: any) {
+    if (e instanceof Response) return e;
+    console.error("[follows POST]", e);
+    return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
+  }
 }
 
 export async function DELETE(req: NextRequest) {
+  try {
   const user = await requireAuth();
   const { followType, entityId } = await req.json();
 
@@ -94,6 +101,11 @@ export async function DELETE(req: NextRequest) {
     );
 
   return NextResponse.json({ ok: true });
+  } catch (e: any) {
+    if (e instanceof Response) return e;
+    console.error("[follows DELETE]", e);
+    return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
+  }
 }
 
 async function sendFollowNotification(

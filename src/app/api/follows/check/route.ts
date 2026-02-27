@@ -4,6 +4,7 @@ import { db, userFollows } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 
 export async function GET(req: NextRequest) {
+  try {
   const user = await requireAuth();
 
   const followType = req.nextUrl.searchParams.get("followType");
@@ -26,4 +27,9 @@ export async function GET(req: NextRequest) {
     .limit(1);
 
   return NextResponse.json({ following: !!existing });
+  } catch (e: any) {
+    if (e instanceof Response) return e;
+    console.error("[follows/check]", e);
+    return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
+  }
 }
