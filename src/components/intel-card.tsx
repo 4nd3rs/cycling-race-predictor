@@ -1,11 +1,10 @@
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { formatDistanceToNow } from "date-fns";
 
 interface IntelCardProps {
   riderId: string;
   riderName: string;
+  photoUrl?: string | null;
   summary: string | null;
   aggregateScore: string | null;
   tipCount: number | null;
@@ -13,56 +12,68 @@ interface IntelCardProps {
 }
 
 function getIntelType(score: number): { label: string; className: string } {
-  if (score < -0.3) return { label: "INJURY", className: "bg-red-500/20 text-red-400 border-red-500/30" };
-  if (score > 0.3) return { label: "FORM", className: "bg-green-500/20 text-green-400 border-green-500/30" };
-  if (score > 0) return { label: "TRANSFER", className: "bg-blue-500/20 text-blue-400 border-blue-500/30" };
-  return { label: "INTEL", className: "bg-purple-500/20 text-purple-400 border-purple-500/30" };
+  if (score < -0.3) return { label: "INJURY", className: "text-red-400 bg-red-500/15 border-red-500/30" };
+  if (score > 0.3) return { label: "FORM", className: "text-green-400 bg-green-500/15 border-green-500/30" };
+  if (score > 0) return { label: "TRANSFER", className: "text-blue-400 bg-blue-500/15 border-blue-500/30" };
+  return { label: "INTEL", className: "text-muted-foreground bg-muted/40 border-border/40" };
 }
 
 export function IntelCard({
   riderId,
   riderName,
+  photoUrl,
   summary,
   aggregateScore,
   tipCount,
   lastUpdated,
 }: IntelCardProps) {
   const score = parseFloat(aggregateScore || "0");
-  const intelType = getIntelType(score);
+  const { label, className } = getIntelType(score);
+  const initials = riderName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
 
   return (
-    <Card className="border-border/50 hover:border-border transition-colors overflow-hidden w-full">
-      <CardContent className="p-4">
-        <div className="flex items-start gap-3">
-          <span className="text-lg mt-0.5 shrink-0">
-            {"\u{1F575}\u{FE0F}"}
-          </span>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <Link
-                href={`/riders/${riderId}`}
-                className="font-semibold text-sm hover:text-primary transition-colors truncate"
-              >
-                {riderName}
-              </Link>
-              <Badge variant="outline" className={`text-[10px] px-1.5 py-0 shrink-0 ${intelType.className}`}>
-                {intelType.label}
-              </Badge>
-            </div>
-            {summary && (
-              <p className="text-sm text-muted-foreground line-clamp-2 break-words overflow-hidden">
-                {summary}
-              </p>
-            )}
-            <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-              <span>{formatDistanceToNow(lastUpdated, { addSuffix: true })}</span>
-              {tipCount && tipCount > 0 && (
-                <span>{tipCount} {tipCount === 1 ? "source" : "sources"}</span>
-              )}
-            </div>
+    <Link
+      href={`/riders/${riderId}`}
+      className="flex items-start gap-3 py-3 px-3 rounded-lg hover:bg-muted/20 transition-colors group border border-transparent hover:border-border/30"
+    >
+      {/* Rider photo */}
+      <div className="shrink-0 mt-0.5">
+        {photoUrl ? (
+          <img
+            src={photoUrl}
+            alt={riderName}
+            className="w-9 h-9 rounded-full object-cover object-top border border-border/30"
+          />
+        ) : (
+          <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground">
+            {initials}
           </div>
+        )}
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0 overflow-hidden">
+        <div className="flex items-center gap-2 mb-1 flex-wrap">
+          <span className="font-semibold text-sm group-hover:text-primary transition-colors truncate">
+            {riderName}
+          </span>
+          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${className}`}>
+            {label}
+          </span>
         </div>
-      </CardContent>
-    </Card>
+        {summary && (
+          <p className="text-xs text-muted-foreground line-clamp-2 break-words leading-relaxed">
+            {summary}
+          </p>
+        )}
+        <div className="flex items-center gap-3 mt-1.5 text-[11px] text-muted-foreground/70">
+          <span>{formatDistanceToNow(lastUpdated, { addSuffix: true })}</span>
+          {tipCount && tipCount > 0 && (
+            <span>{tipCount} {tipCount === 1 ? "source" : "sources"}</span>
+          )}
+          <span className="ml-auto text-primary/60 group-hover:text-primary transition-colors text-[11px]">View profile →</span>
+        </div>
+      </div>
+    </Link>
   );
 }

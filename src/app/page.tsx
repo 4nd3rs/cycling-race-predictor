@@ -140,7 +140,7 @@ async function getLatestIntel() {
     const result = await db
       .select({
         rumour: riderRumours,
-        rider: riders,
+        rider: { id: riders.id, name: riders.name, photoUrl: riders.photoUrl },
       })
       .from(riderRumours)
       .innerJoin(riders, eq(riderRumours.riderId, riders.id))
@@ -363,12 +363,13 @@ export default async function Home({ searchParams }: HomePageProps) {
                 Latest Intel
               </h2>
               {latestIntel.length > 0 ? (
-                <div className="space-y-3">
+                <div className="rounded-lg border border-border/40 overflow-hidden divide-y divide-border/20">
                   {latestIntel.map(({ rumour, rider }) => (
                     <IntelCard
                       key={rumour.id}
                       riderId={rider.id}
                       riderName={rider.name}
+                      photoUrl={rider.photoUrl}
                       summary={rumour.summary}
                       aggregateScore={rumour.aggregateScore}
                       tipCount={rumour.tipCount}
