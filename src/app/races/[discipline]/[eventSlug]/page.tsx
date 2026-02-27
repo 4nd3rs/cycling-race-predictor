@@ -4,6 +4,8 @@ import { Header } from "@/components/header";
 import { Badge } from "@/components/ui/badge";
 import { TelegramSubscribeButton } from "@/components/telegram-subscribe-button";
 import { RaceLinksSection } from "@/components/race-links";
+import { getRaceProfile } from "@/lib/race-profiles";
+import { analyzeRaceWeather } from "@/lib/weather-analysis";
 import { FollowButton } from "@/components/follow-button";
 import {
   db,
@@ -284,6 +286,9 @@ export default async function EventPage({ params }: PageProps) {
   ]);
 
   const wx = weather ? wmoToEmoji(weather.weatherCode) : null;
+  const raceProfile = getRaceProfile(event.slug ?? "", event.name ?? "");
+  const intelHeadlines = Object.values(intelPerRace).flat().map((i: any) => i.title || i.content || "");
+  const weatherAnalysis = weather ? analyzeRaceWeather(weather, raceProfile, intelHeadlines) : null;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -378,7 +383,7 @@ export default async function EventPage({ params }: PageProps) {
 
               {/* Right: weather card */}
               {weather && wx && (
-                <div className="lg:w-60 shrink-0">
+                <div className="lg:w-64 shrink-0">
                   <div className="rounded-xl border border-border/60 bg-muted/20 p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Race Day Weather</span>
@@ -393,20 +398,105 @@ export default async function EventPage({ params }: PageProps) {
                     </div>
                     <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/30">
                       <div className="text-xs">
-                        <p className="text-muted-foreground">💧 Rain</p>
+                        <p className="text-muted-foreground">Rain</p>
                         <p className="font-semibold">{weather.precipMm} mm</p>
                       </div>
                       <div className="text-xs">
-                        <p className="text-muted-foreground">💨 Wind</p>
+                        <p className="text-muted-foreground">Wind</p>
                         <p className="font-semibold">{weather.windKmh} km/h</p>
                       </div>
                     </div>
+                    {weatherAnalysis && (
+                      <div className="pt-2 border-t border-border/30 space-y-2">
+                        <p className="text-xs text-muted-foreground italic leading-snug">{weatherAnalysis.summary}</p>
+                        {weatherAnalysis.alerts.map((alert: string, i: number) => (
+                          <div key={i} className="flex gap-1.5 items-start">
+                            <span className="text-amber-400 text-xs shrink-0 mt-0.5">▲</span>
+                            <p className="text-xs text-amber-300/90 leading-snug">{alert}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
             </div>
           </div>
         </section>
+
+
+        {/* ── RACE PROFILE ──────────────────────────────────────────────── */}
+        {raceProfile && (
+          <section className="border-b border-border/50">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-6">
+              <h2 className="text-base font-semibold uppercase tracking-wide text-muted-foreground mb-4">Race Profile</h2>
+              <div className="grid gap-6 lg:grid-cols-3">
+                {/* Stats */}
+                <div className="flex flex-wrap gap-4 lg:col-span-1 content-start">
+                  {raceProfile.distanceKm && (
+                    <div className="min-w-[80px]">
+                      <p className="text-xs text-muted-foreground">Distance</p>
+                      <p className="text-xl font-bold tabular-nums">{raceProfile.distanceKm}<span className="text-sm font-normal text-muted-foreground ml-1">km</span></p>
+                    </div>
+                  )}
+                  {raceProfile.elevationGainM && (
+                    <div className="min-w-[80px]">
+                      <p className="text-xs text-muted-foreground">Elevation</p>
+                      <p className="text-xl font-bold tabular-nums">{raceProfile.elevationGainM.toLocaleString()}<span className="text-sm font-normal text-muted-foreground ml-1">m</span></p>
+                    </div>
+                  )}
+                  {raceProfile.cobbleSectors && (
+                    <div className="min-w-[80px]">
+                      <p className="text-xs text-muted-foreground">Cobble sectors</p>
+                      <p className="text-xl font-bold tabular-nums">{raceProfile.cobbleSectors}</p>
+                    </div>
+                  )}
+                  {raceProfile.firstEdition && (
+                    <div className="min-w-[80px]">
+                      <p className="text-xs text-muted-foreground">First edition</p>
+                      <p className="text-xl font-bold tabular-nums">{raceProfile.firstEdition}</p>
+                    </div>
+                  )}
+                  {raceProfile.surface && (
+                    <div className="w-full">
+                      <p className="text-xs text-muted-foreground mb-0.5">Surface</p>
+                      <p className="text-sm">{raceProfile.surface}</p>
+                    </div>
+                  )}
+                </div>
+                {/* Character + features */}
+                <div className="lg:col-span-2 space-y-3">
+                  <p className="text-sm text-muted-foreground leading-relaxed">{raceProfile.raceCharacter}</p>
+                  {raceProfile.keyFeatures.length > 0 && (
+                    <ul className="space-y-1">
+                      {raceProfile.keyFeatures.map((f: string, i: number) => (
+                        <li key={i} className="flex gap-2 text-sm">
+                          <span className="text-primary shrink-0 mt-0.5">—</span>
+                          <span>{f}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+              {/* Past winners */}
+              {raceProfile.pastWinners && raceProfile.pastWinners.length > 0 && (
+                <div className="mt-5 pt-5 border-t border-border/30">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Recent winners</p>
+                  <div className="flex flex-wrap gap-x-6 gap-y-1">
+                    {raceProfile.pastWinners.map((w) => (
+                      <div key={w.year} className="flex items-baseline gap-2 text-sm">
+                        <span className="text-muted-foreground font-mono w-10 shrink-0">{w.year}</span>
+                        <span className="font-medium">{w.name}</span>
+                        {w.team && <span className="text-xs text-muted-foreground">{w.team}</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
 
         {/* ── RACE PULSE: Latest News ──────────────────────────────────── */}
         {latestNews.length > 0 && (
