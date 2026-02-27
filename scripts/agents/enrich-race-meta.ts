@@ -1,9 +1,10 @@
 /**
  * enrich-race-meta.ts
+ *
  * Fetches XCOdata race detail pages for all upcoming MTB race_events and updates:
- *   - race_events.country (ISO 3-letter)
+ *   - race_events.country (ISO 3-letter from flag CSS class)
  *   - races.uci_category (from page title: "Race Name (C2)")
- *   - race_events.slug (fix bad slugs with dates/locations embedded)
+ *   - race_events.slug (fix bad slugs with dates/locations)
  *
  * Usage: npx tsx scripts/agents/enrich-race-meta.ts [--dry-run]
  */
@@ -14,8 +15,6 @@ import { neon } from "@neondatabase/serverless";
 import { eq, isNotNull } from "drizzle-orm";
 import * as schema from "../../src/lib/db/schema";
 import { generateEventSlug } from "../../src/lib/url-utils";
-import { chromium } from "playwright";
-
 
 const db = drizzle(neon(process.env.DATABASE_URL!), { schema });
 const DRY_RUN = process.argv.includes("--dry-run");
@@ -27,7 +26,7 @@ const ISO2_TO_3: Record<string, string> = {
   SI:"SVN", PT:"PRT", GB:"GBR", US:"USA", CA:"CAN", BR:"BRA",
   AR:"ARG", CL:"CHL", CO:"COL", ZA:"RSA", NA:"NAM", IN:"IND",
   JP:"JPN", AU:"AUS", NZ:"NZL", CN:"CHN", IL:"ISR", UA:"UKR",
-  RO:"ROU", BG:"BUL", TR:"TUR", CR:"CRC",
+  RO:"ROU", BG:"BUL", TR:"TUR",
 };
 
 const COUNTRY_TEXT: Record<string, string> = {
@@ -41,32 +40,37 @@ const COUNTRY_TEXT: Record<string, string> = {
 };
 
 function parseCountry(html: string): string | null {
-  // xcodata uses CSS flag sprites: class="flag-se" or similar
-  const m = html.match(/\bflag[_-]([a-z]{2})\b/i);
+  // xcodata uses CSS flag sprites: class="fi fi-se" or flag-se
+  const m = html.match(/\bfi[- ]fi[- ]([a-z]{2})\b/i) ?? html.match(/\bflag[_-]([a-z]{2})\b/i);
   if (m) return ISO2_TO_3[m[1].toUpperCase()] ?? null;
-  // alt text like <img alt="Sweden"
-  const alt = html.match(/alt="([A-Za-z ]+?)"/g);
-  if (alt) {
-    for (const a of alt) {
-      const name = a.replace(/alt="|"/g, "").toLowerCase();
-      if (COUNTRY_TEXT[name]) return COUNTRY_TEXT[name];
-    }
-  }
-  // text match
-  const lower = html.toLowerCase();
-  for (const [name, code] of Object.entries(COUNTRY_TEXT)) {
-    if (lower.includes(name)) return code;
+  // alt text like <img alt="Sweden">
+  const alts = html.matchAll(/alt="([A-Za-z ]+?)"/g);
+  for (const alt of alts) {
+    const name = alt[1].toLowerCase();
+    if (COUNTRY_TEXT[name]) return COUNTRY_TEXT[name];
   }
   return null;
 }
 
 function parseCategoryFromTitle(title: string): string | null {
-  const m = title.match(/\(([A-Z][A-Z0-9]*)\)\s*[|\-]/);
+  // "Klippingracet (C2) | XCODATA" or "World Cup (WC) | XCODATA"
+  const m = title.match(/\(([A-Z][A-Z0-9]*)\)\s*[|\-|$]/);
   return m ? m[1] : null;
 }
 
 function needsSlugFix(slug: string): boolean {
-  return /\d{4}|winner|sater|saeter|\bjun\b|\bfeb\b|\bmar\b|\bapr\b|\bmay\b/i.test(slug);
+  return /\d{4}|winner|sater|saeter|\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b/i.test(slug);
+}
+
+async function fetchPage(url: string): Promise<{ title: string; html: string }> {
+  const res = await fetch(url, {
+    headers: { "User-Agent": "Mozilla/5.0 (compatible; CyclingBot/1.0)" },
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const html = await res.text();
+  const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+  return { title: titleMatch?.[1] ?? "", html };
 }
 
 async function main() {
@@ -84,19 +88,21 @@ async function main() {
 
   console.log(`Found ${xcoEvents.length} upcoming XCOdata events\n`);
 
-  const browser = await chromium.launch({ headless: true });
+  // Deduplicate by sourceUrl
+  const seen = new Set<string>();
+  const unique = xcoEvents.filter(e => {
+    if (seen.has(e.sourceUrl!)) return false;
+    seen.add(e.sourceUrl!);
+    return true;
+  });
+
   let updated = 0, skipped = 0, failed = 0;
 
-  for (const event of xcoEvents) {
+  for (const event of unique) {
     const url = event.sourceUrl!;
     const raceDate = event.races[0]?.date ? new Date(event.races[0].date).toISOString().substring(0,10) : "?";
     try {
-      const page = await browser.newPage();
-      await page.goto(url, { waitUntil: "domcontentloaded", timeout: 15000 });
-      const title = await page.title();
-      const html = await page.content();
-      await page.close();
-
+      const { title, html } = await fetchPage(url);
       const newCategory = parseCategoryFromTitle(title);
       const newCountry = parseCountry(html);
       const newSlug = needsSlugFix(event.slug ?? "") ? generateEventSlug(event.name) : null;
@@ -104,12 +110,12 @@ async function main() {
       const changes: string[] = [];
       if (newCategory) changes.push(`cat:${newCategory}`);
       if (newCountry && !event.country) changes.push(`country:${newCountry}`);
-      if (newSlug) changes.push(`slug:${newSlug}`);
+      if (newSlug) changes.push(`slug:${event.slug} → ${newSlug}`);
 
       if (!changes.length) {
         process.stdout.write(".");
         skipped++;
-        await new Promise(r => setTimeout(r, 300));
+        await new Promise(r => setTimeout(r, 100));
         continue;
       }
 
@@ -131,14 +137,13 @@ async function main() {
         }
       }
       updated++;
-      await new Promise(r => setTimeout(r, 400));
+      await new Promise(r => setTimeout(r, 200));
     } catch (e: any) {
       console.error(`\n❌ ${event.name}: ${e.message?.split("\n")[0]}`);
       failed++;
     }
   }
 
-  await browser.close();
-  console.log(`\n\nDone: ${updated} updated, ${skipped} skipped (no changes), ${failed} failed${DRY_RUN ? " [DRY RUN]" : ""}`);
+  console.log(`\n\nDone: ${updated} updated, ${skipped} no-changes, ${failed} failed${DRY_RUN ? " [DRY RUN]" : ""}`);
 }
 main().catch(console.error);
