@@ -178,7 +178,24 @@ export default async function MyRaceHubPage({ searchParams }: { searchParams: Pr
   if (!data) redirect("/sign-in");
 
   const { tab = "schedule" } = await searchParams;
-  const activeTab = ["schedule", "following", "notifications"].includes(tab) ? tab : "schedule";
+  const activeTab = ["schedule", "following", "notifications", "feed"].includes(tab) ? tab : "schedule";
+
+  // Fetch notification feed
+  const feedItems = await import("@neondatabase/serverless").then(async ({ neon }) => {
+    const sql = neon(process.env.DATABASE_URL!);
+    return sql`
+      SELECT nl.message_type, nl.sent_at, nl.message_text,
+             re.name as event_name, re.slug as event_slug, re.discipline
+      FROM notification_log nl
+      LEFT JOIN races r ON r.id = nl.race_id
+      LEFT JOIN race_events re ON re.id = r.race_event_id
+      WHERE nl.user_id = ${data.user.id}
+        AND nl.message_text IS NOT NULL
+        AND nl.channel = 'telegram'
+      ORDER BY nl.sent_at DESC
+      LIMIT 30
+    `;
+  }).catch(() => []);
 
   const { user } = data;
   const initials = (user.name || user.email || "U").split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2);
@@ -186,6 +203,7 @@ export default async function MyRaceHubPage({ searchParams }: { searchParams: Pr
   const tabs = [
     { id: "schedule", label: "Schedule" },
     { id: "following", label: "Following" },
+    { id: "feed", label: "My Feed" },
     { id: "notifications", label: "Notifications" },
   ];
 
@@ -347,6 +365,56 @@ export default async function MyRaceHubPage({ searchParams }: { searchParams: Pr
         )}
 
         {/* ── NOTIFICATIONS TAB ─────────────────────────────────────────── */}
+        {activeTab === "feed" && (
+          <div className="space-y-4 max-w-2xl">
+            {feedItems.length === 0 ? (
+              <div className="rounded-xl border border-border/50 bg-card/20 p-8 text-center">
+                <p className="text-muted-foreground text-sm">No messages yet. Connect Telegram or WhatsApp and follow some riders to get started.</p>
+              </div>
+            ) : (
+              feedItems.map((item: any, i: number) => {
+                const typeLabel: Record<string, string> = {
+                  preview: "Race Preview",
+                  raceday: "Race Day",
+                  breaking: "Breaking",
+                  result: "Result",
+                };
+                const date = new Date(item.sent_at);
+                const text = (item.message_text as string)
+                  .replace(/https?:\/\/\S+/g, "")
+                  .trim();
+                return (
+                  <div key={i} className="rounded-xl border border-border/50 bg-card/30 p-5">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-xs font-semibold uppercase tracking-widest text-[#C8102E]">
+                        {typeLabel[item.message_type] || item.message_type}
+                      </span>
+                      {item.event_name && (
+                        <>
+                          <span className="text-muted-foreground text-xs">·</span>
+                          <span className="text-xs text-muted-foreground">{item.event_name}</span>
+                        </>
+                      )}
+                      <span className="ml-auto text-xs text-muted-foreground">
+                        {date.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                      </span>
+                    </div>
+                    <p className="text-sm leading-relaxed whitespace-pre-line">{text}</p>
+                    {item.event_slug && (
+                      <Link
+                        href={`/races/${item.discipline}/${item.event_slug}`}
+                        className="inline-block mt-3 text-xs text-[#C8102E] hover:underline font-medium"
+                      >
+                        View race →
+                      </Link>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+
         {activeTab === "notifications" && (
           <div className="space-y-8 max-w-xl">
             {/* Channels */}

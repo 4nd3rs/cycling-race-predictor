@@ -90,10 +90,10 @@ async function alreadySent(userId: string, raceId: string, type: MessageType, ch
   return rows.length > 0;
 }
 
-async function logSent(userId: string, raceId: string, type: MessageType, channel: string) {
+async function logSent(userId: string, raceId: string, type: MessageType, channel: string, text?: string) {
   await sql`
-    INSERT INTO notification_log (user_id, race_id, message_type, channel)
-    VALUES (${userId}, ${raceId}, ${type}, ${channel})
+    INSERT INTO notification_log (user_id, race_id, message_type, channel, message_text)
+    VALUES (${userId}, ${raceId}, ${type}, ${channel}, ${text ?? null})
     ON CONFLICT DO NOTHING
   `;
 }
@@ -249,7 +249,7 @@ async function main() {
         else {
           const ok = await sendTelegram(chatId, copy.message);
           console.log(`  ${ok ? "✓" : "✗"} Telegram → ${userId}`);
-          if (ok) { await logSent(userId, race.race_id as string, MESSAGE_TYPE, "telegram"); sent++; }
+          if (ok) { await logSent(userId, race.race_id as string, MESSAGE_TYPE, "telegram", copy.plainText); sent++; }
         }
       }
 
@@ -261,7 +261,7 @@ async function main() {
         else {
           const ok = await sendWhatsApp(phone, copy.plainText);
           console.log(`  ${ok ? "✓" : "✗"} WhatsApp → ${phone}`);
-          if (ok) { await logSent(userId, race.race_id as string, MESSAGE_TYPE, "whatsapp"); sent++; }
+          if (ok) { await logSent(userId, race.race_id as string, MESSAGE_TYPE, "whatsapp", copy.plainText); sent++; }
         }
       }
     }
