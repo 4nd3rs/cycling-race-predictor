@@ -161,6 +161,23 @@ async function getRaceByCategorySlug(eventId: string, categorySlug: string) {
         .limit(1);
     }
 
+    // Inherit uciCategory from sibling elite race if null
+    if (race && !race.uciCategory) {
+      const [sibling] = await db
+        .select({ uciCategory: races.uciCategory })
+        .from(races)
+        .where(
+          and(
+            eq(races.raceEventId, eventId),
+            eq(races.ageCategory, "elite")
+          )
+        )
+        .limit(1);
+      if (sibling?.uciCategory) {
+        race = { ...race, uciCategory: sibling.uciCategory };
+      }
+    }
+
     return race;
   } catch {
     return null;
