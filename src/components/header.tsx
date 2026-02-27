@@ -42,7 +42,9 @@ export function Header() {
             <circle cx="162" cy="30" r="5.5" fill="#0D0D0D"/>
             <circle cx="38" cy="170" r="5.5" fill="#0D0D0D"/>
             <circle cx="162" cy="170" r="5.5" fill="#0D0D0D"/>
-            <text x="100" y="100" fontFamily="'Barlow Condensed','Arial Narrow',Impact,sans-serif" fontWeight="800" fontSize="122" fill="#C8102E" textAnchor="middle" dominantBaseline="middle" transform="rotate(180,100,100)">13</text>
+            <g transform="translate(100,100) rotate(180)">
+              <text x="0" y="0" fontFamily="'Barlow Condensed','Arial Narrow',Impact,sans-serif" fontWeight="800" fontSize="108" fill="#C8102E" textAnchor="middle" dominantBaseline="central">13</text>
+            </g>
           </svg>
           <div className="flex flex-col leading-none">
             <span className="font-display text-[11px] font-semibold uppercase tracking-[0.12em] text-foreground">Pro Cycling</span>
