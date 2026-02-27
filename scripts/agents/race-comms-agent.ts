@@ -102,11 +102,15 @@ function buildPrompt(user: UserContext, race: RaceContext, userMemory: string): 
 
   const typeInstructions: Record<MessageType, string> = {
     preview: `Write a race PREVIEW message (T-2 days).
-- Open with what makes this race special — one punchy sentence
-- Give your 5 predictions with brief reasoning for the top 2-3
-- Highlight the user's followed riders specifically and where you see them
-- End with the URL on its own line (no label)
-- Length: 120-180 words`,
+- One opening sentence on what makes this race special
+- Then a numbered list of predictions in this exact format:
+  1. Rider Name — X.X% — one short phrase on why
+  2. Rider Name — X.X%
+  (continue for all 5)
+- If a rider in the list clearly doesn't suit the parcours, note it briefly after their entry
+- One sentence on the user's followed riders and where they feature in the list
+- End with the URL on its own line
+- Length: 100-150 words`,
 
     breaking: `Write a SHORT BREAKING NEWS message about a development for this race.
 - One key development from the news items below
@@ -122,12 +126,15 @@ function buildPrompt(user: UserContext, race: RaceContext, userMemory: string): 
 - End with the URL`,
 
     result: `Write a RESULTS message after the race.
-- Lead with who won and how — one vivid sentence
-- Then cover the user's followed riders specifically
-- Reference your pre-race prediction if relevant ("we had them top 3 — delivered" or "our model missed this one")
-- Conversational, fan-to-fan
-- End with the URL
-- Length: 60-100 words`,
+- One sentence on who won and how
+- Then a numbered results list in this exact format:
+  1. Winner Name
+  2. Second place
+  3. Third place
+  (up to 5 if available)
+- One line on the user's followed riders: how they finished vs our prediction
+- End with the URL on its own line
+- Length: 60-90 words`,
   };
 
   return `You are a passionate cycling expert writing personalized race updates for a fan.
