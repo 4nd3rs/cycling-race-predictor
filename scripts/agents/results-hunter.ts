@@ -2,7 +2,8 @@ import { config } from "dotenv";
 config({ path: ".env.local" });
 
 import { db, races, riders, raceResults, teams } from "./lib/db";
-import { and, ilike, eq } from "drizzle-orm";
+import { and, ilike, eq, asc } from "drizzle-orm";
+import { notifyRaceEventFollowers, notifyRiderFollowers, getRaceEventId, getRaceEventInfo } from "./lib/notify-followers";
 
 interface ResultInput {
   raceName: string;
@@ -223,6 +224,61 @@ async function main() {
       racesCompleted++;
     } catch (err) {
       console.error(`Error marking race ${raceId} as completed: ${err}`);
+    }
+  }
+
+
+  // Notify followers about results
+  for (const raceId of racesWithNewResults) {
+    try {
+      const raceEventId = await getRaceEventId(raceId);
+      if (!raceEventId) continue;
+      const eventInfo = await getRaceEventInfo(raceEventId);
+      if (!eventInfo) continue;
+
+      // Fetch top 3 results
+      const top3 = await db
+        .select({ name: riders.name, riderId: raceResults.riderId, position: raceResults.position })
+        .from(raceResults)
+        .innerJoin(riders, eq(raceResults.riderId, riders.id))
+        .where(eq(raceResults.raceId, raceId))
+        .orderBy(asc(raceResults.position))
+        .limit(3);
+
+      if (top3.length === 0) continue;
+
+      const raceUrl = eventInfo.slug
+        ? `https://procyclingpredictor.com/races/${eventInfo.discipline}/${eventInfo.slug}`
+        : `https://procyclingpredictor.com`;
+
+      const podiumLines = top3
+        .map((r, i) => `${["🥇","🥈","🥉"][i]} ${r.name}`)
+        .join("\n");
+
+      // Notify race followers
+      const raceMsg = [
+        `🏆 <b>Results are in for ${eventInfo.name}!</b>`,
+        ``,
+        podiumLines,
+        ``,
+        `👉 <a href="${raceUrl}">Full results on Pro Cycling Predictor</a>`,
+      ].join("\n");
+      const raceNotified = await notifyRaceEventFollowers(raceEventId, raceMsg);
+      if (raceNotified > 0) console.error(`📨 Notified ${raceNotified} race follower(s)`);
+
+      // Notify followers of each top-3 rider individually
+      for (const rider of top3) {
+        const positions = ["won", "finished 2nd in", "finished 3rd in"];
+        const riderMsg = [
+          `🚴 <b>${rider.name} ${positions[rider.position! - 1] ?? `finished P${rider.position} in`} ${eventInfo.name}!</b>`,
+          ``,
+          `👉 <a href="${raceUrl}">See full results on Pro Cycling Predictor</a>`,
+        ].join("\n");
+        const riderNotified = await notifyRiderFollowers(rider.riderId, riderMsg);
+        if (riderNotified > 0) console.error(`📨 Notified ${riderNotified} follower(s) of ${rider.name}`);
+      }
+    } catch (err) {
+      console.error(`Notification error for race ${raceId}:`, err);
     }
   }
 

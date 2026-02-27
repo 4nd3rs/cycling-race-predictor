@@ -17,13 +17,15 @@ import * as schema from "../../src/lib/db/schema";
 import * as cheerio from "cheerio";
 import { chromium } from "playwright";
 import { writeScrapeStatus, type RaceRow } from "./lib/scrape-status";
+import { notifyRiderFollowers, getRaceEventInfo } from "./lib/notify-followers";
 
 const sql = neon(process.env.DATABASE_URL!);
 const db = drizzle(sql, { schema });
 
 // Parse args
 const args = process.argv.slice(2);
-const raceIdArg = args[args.indexOf("--race-id") + 1] || null;
+const raceIdArgIdx = args.indexOf("--race-id");
+const raceIdArg = raceIdArgIdx !== -1 ? args[raceIdArgIdx + 1] || null : null;
 const limitArg = parseInt(args[args.indexOf("--limit") + 1] || "8", 10);
 const daysAheadArg = parseInt(args[args.indexOf("--days") + 1] || "30", 10);
 
@@ -236,6 +238,7 @@ async function syncStartlistForRace(race: { id: string; name: string; pcsUrl: st
   console.log(`   📋 Found ${entries2.length} riders`);
 
   let inserted = 0, updated = 0, errors = 0;
+  const newlyInsertedRiderIds: string[] = [];
 
   for (const entry of entries2) {
     try {
@@ -301,6 +304,7 @@ async function syncStartlistForRace(race: { id: string; name: string; pcsUrl: st
           bibNumber: entry.bibNumber || undefined,
         });
         inserted++;
+        newlyInsertedRiderIds.push(riderId);
       } else {
         // Update bib/team if changed or team was previously missing
         const bibChanged = entry.bibNumber && existingByRider.bibNumber !== entry.bibNumber;
@@ -322,6 +326,34 @@ async function syncStartlistForRace(race: { id: string; name: string; pcsUrl: st
   }
 
   console.log(`   ✅ ${inserted} inserted, ${updated} updated, ${errors} errors`);
+
+  // Notify rider followers about startlist addition
+  if (newlyInsertedRiderIds.length > 0 && race.raceEventId) {
+    const eventInfo = await getRaceEventInfo(race.raceEventId);
+    if (eventInfo) {
+      const raceUrl = eventInfo.slug
+        ? `https://procyclingpredictor.com/races/${eventInfo.discipline}/${eventInfo.slug}`
+        : `https://procyclingpredictor.com`;
+      for (const riderId of newlyInsertedRiderIds) {
+        try {
+          const riderRow = await db.query.riders.findFirst({ where: (r, { eq }) => eq(r.id, riderId) });
+          if (!riderRow) continue;
+          const msg = [
+            `📋 <b>${riderRow.name} is starting ${eventInfo.name}!</b>`,
+            ``,
+            `Your followed rider has been added to the startlist.`,
+            ``,
+            `👉 <a href="${raceUrl}">Full startlist & predictions on Pro Cycling Predictor</a>`,
+          ].join("\n");
+          const notified = await notifyRiderFollowers(riderId, msg);
+          if (notified > 0) console.log(`   📨 Notified ${notified} follower(s) of ${riderRow.name}`);
+        } catch (err) {
+          console.error(`   Notification error for rider ${riderId}:`, err);
+        }
+      }
+    }
+  }
+
   return { inserted, updated, skipped: entries2.length - inserted - updated - errors };
 }
 

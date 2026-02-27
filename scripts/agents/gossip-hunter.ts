@@ -2,6 +2,7 @@ import { config } from "dotenv";
 config({ path: ".env.local" });
 
 import { db, riders, riderRumours } from "./lib/db";
+import { notifyRiderFollowers } from "./lib/notify-followers";
 import { eq, ilike } from "drizzle-orm";
 
 interface NewsItem {
@@ -229,6 +230,30 @@ async function processGossip(
         tipCount: input.news.length,
         summary,
       });
+    }
+
+    // Notify followers if sentiment is strongly negative (injury/doubt) or strongly positive
+    const sentimentNum = parseFloat(String(sentiment));
+    if (Math.abs(sentimentNum) >= 0.4) {
+      try {
+        const riderRow = await db.query.riders.findFirst({ where: (r, { eq }) => eq(r.id, riderId!) });
+        if (riderRow) {
+          const isNegative = sentimentNum < 0;
+          const emoji = isNegative ? "⚠️" : "📈";
+          const label = isNegative ? "Negative intel detected" : "Positive form update";
+          const msg = [
+            `${emoji} <b>${label}: ${riderRow.name}</b>`,
+            ``,
+            summary || `New intel about ${riderRow.name}.`,
+            ``,
+            `👉 <a href="https://procyclingpredictor.com/riders/${riderId}">View on Pro Cycling Predictor</a>`,
+          ].join("\n");
+          const notified = await notifyRiderFollowers(riderId!, msg);
+          if (notified > 0) console.error(`📨 Notified ${notified} follower(s) of ${riderRow.name} (sentiment: ${sentimentNum.toFixed(2)})`);
+        }
+      } catch (notifyErr) {
+        console.error(`Notification error for ${input.riderName}:`, notifyErr);
+      }
     }
 
     return "upserted";

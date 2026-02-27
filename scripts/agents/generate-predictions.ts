@@ -15,6 +15,7 @@ import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
 import { eq, and } from "drizzle-orm";
 import * as schema from "../../src/lib/db/schema";
+import { notifyRaceEventFollowers, getRaceEventId, getRaceEventInfo } from "./lib/notify-followers";
 
 const sql = neon(process.env.DATABASE_URL!);
 const db = drizzle(sql, { schema });
@@ -253,6 +254,32 @@ async function main() {
     );
   }
   console.log("─".repeat(80));
+  // 12. Notify race_event followers
+  if (race.raceEventId && predictionValues.length > 0) {
+    try {
+      const eventInfo = await getRaceEventInfo(race.raceEventId);
+      if (eventInfo) {
+        const top3Names = riderScores.slice(0, 3).map((r, i) =>
+          `${["🥇","🥈","🥉"][i]} ${r.riderName}`
+        ).join("\n");
+        const raceUrl = eventInfo.slug
+          ? `https://procyclingpredictor.com/races/${eventInfo.discipline}/${eventInfo.slug}`
+          : `https://procyclingpredictor.com`;
+        const msg = [
+          `🔮 <b>Predictions are live for ${eventInfo.name}!</b>`,
+          ``,
+          `Our AI has ranked ${predictionValues.length} riders. Top picks:`,
+          top3Names,
+          ``,
+          `👉 <a href="${raceUrl}">Full predictions on Pro Cycling Predictor</a>`,
+        ].join("\n");
+        const notified = await notifyRaceEventFollowers(race.raceEventId, msg);
+        if (notified > 0) console.log(`📨 Notified ${notified} follower(s) about predictions`);
+      }
+    } catch (err) {
+      console.error("Failed to send prediction notifications:", err);
+    }
+  }
 }
 
 main().catch((err) => {
