@@ -5,7 +5,7 @@ import { RaceFollowButton } from "@/components/race-follow-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { format, formatDistanceToNow, isPast, isFuture, isToday, isTomorrow, differenceInCalendarDays } from "date-fns";
+import { format, formatDistanceToNow, isPast, isFuture, isToday, isTomorrow } from "date-fns";
 import { toRaceDate, toDateStr } from "@/lib/utils";
 import { formatCategoryDisplay } from "@/lib/category-utils";
 import { EventEditDialog } from "./event-edit-dialog";
@@ -322,11 +322,7 @@ export function EventListRow({
   ) : isCompleted ? (
     <span className="rounded px-1.5 py-0.5 text-xs text-muted-foreground bg-muted/40 shrink-0">Done</span>
   ) : (
-    (isEventToday || isTomorrowEvent) ? null : (
-    <span className="rounded px-1.5 py-0.5 text-xs text-green-400 bg-green-500/10 border border-green-500/20 whitespace-nowrap shrink-0 tabular-nums">
-      {`in ${differenceInCalendarDays(startDate, new Date())}d`}
-    </span>
-    )
+null
   );
 
   return (
