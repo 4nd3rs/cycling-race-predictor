@@ -16,8 +16,8 @@ type TeamRow = {
   slug: string | null;
   country: string | null;
   riderCount: number;
-  avgElo: number;
-  bestElo: number;
+  totalUciPoints: number;
+  topRiderUciPoints: number;
   totalWins: number;
   totalPodiums: number;
   discipline: string;
@@ -82,8 +82,8 @@ function processRow(raw: {
   country: string | null;
   division: string | null;
   rider_count: number | string;
-  avg_elo: number | string | null;
-  best_elo: number | string | null;
+  total_uci_points: number | string | null;
+  top_rider_uci_points: number | string | null;
   total_wins: number | string | null;
   total_podiums: number | string | null;
   discipline?: string;
@@ -97,8 +97,8 @@ function processRow(raw: {
     slug: raw.slug,
     country: raw.country,
     riderCount: Number(raw.rider_count) || 0,
-    avgElo: Number(raw.avg_elo) || 0,
-    bestElo: Number(raw.best_elo) || 0,
+    totalUciPoints: Number(raw.total_uci_points) || 0,
+    topRiderUciPoints: Number(raw.top_rider_uci_points) || 0,
     totalWins: Number(raw.total_wins) || 0,
     totalPodiums: Number(raw.total_podiums) || 0,
     discipline: (raw as { discipline?: string }).discipline || "road",
@@ -111,8 +111,8 @@ async function getTopRoadTeams(gender: "men" | "women", limit = 15): Promise<Tea
       SELECT 
         t.id, t.name, t.slug, t.country, t.division,
         COUNT(DISTINCT r.id)::int AS rider_count,
-        AVG(rds.current_elo::float)::int AS avg_elo,
-        MAX(rds.current_elo::float)::int AS best_elo,
+        COALESCE(SUM(rds.uci_points), 0)::int AS total_uci_points,
+        COALESCE(MAX(rds.uci_points), 0)::int AS top_rider_uci_points,
         COALESCE(SUM(rds.wins_total), 0)::int AS total_wins,
         COALESCE(SUM(rds.podiums_total), 0)::int AS total_podiums
       FROM teams t
@@ -124,7 +124,7 @@ async function getTopRoadTeams(gender: "men" | "women", limit = 15): Promise<Tea
       WHERE t.discipline = 'road'
       GROUP BY t.id, t.name, t.slug, t.country, t.division
       HAVING COUNT(DISTINCT r.id) >= 3
-      ORDER BY avg_elo DESC NULLS LAST
+      ORDER BY total_uci_points DESC NULLS LAST
       LIMIT ${limit}
     `);
     return (rows.rows as Parameters<typeof processRow>[0][]).map((r) => processRow({ ...r, discipline: "road" }));
@@ -139,8 +139,8 @@ async function getTopMtbTeams(gender: "men" | "women", limit = 15): Promise<Team
       SELECT 
         t.id, t.name, t.slug, t.country, t.division,
         COUNT(DISTINCT rds.rider_id)::int AS rider_count,
-        AVG(rds.current_elo::float)::int AS avg_elo,
-        MAX(rds.current_elo::float)::int AS best_elo,
+        COALESCE(SUM(rds.uci_points), 0)::int AS total_uci_points,
+        COALESCE(MAX(rds.uci_points), 0)::int AS top_rider_uci_points,
         COALESCE(SUM(rds.wins_total), 0)::int AS total_wins,
         COALESCE(SUM(rds.podiums_total), 0)::int AS total_podiums
       FROM teams t
@@ -151,7 +151,7 @@ async function getTopMtbTeams(gender: "men" | "women", limit = 15): Promise<Team
       WHERE t.discipline = 'mtb'
       GROUP BY t.id, t.name, t.slug, t.country, t.division
       HAVING COUNT(DISTINCT rds.rider_id) >= 3
-      ORDER BY avg_elo DESC NULLS LAST
+      ORDER BY total_uci_points DESC NULLS LAST
       LIMIT ${limit}
     `);
     return (rows.rows as Parameters<typeof processRow>[0][]).map((r) => processRow({ ...r, discipline: "mtb" }));
@@ -167,8 +167,8 @@ async function searchTeams(query: string): Promise<TeamRow[]> {
       SELECT 
         t.id, t.name, t.slug, t.country, t.division, 'road' AS discipline,
         COUNT(DISTINCT r.id)::int AS rider_count,
-        AVG(rds.current_elo::float)::int AS avg_elo,
-        MAX(rds.current_elo::float)::int AS best_elo,
+        COALESCE(SUM(rds.uci_points), 0)::int AS total_uci_points,
+        COALESCE(MAX(rds.uci_points), 0)::int AS top_rider_uci_points,
         COALESCE(SUM(rds.wins_total), 0)::int AS total_wins,
         COALESCE(SUM(rds.podiums_total), 0)::int AS total_podiums
       FROM teams t
@@ -176,7 +176,7 @@ async function searchTeams(query: string): Promise<TeamRow[]> {
       LEFT JOIN rider_discipline_stats rds ON rds.rider_id = r.id AND rds.discipline = 'road'
       WHERE t.discipline = 'road' AND t.name ILIKE ${'%' + query + '%'}
       GROUP BY t.id, t.name, t.slug, t.country, t.division
-      ORDER BY avg_elo DESC NULLS LAST
+      ORDER BY total_uci_points DESC NULLS LAST
       LIMIT 30
     `);
     // MTB teams
@@ -184,8 +184,8 @@ async function searchTeams(query: string): Promise<TeamRow[]> {
       SELECT 
         t.id, t.name, t.slug, t.country, t.division, 'mtb' AS discipline,
         COUNT(DISTINCT rds.rider_id)::int AS rider_count,
-        AVG(rds.current_elo::float)::int AS avg_elo,
-        MAX(rds.current_elo::float)::int AS best_elo,
+        COALESCE(SUM(rds.uci_points), 0)::int AS total_uci_points,
+        COALESCE(MAX(rds.uci_points), 0)::int AS top_rider_uci_points,
         COALESCE(SUM(rds.wins_total), 0)::int AS total_wins,
         COALESCE(SUM(rds.podiums_total), 0)::int AS total_podiums
       FROM teams t
@@ -193,14 +193,14 @@ async function searchTeams(query: string): Promise<TeamRow[]> {
       WHERE t.discipline = 'mtb' AND t.name ILIKE ${'%' + query + '%'}
       GROUP BY t.id, t.name, t.slug, t.country, t.division
       HAVING COUNT(DISTINCT rds.rider_id) >= 1
-      ORDER BY avg_elo DESC NULLS LAST
+      ORDER BY total_uci_points DESC NULLS LAST
       LIMIT 30
     `);
     const combined = [
       ...(road.rows as Parameters<typeof processRow>[0][]).map((r) => processRow(r)),
       ...(mtb.rows as Parameters<typeof processRow>[0][]).map((r) => processRow(r)),
     ];
-    combined.sort((a, b) => b.avgElo - a.avgElo);
+    combined.sort((a, b) => b.totalUciPoints - a.totalUciPoints);
     return combined.slice(0, 60);
   } catch {
     return [];
@@ -253,9 +253,9 @@ function TeamTableRow({ team, rank }: { team: TeamRow; rank: number }) {
       <td className="px-3 py-3 text-sm text-center text-muted-foreground w-14 shrink-0 whitespace-nowrap">
         {team.riderCount || "—"}
       </td>
-      {/* Avg ELO */}
-      <td className={`pl-3 pr-4 py-3 text-sm text-right font-mono font-semibold w-20 shrink-0 whitespace-nowrap ${eloColor(team.avgElo)}`}>
-        {team.avgElo > 0 ? team.avgElo : "—"}
+      {/* UCI Points */}
+      <td className="pl-3 pr-4 py-3 text-sm text-right font-mono font-semibold w-20 shrink-0 whitespace-nowrap text-blue-300">
+        {team.totalUciPoints > 0 ? team.totalUciPoints.toLocaleString() : "—"}
       </td>
     </tr>
   );
@@ -276,7 +276,7 @@ function TeamTable({
       <h2 className="text-lg font-bold mb-3 flex items-center gap-2">
         <span>{icon}</span>
         <span>{title}</span>
-        <span className="text-xs text-muted-foreground font-normal ml-1">by avg ELO</span>
+        <span className="text-xs text-muted-foreground font-normal ml-1">by UCI points</span>
       </h2>
       <div className="rounded-xl border border-white/10 overflow-hidden bg-white/2">
         <table className="w-full text-sm table-fixed">
@@ -285,7 +285,7 @@ function TeamTable({
               <th className="pl-4 pr-2 py-2.5 text-xs font-medium text-muted-foreground text-center w-8">#</th>
               <th className="px-2 py-2.5 text-xs font-medium text-muted-foreground text-left">Team</th>
               <th className="px-3 py-2.5 text-xs font-medium text-muted-foreground text-center w-14 whitespace-nowrap">Riders</th>
-              <th className="pl-3 pr-4 py-2.5 text-xs font-medium text-muted-foreground text-right w-20 whitespace-nowrap">ELO</th>
+              <th className="pl-3 pr-4 py-2.5 text-xs font-medium text-muted-foreground text-right w-20 whitespace-nowrap">UCI Pts</th>
             </tr>
           </thead>
           <tbody>
@@ -342,7 +342,7 @@ export default async function TeamsPage({ searchParams }: PageProps) {
           <div>
             <h1 className="text-3xl font-bold">Teams</h1>
             <p className="text-muted-foreground mt-1">
-              Top teams ranked by average rider ELO
+              Top teams ranked by total UCI points
             </p>
           </div>
           <form className="w-full md:w-72">
