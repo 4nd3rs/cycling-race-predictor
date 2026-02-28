@@ -57,6 +57,16 @@ function saveTracking(data: TrackingData): void {
   writeFileSync(TRACKING_FILE, JSON.stringify(data, null, 2));
 }
 
+
+const EUROPEAN_COUNTRIES = new Set([
+  "BEL","FRA","ITA","ESP","NED","GER","GBR","SUI","AUT","POR","NOR","SWE","DEN","FIN",
+  "POL","CZE","SVK","HUN","ROU","BUL","SRB","CRO","SLO","EST","LAT","LTU","UKR","GRE",
+  "TUR","LUX","IRL","RSM","MCO","AND","MNE","BIH","ALB","MKD","MDA","BLR","RUS","GEO",
+  // common UCI 3-letter codes too
+  "NL","DE","FR","IT","ES","BE","GB","CH","AT","NO","SE","DK","FI","PT","PL","CZ","HU",
+  "RO","BG","RS","HR","SI","EE","LV","LT","UA","GR","TR","LU","IE","SM","MC","AD"
+]);
+
 async function getEventSlug(race: typeof races.$inferSelect): Promise<string | null> {
   if (!race.raceEventId) return null;
   try {
@@ -66,17 +76,28 @@ async function getEventSlug(race: typeof races.$inferSelect): Promise<string | n
 }
 
 // Only post Instagram stories for elite road/mtb WorldCup races (skip junior/u23 series)
-function shouldPostToInstagram(race: { name: string; discipline?: string | null; categorySlug?: string | null; uciCategory?: string | null }): boolean {
+function shouldPostToInstagram(race: { name: string; discipline?: string | null; categorySlug?: string | null; uciCategory?: string | null; country?: string | null }): boolean {
   const name = (race.name || "").toLowerCase();
   const category = (race.categorySlug || "").toLowerCase();
   const uci = (race.uciCategory || "").toLowerCase();
-  // Skip junior, u23, junior-series
+  const country = (race.country || "").toUpperCase();
+  const isMtb = (race.discipline || "").toLowerCase() === "mtb";
+
+  // Skip junior, u23
   if (category.includes("junior") || category.includes("u23")) return false;
   if (name.includes("junior") || name.includes("u23")) return false;
-  // Only WorldTour, 1.Pro, 1.UWT, or top MTB (UCI XCO World Cup / C1)
-  if (uci.includes("worldtour") || uci.includes("1.pro") || uci.includes("1.uwt") || uci.includes("world cup") || uci.includes("c1")) return true;
-  // Also allow if no category but it's a recognisable major race
+
+  // MTB: European races only
+  if (isMtb) {
+    return EUROPEAN_COUNTRIES.has(country);
+  }
+
+  // Road: WorldTour, 1.Pro — all fine
+  if (uci.includes("worldtour") || uci.includes("1.pro") || uci.includes("1.uwt")) return true;
+
+  // Road: recognisable Classics by name
   if (name.includes("omloop") || name.includes("strade bianche") || name.includes("milan") || name.includes("ronde") || name.includes("paris-roubaix") || name.includes("liege") || name.includes("amstel") || name.includes("fleche")) return true;
+
   return false;
 }
 
@@ -106,7 +127,8 @@ async function main() {
 
   console.log(`\n🔍 Looking for upcoming races between ${today} and ${threeDaysOut}...\n`);
 
-  const upcomingRaces = await db
+  // Fetch races joined with event for country + discipline
+  const upcomingRacesRaw = await db
     .select()
     .from(races)
     .where(
@@ -117,6 +139,16 @@ async function main() {
       )
     )
     .orderBy(races.date);
+
+  // Enrich with event country/discipline via slug lookup
+  const upcomingRaces = await Promise.all(upcomingRacesRaw.map(async (race) => {
+    if (!race.raceEventId) return { ...race, country: null };
+    try {
+      const [ev] = await db.select({ country: raceEvents.country, discipline: raceEvents.discipline })
+        .from(raceEvents).where(eqOp(raceEvents.id, race.raceEventId)).limit(1);
+      return { ...race, country: ev?.country ?? null, discipline: ev?.discipline ?? race.discipline };
+    } catch { return { ...race, country: null }; }
+  }));
 
   for (const race of upcomingRaces) {
     if (tracking.previews.includes(race.id)) {
@@ -139,21 +171,26 @@ async function main() {
       console.error(`❌ Failed to post preview for ${race.name}:`, err);
     }
 
-    // Instagram Stories — elite races only
+    // Instagram Stories — elite races only, post men + women
     const igPreviewSlug = await getEventSlug(race);
     if (igPreviewSlug && shouldPostToInstagram(race) && !tracking.igPreviews.includes(race.id)) {
-      console.log(`📸 Posting Instagram Story preview: ${race.name}`);
-      try {
-        execSync(
-          `node_modules/.bin/tsx scripts/agents/post-to-instagram.ts --event ${igPreviewSlug} --type preview --stories`,
-          { encoding: "utf-8", stdio: "inherit", cwd: process.cwd(), timeout: 120000 }
-        );
-        tracking.igPreviews.push(race.id);
-        saveTracking(tracking);
-        console.log(`✅ Instagram Story preview posted: ${race.name}\n`);
-      } catch (err) {
-        console.error(`❌ Instagram Story preview failed for ${race.name}:`, (err as any)?.message?.slice(0, 200));
+      const cat = (race.categorySlug || "").toLowerCase();
+      const genders: string[] = cat.includes("women") ? ["women"] : cat.includes("men") ? ["men"] : ["men", "women"];
+      for (const gender of genders) {
+        console.log(`📸 Posting Instagram Story preview (${gender}): ${race.name}`);
+        try {
+          execSync(
+            `node_modules/.bin/tsx scripts/agents/post-to-instagram.ts --event ${igPreviewSlug} --type preview --gender ${gender} --stories`,
+            { encoding: "utf-8", stdio: "inherit", cwd: process.cwd(), timeout: 120000 }
+          );
+          console.log(`✅ Instagram Story preview (${gender}) posted: ${race.name}\n`);
+        } catch (err) {
+          console.error(`❌ Instagram Story preview (${gender}) failed for ${race.name}:`, (err as any)?.message?.slice(0, 200));
+        }
+        await new Promise(r => setTimeout(r, 3000)); // brief pause between posts
       }
+      tracking.igPreviews.push(race.id);
+      saveTracking(tracking);
     }
   }
 
@@ -163,7 +200,7 @@ async function main() {
   console.log(`\n🔍 Looking for completed races from ${yesterday}...\n`);
 
   // Find races from yesterday that have results
-  const completedRaces = await db
+  const completedRacesRaw = await db
     .select()
     .from(races)
     .where(
@@ -173,6 +210,15 @@ async function main() {
       )
     )
     .orderBy(races.date);
+
+  const completedRaces = await Promise.all(completedRacesRaw.map(async (race) => {
+    if (!race.raceEventId) return { ...race, country: null };
+    try {
+      const [ev] = await db.select({ country: raceEvents.country, discipline: raceEvents.discipline })
+        .from(raceEvents).where(eqOp(raceEvents.id, race.raceEventId)).limit(1);
+      return { ...race, country: ev?.country ?? null, discipline: ev?.discipline ?? race.discipline };
+    } catch { return { ...race, country: null }; }
+  }));
 
   for (const race of completedRaces) {
     if (tracking.results.includes(race.id)) {
@@ -194,21 +240,26 @@ async function main() {
       console.error(`❌ Failed to post result for ${race.name}:`, err);
     }
 
-    // Instagram Stories — elite races only
+    // Instagram Stories — elite races only, post men + women
     const igResultSlug = await getEventSlug(race);
     if (igResultSlug && shouldPostToInstagram(race) && !tracking.igResults.includes(race.id)) {
-      console.log(`📸 Posting Instagram Story result: ${race.name}`);
-      try {
-        execSync(
-          `node_modules/.bin/tsx scripts/agents/post-to-instagram.ts --event ${igResultSlug} --type results --stories`,
-          { encoding: "utf-8", stdio: "inherit", cwd: process.cwd(), timeout: 120000 }
-        );
-        tracking.igResults.push(race.id);
-        saveTracking(tracking);
-        console.log(`✅ Instagram Story result posted: ${race.name}\n`);
-      } catch (err) {
-        console.error(`❌ Instagram Story result failed for ${race.name}:`, (err as any)?.message?.slice(0, 200));
+      const cat = (race.categorySlug || "").toLowerCase();
+      const genders: string[] = cat.includes("women") ? ["women"] : cat.includes("men") ? ["men"] : ["men", "women"];
+      for (const gender of genders) {
+        console.log(`📸 Posting Instagram Story result (${gender}): ${race.name}`);
+        try {
+          execSync(
+            `node_modules/.bin/tsx scripts/agents/post-to-instagram.ts --event ${igResultSlug} --type results --gender ${gender} --stories`,
+            { encoding: "utf-8", stdio: "inherit", cwd: process.cwd(), timeout: 120000 }
+          );
+          console.log(`✅ Instagram Story result (${gender}) posted: ${race.name}\n`);
+        } catch (err) {
+          console.error(`❌ Instagram Story result (${gender}) failed for ${race.name}:`, (err as any)?.message?.slice(0, 200));
+        }
+        await new Promise(r => setTimeout(r, 3000));
       }
+      tracking.igResults.push(race.id);
+      saveTracking(tracking);
     }
   }
 
