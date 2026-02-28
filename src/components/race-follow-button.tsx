@@ -126,17 +126,67 @@ export function RaceFollowButton({
     setState("idle");
   }
 
-  // Compact: icon-only bell, no text, click still toggles
+  // Compact: icon-only bell — opens category picker popover (or toggles directly if no categories)
   if (compact) {
+    if (categories.length === 0) {
+      return (
+        <button
+          onClick={toggleAll}
+          disabled={state === "toggling"}
+          title={isFollowingAny ? "Following — click to unfollow" : "Follow"}
+          className={cn("h-5 w-5 flex items-center justify-center text-muted-foreground transition-colors hover:text-primary", isFollowingAny && "text-primary", className)}
+        >
+          <Bell className={"h-3.5 w-3.5" + (isFollowingAny ? " fill-current" : "")} />
+        </button>
+      );
+    }
     return (
-      <button
-        onClick={toggleAll}
-        disabled={state === "toggling"}
-        title={isFollowingAny ? "Following — click to unfollow" : "Follow"}
-        className={cn("h-5 w-5 flex items-center justify-center text-muted-foreground transition-colors hover:text-primary", isFollowingAny && "text-primary", className)}
-      >
-        <Bell className={"h-3.5 w-3.5" + (isFollowingAny ? " fill-current" : "")} />
-      </button>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button
+            disabled={state === "toggling"}
+            title={isFollowingAny ? "Following — click to change" : "Follow"}
+            className={cn("h-5 w-5 flex items-center justify-center text-muted-foreground transition-colors hover:text-primary", isFollowingAny && "text-primary", className)}
+            onClick={(e) => {
+              if (!isSignedIn) { e.preventDefault(); handleNotSignedIn(); return; }
+            }}
+          >
+            <Bell className={"h-3.5 w-3.5" + (isFollowingAny ? " fill-current" : "")} />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-52 p-2" align="end">
+          <p className="text-xs text-muted-foreground font-medium px-2 py-1 mb-1 truncate">{eventName}</p>
+          <button
+            onClick={toggleAll}
+            disabled={state === "toggling"}
+            className={cn("flex items-center justify-between w-full rounded px-2 py-1.5 text-sm hover:bg-muted transition-colors", isFollowingAll && "text-primary font-medium")}
+          >
+            <span>All categories</span>
+            {isFollowingAll && <Check className="h-3.5 w-3.5" />}
+          </button>
+          <div className="my-1 border-t border-border/50" />
+          {categories
+            .sort((a, b) => {
+              const o = { elite: 0, u23: 1, junior: 2, masters: 3 };
+              return (o[a.ageCategory as keyof typeof o] ?? 4) - (o[b.ageCategory as keyof typeof o] ?? 4) || (a.gender === "men" ? -1 : 1);
+            })
+            .map((cat) => {
+              const key = `race:${cat.id}`;
+              const isFollowing = !!followingMap[key] || isFollowingAll;
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => toggleCategory(cat.id)}
+                  disabled={state === "toggling" || isFollowingAll}
+                  className={cn("flex items-center justify-between w-full rounded px-2 py-1.5 text-sm hover:bg-muted transition-colors", isFollowing && "text-primary font-medium", isFollowingAll && "opacity-50 cursor-not-allowed")}
+                >
+                  <span>{formatCategoryDisplay(cat.ageCategory, cat.gender)}</span>
+                  {isFollowing && <Check className="h-3.5 w-3.5" />}
+                </button>
+              );
+            })}
+        </PopoverContent>
+      </Popover>
     );
   }
 
