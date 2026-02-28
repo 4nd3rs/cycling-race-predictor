@@ -15,7 +15,7 @@ import { neon } from "@neondatabase/serverless";
 import { eq, gte, lte, and, isNotNull, ilike, or, asc } from "drizzle-orm";
 import * as schema from "../../src/lib/db/schema";
 import * as cheerio from "cheerio";
-import { chromium } from "playwright";
+import * as cheerio from "cheerio";
 import { writeScrapeStatus, type RaceRow } from "./lib/scrape-status";
 import { notifyRiderFollowers, getRaceEventInfo } from "./lib/notify-followers";
 
@@ -161,67 +161,51 @@ async function syncStartlistForRace(race: { id: string; name: string; pcsUrl: st
   console.log(`\n🔍 ${race.name}`);
   console.log(`   URL: ${startlistUrl}`);
 
-  // Use Playwright to bypass Cloudflare on PCS — extract via DOM eval, not raw HTML
+  // Use scrape.do to bypass Cloudflare on PCS — returns rendered HTML
   type RawEntry = { riderName: string; riderPcsId: string; teamName: string | null; bibNumber: number | null };
   let rawEntries: RawEntry[] = [];
 
-  const browser = await chromium.launch({ headless: true });
   try {
-    const page = await browser.newPage();
-    await page.setExtraHTTPHeaders({
-      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      "Accept-Language": "en-US,en;q=0.9",
-    });
-    await page.goto(startlistUrl, { waitUntil: "networkidle", timeout: 30000 });
-    await page.waitForTimeout(2000);
-    await page.waitForSelector(".startlist_v4, .ridersCont", { timeout: 10000 }).catch(() => {});
+    const token = process.env.SCRAPE_DO_TOKEN;
+    if (!token) throw new Error("SCRAPE_DO_TOKEN not set in .env.local");
+    const apiUrl = `https://api.scrape.do?token=${token}&url=${encodeURIComponent(startlistUrl)}&render=true`;
+    const res = await fetch(apiUrl, { signal: AbortSignal.timeout(30000) });
+    if (!res.ok) throw new Error(`scrape.do returned ${res.status}: ${await res.text()}`);
+    const html = await res.text();
+    const $ = cheerio.load(html);
 
-    // Extract directly from live DOM to avoid cheerio/serialization issues
-    rawEntries = await page.evaluate(() => {
-      const entries: { riderName: string; riderPcsId: string; teamName: string | null; bibNumber: number | null }[] = [];
-
-      // Method 1: Team-based .startlist_v4
-      // Note: PCS uses relative hrefs ("rider/slug") — match with href*="rider/" not "/rider/"
-      const teamEls = document.querySelectorAll(".startlist_v4 > li");
-      teamEls.forEach((teamEl) => {
-        // PCS team name is in <a class="team" href="team/..."> (second link, first is jersey img)
-        const teamNameEl = teamEl.querySelector("a.team[href*='team/'], b, .team-name, h3");
-        const teamName = teamNameEl?.textContent?.trim()?.replace(/\s*\(WT\)|\s*\(PRT\)|\s*\(CT\)/gi, '').trim() || null;
-        teamEl.querySelectorAll(".ridersCont li, ul li").forEach((riderEl) => {
-          const link = riderEl.querySelector("a[href*='rider/']") as HTMLAnchorElement | null;
-          if (!link) return;
-          const riderName = link.textContent?.trim() || "";
-          const href = link.getAttribute("href") || "";
-          const riderPcsId = href.replace(/^\//, "").split("rider/")[1]?.split("/")[0]?.split("?")[0] || "";
-          const bibEl = riderEl.querySelector(".bib, .nr");
-          const bib = bibEl ? parseInt(bibEl.textContent?.trim() || "") || null : null;
-          if (riderName && riderPcsId) {
-            entries.push({ riderName, riderPcsId, teamName, bibNumber: bib });
-          }
-        });
+    // Method 1: Team-based .startlist_v4
+    $(".startlist_v4 > li").each((_, teamEl) => {
+      const teamNameEl = $(teamEl).find("a.team[href*='team/'], b, .team-name, h3").first();
+      const teamName = teamNameEl.text().trim().replace(/\s*\(WT\)|\s*\(PRT\)|\s*\(CT\)/gi, "").trim() || null;
+      $(teamEl).find(".ridersCont li, ul li").each((_, riderEl) => {
+        const link = $(riderEl).find("a[href*='rider/']").first();
+        if (!link.length) return;
+        const riderName = link.text().trim();
+        const href = link.attr("href") || "";
+        const riderPcsId = href.replace(/^\//, "").split("rider/")[1]?.split("/")[0]?.split("?")[0] || "";
+        const bibText = $(riderEl).find(".bib, .nr").text().trim();
+        const bib = bibText ? parseInt(bibText) || null : null;
+        if (riderName && riderPcsId) rawEntries.push({ riderName, riderPcsId, teamName, bibNumber: bib });
       });
-
-      // Method 2: flat rider links if method 1 empty
-      if (entries.length === 0) {
-        document.querySelectorAll("a[href*='rider/']").forEach((el) => {
-          const riderName = el.textContent?.trim() || "";
-          const href = el.getAttribute("href") || "";
-          const riderPcsId = href.replace(/^\//, "").split("rider/")[1]?.split("/")[0] || "";
-          if (riderName && riderPcsId && riderName.length > 2 && riderName.length < 60) {
-            const teamLink = el.closest("li, tr")?.querySelector("a[href*='team/']") as HTMLAnchorElement | null;
-            const teamName = teamLink?.textContent?.trim() || null;
-            entries.push({ riderName, riderPcsId, teamName, bibNumber: null });
-          }
-        });
-      }
-      return entries;
     });
+
+    // Method 2: flat fallback
+    if (rawEntries.length === 0) {
+      $("a[href*='rider/']").each((_, el) => {
+        const riderName = $(el).text().trim();
+        const href = $(el).attr("href") || "";
+        const riderPcsId = href.replace(/^\//, "").split("rider/")[1]?.split("/")[0] || "";
+        if (riderName && riderPcsId && riderName.length > 2 && riderName.length < 60) {
+          const teamName = $(el).closest("li, tr").find("a[href*='team/']").first().text().trim() || null;
+          rawEntries.push({ riderName, riderPcsId, teamName, bibNumber: null });
+        }
+      });
+    }
   } catch (err: any) {
-    await browser.close();
-    console.error(`   ❌ Playwright fetch failed: ${err.message}`);
+    console.error(`   ❌ scrape.do fetch failed: ${err.message}`);
     return { inserted: 0, updated: 0, skipped: 0 };
   }
-  await browser.close();
 
   // Deduplicate by pcsId
   const seen = new Set<string>();
