@@ -77,6 +77,7 @@ async function main() {
 
   interface RiderScore {
     riderId: string;
+    racesTotal: number;
     riderName: string;
     eloMean: number;
     uciPoints: number;
@@ -100,7 +101,7 @@ async function main() {
     });
 
     if (!stats) {
-      // Create default stats
+      // Create a placeholder row so we can track this rider — but mark as unranked (racesTotal=0)
       await db
         .insert(schema.riderDisciplineStats)
         .values({
@@ -110,7 +111,8 @@ async function main() {
           gender,
           currentElo: "1500",
           eloMean: "1500",
-          eloVariance: "350",
+          eloVariance: "500", // high uncertainty
+          racesTotal: 0,
           uciPoints: 0,
         })
         .onConflictDoNothing();
@@ -128,8 +130,28 @@ async function main() {
       withExisting++;
     }
 
-    const eloMean = stats ? parseFloat(stats.eloMean || "1500") : 1500;
+    const racesTotal = stats?.racesTotal ?? 0;
     const uciPoints = stats?.uciPoints ?? 0;
+
+    // Scoring logic:
+    // - Unranked (0 results): score is BELOW all ranked riders.
+    //   If they have UCI points, use those as a weak signal within the unranked band.
+    // - Ranked (≥1 result): use ELO mean as primary signal + UCI points as secondary.
+    const UNRANKED_BASE = 500;   // ceiling for unranked riders — always below ranked
+    const RANKED_BASE   = 1000;  // floor for ranked riders
+
+    let rawScore: number;
+    if (racesTotal === 0) {
+      // Unranked: base 0–500, boosted by UCI points (capped at 400 so still below ranked floor)
+      const uciBoost = Math.min(uciPoints / 500 * 400, 400);
+      rawScore = uciBoost; // 0–400
+    } else {
+      // Ranked: ELO (1000–2000 range) weighted 70% + UCI points 30%
+      const eloMean = parseFloat(stats?.eloMean || "1500");
+      const eloComponent = eloMean * 0.7;
+      const uciComponent = Math.min(uciPoints / 2000 * 500, 500) * 0.3;
+      rawScore = RANKED_BASE + eloComponent + uciComponent;
+    }
 
     // Check for rumours
     const rumour = await db.query.riderRumours.findFirst({
@@ -154,16 +176,14 @@ async function main() {
 
     // rumourModifier: sentiment -1 to +1, apply as ±5%
     const rumourModifier = rumourSentiment * 0.05;
-
-    // 5. Compute score
-    const eloComponent = eloMean * 0.7;
-    const uciComponent = Math.min(uciPoints / 2000 * 500, 500) * 0.3;
-    const rawScore = eloComponent + uciComponent;
     const score = rawScore * (1 + rumourModifier);
+
+    const eloMean = racesTotal > 0 ? parseFloat(stats?.eloMean || "1500") : 1500;
 
     riderScores.push({
       riderId: rider.id,
       riderName: rider.name,
+      racesTotal,
       eloMean,
       uciPoints,
       rumourModifier,
@@ -227,7 +247,7 @@ async function main() {
     top10Probability: top10Probs[i].toFixed(4),
     eloScore: r.eloMean.toFixed(4),
     rumourModifier: r.rumourModifier.toFixed(4),
-    confidenceScore: r.uciPoints > 0 || r.eloMean !== 1500 ? "0.6000" : "0.3000",
+    confidenceScore: r.racesTotal > 0 ? (r.uciPoints > 0 ? "0.7000" : "0.5000") : (r.uciPoints > 0 ? "0.3000" : "0.1000"),
     version: 1,
   }));
 
