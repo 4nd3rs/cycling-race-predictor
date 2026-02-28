@@ -13,7 +13,7 @@ import { buildEventUrl, buildRaceUrl, getDisciplineShortLabel, normalizeUciCateg
 import { RaceLinksSection } from "@/components/race-links";
 import { EventListView } from "@/components/event-card";
 import { MyFeedWidget } from "@/components/my-feed-widget";
-import { RaceFilters } from "@/components/race-filters";
+import { DisciplineFilter, CalendarFilters } from "@/components/race-filters";
 import { RaceFollowButton } from "@/components/race-follow-button";
 import { auth } from "@clerk/nextjs/server";
 import { SignInButton } from "@clerk/nextjs";
@@ -308,9 +308,7 @@ export default async function Home({ searchParams }: HomePageProps) {
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl h-10 flex items-center gap-3">
             <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground shrink-0">Filter</span>
             <span className="w-px h-3 bg-border/50 shrink-0" />
-            <div className="flex-1 min-w-0">
-              <RaceFilters countries={calendarCountries} basePath="/" />
-            </div>
+            <DisciplineFilter basePath="/" />
             {!userId && (
               <SignInButton mode="modal">
                 <button className="hidden sm:flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap shrink-0 group">
@@ -341,11 +339,14 @@ export default async function Home({ searchParams }: HomePageProps) {
         {/* ---- UPCOMING RACES TABLE ---- */}
         <section className="border-b border-border/50">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-10">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-3">
               <h2 className="text-xl font-bold tracking-tight">On the Calendar</h2>
               <Link href="/races" className="text-sm text-primary hover:text-primary/80 transition-colors">
                 View all races &rarr;
               </Link>
+            </div>
+            <div className="mb-4">
+              <CalendarFilters countries={calendarCountries} basePath="/" />
             </div>
             {upcomingRaces.length > 0 ? (
               <EventListView events={upcomingRaces} />
