@@ -1,11 +1,11 @@
 # SCRAPE_STATUS.md — Pipeline Status
 
-_Last updated: 2026-02-28 12:29:24 (Stockholm)_
+_Last updated: 2026-02-28 13:33:48 (Stockholm)_
 
 ## 📅 Race Calendar
-- **Last run:** 2026-02-28 07:30:31
+- **Last run:** 2026-02-28 13:33:48
 - **Status:** ✅ OK
-- Road (PCS): 19 found, 0 new, 19 existed. MTB (XCOdata): 83 found, 2 new, 81 existed.
+- Road (PCS): 0 found, 0 new, 0 existed. MTB (XCOdata): 90 found, 5 new, 85 existed.
 
 ## 📋 Startlists
 - **Last run:** 2026-02-28 12:06:45
@@ -22,14 +22,14 @@ _Last updated: 2026-02-28 12:29:24 (Stockholm)_
 | VTT Chabrières + UCI XCO Junior Series - Elite Women | 2026-03-01 | 0 | ⏭️ no pcsUrl | 2026-02-28 12:06:45 |
 
 ## 🏁 Results
-- **Last run:** 2026-02-28 12:29:24
+- **Last run:** 2026-02-28 13:29:49
 - **Status:** ✅ OK
 - 0 results imported across 2 race(s). 0 race(s) need LLM fallback (no pcsUrl).
 
 | Race | Date | Results | Status | Scraped |
 |------|------|---------|--------|---------|
-| Omloop Het Nieuwsblad 2026 - Elite Men | 2026-02-28 | 0 | ⏳ pending | 2026-02-28 12:29:15 |
-| Omloop Het Nieuwsblad 2026 - Elite Women | 2026-02-28 | 0 | ⏳ pending | 2026-02-28 12:29:20 |
+| Omloop Het Nieuwsblad 2026 - Elite Men | 2026-02-28 | 0 | ⏳ pending | 2026-02-28 13:29:15 |
+| Omloop Het Nieuwsblad 2026 - Elite Women | 2026-02-28 | 0 | ⏳ pending | 2026-02-28 13:29:45 |
 
 ---
 <!-- STATUS_JSON
@@ -94,23 +94,23 @@ _Last updated: 2026-02-28 12:29:24 (Stockholm)_
         "date": "2026-02-28",
         "count": 0,
         "status": "⏳ pending",
-        "scrapedAt": "2026-02-28 12:29:15"
+        "scrapedAt": "2026-02-28 13:29:15"
       },
       {
         "name": "Omloop Het Nieuwsblad 2026 - Elite Women",
         "date": "2026-02-28",
         "count": 0,
         "status": "⏳ pending",
-        "scrapedAt": "2026-02-28 12:29:20"
+        "scrapedAt": "2026-02-28 13:29:45"
       }
     ],
-    "updatedAt": "2026-02-28 12:29:24"
+    "updatedAt": "2026-02-28 13:29:49"
   },
   "calendar": {
     "component": "calendar",
     "status": "ok",
-    "summary": "Road (PCS): 19 found, 0 new, 19 existed. MTB (XCOdata): 83 found, 2 new, 81 existed.",
-    "updatedAt": "2026-02-28 07:30:31"
+    "summary": "Road (PCS): 0 found, 0 new, 0 existed. MTB (XCOdata): 90 found, 5 new, 85 existed.",
+    "updatedAt": "2026-02-28 13:33:48"
   }
 }
 STATUS_JSON -->

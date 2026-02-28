@@ -489,16 +489,20 @@ async function scrapeMtbCalendar(): Promise<ScrapedRace[]> {
     }
 
     const TARGET_CLASSES = new Set(["WC", "WCH", "C1", "C2"]);
+    // XCC races use C3 as their equivalent of C1; accept them when name contains XCC
+    const XCC_CLASSES = new Set(["WC", "WCH", "C1", "C2", "C3", "HC"]);
 
     for (const row of rows) {
       const dateStr = parseXcoDate(row.date);
       if (!dateStr || !isInDateRange(dateStr)) continue;
 
       const classCode = row.raceClass.toUpperCase().trim();
-      if (!TARGET_CLASSES.has(classCode)) continue;
+      const isXCC = /XCC/i.test(row.name);
+      const allowedClasses = isXCC ? XCC_CLASSES : TARGET_CLASSES;
+      if (!allowedClasses.has(classCode)) continue;
 
-      // Clean name: remove XCO suffix etc.
-      const name = row.name.replace(/\s*[-–]\s*XCO\s*$/, "").trim();
+      // Clean name: remove XCO/XCC suffix
+      const name = row.name.replace(/\s*[-–]\s*XC[CO]\s*$/, "").trim();
 
       let series: string | undefined;
       if (classCode === "WC") series = "world-cup";
@@ -514,7 +518,7 @@ async function scrapeMtbCalendar(): Promise<ScrapedRace[]> {
         uciCategory: classCode,
         sourceUrl,
         discipline: "mtb",
-        subDiscipline: "xco",
+        subDiscipline: isXCC ? "xcc" : "xco",
         series,
       });
     }

@@ -179,8 +179,8 @@ export async function scrapeXCOdataRacesList(
       continue;
     }
 
-    // Only include XCO races
-    if (raceName.includes("XCO") || (!raceName.includes("XCC") && !raceName.includes("XCM") && !raceName.includes("XCE"))) {
+    // Include XCO and XCC races (skip XCM, XCE, XCO/XCC combo events handled by calendar sync)
+    if (raceName.includes("XCO") || raceName.includes("XCC")) {
       races.push({
         id: raceId,
         name: raceName,
