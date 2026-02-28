@@ -141,9 +141,12 @@ export async function findOrCreateTeam(
 
 /**
  * Normalize rider name for matching.
- * Handles "LAST, First" format and converts to title case.
+ * Handles multiple formats:
+ * - "LAST, First" → "First Last"
+ * - "LASTNAME Firstname" (UCI/XCOdata format: ALL_CAPS last + Title first) → "Firstname Lastname"
+ * - Plain "First Last" → title case normalization
  */
-function normalizeRiderName(name: string): string {
+export function normalizeRiderName(name: string): string {
   let normalized = name.trim().replace(/\s+/g, " ");
 
   // Handle "LAST, First" format
@@ -151,6 +154,33 @@ function normalizeRiderName(name: string): string {
     const parts = normalized.split(",").map((p) => p.trim());
     if (parts.length === 2) {
       normalized = `${parts[1]} ${parts[0]}`;
+    }
+  } else {
+    // Detect "LASTNAME Firstname" UCI format:
+    // When the name has 2+ words and the first N words are ALL_CAPS (last name),
+    // and the remaining word(s) have mixed case (first name).
+    // e.g. "SÖDERQVIST Jakob" → "Jakob Söderqvist"
+    //      "VAN DER POEL Mathieu" → "Mathieu Van Der Poel"
+    const words = normalized.split(" ");
+    if (words.length >= 2) {
+      // Strip accents for case detection
+      const stripAcc = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      // Find the split point: last consecutive all-caps word from the start
+      let lastCapIdx = -1;
+      for (let i = 0; i < words.length - 1; i++) {
+        const w = stripAcc(words[i]);
+        if (w === w.toUpperCase() && w.length > 1 && /[A-Za-z]/.test(w)) {
+          lastCapIdx = i;
+        } else {
+          break;
+        }
+      }
+      if (lastCapIdx >= 0) {
+        // Split: words[0..lastCapIdx] are the last name, rest is first name
+        const lastNameParts = words.slice(0, lastCapIdx + 1);
+        const firstNameParts = words.slice(lastCapIdx + 1);
+        normalized = [...firstNameParts, ...lastNameParts].join(" ");
+      }
     }
   }
 

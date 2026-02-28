@@ -9,6 +9,7 @@ import { useState, useEffect, useRef } from "react";
 
 const navigation = [
   { name: "Races", href: "/races" },
+  { name: "Results", href: "/results" },
   { name: "Riders", href: "/riders" },
   { name: "Teams", href: "/teams" },
 ];

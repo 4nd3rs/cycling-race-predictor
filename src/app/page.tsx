@@ -338,10 +338,42 @@ export default async function Home({ searchParams }: HomePageProps) {
           </div>
         </section>
 
+        {/* ---- LATEST RESULTS ---- */}
+        <section className="border-b border-border/50">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-10">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold tracking-tight">Latest Results</h2>
+              <Link href="/results" className="text-sm text-primary hover:text-primary/80 transition-colors">
+                View all &rarr;
+              </Link>
+            </div>
+            {recentResults.length > 0 ? (
+              <div className="rounded-lg border border-border/50 overflow-hidden">
+                {recentResults.map(({ race, event, winner }) => (
+                  <Link
+                    key={race.id}
+                    href={event.slug ? buildEventUrl(event.discipline, event.slug) : getRaceUrl(race, event)}
+                    className="flex items-center gap-3 py-3 px-3 border-b border-border/30 last:border-0 hover:bg-white/[0.03] transition-colors group"
+                  >
+                    <span className="text-xs text-muted-foreground w-12 shrink-0">{format(toRaceDate(race.date), "MMM d")}</span>
+                    <span className="text-sm shrink-0">{getFlag(event.country)}</span>
+                    <span className="flex-1 text-sm font-medium truncate group-hover:text-primary transition-colors">{event.name}</span>
+                    <span className="text-sm text-muted-foreground truncate hidden sm:block">{winner.name}</span>
+                    <Badge variant="outline" className={`text-[10px] shrink-0 ${getDisciplineColor(event.discipline)}`}>
+                      {getDisciplineLabel(event.discipline)}
+                    </Badge>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-sm py-8 text-center">No recent results to show.</p>
+            )}
+          </div>
+        </section>
+
+        {/* ---- LATEST INTEL ---- */}
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-10 overflow-hidden">
-          <div className="grid grid-cols-1 gap-10 lg:grid-cols-5 overflow-hidden">
-            {/* ---- LATEST INTEL ---- */}
-            <div className="lg:col-span-3 min-w-0 overflow-hidden">
+          <div className="min-w-0 overflow-hidden">
               <h2 className="text-xl font-bold tracking-tight mb-6">
                 Latest Intel
               </h2>
@@ -367,46 +399,6 @@ export default async function Home({ searchParams }: HomePageProps) {
                   </CardContent>
                 </Card>
               )}
-            </div>
-
-            {/* ---- RECENT RESULTS ---- */}
-            <div className="lg:col-span-2 min-w-0 overflow-hidden">
-              <h2 className="text-xl font-bold tracking-tight mb-6">
-                Latest Results
-              </h2>
-              {recentResults.length > 0 ? (
-                <div className="space-y-2">
-                  {recentResults.map(({ race, event, winner }) => (
-                    <Link
-                      key={race.id}
-                      href={getRaceUrl(race, event)}
-                      className="flex items-center gap-3 p-3 rounded-lg border border-border/50 hover:border-border hover:bg-card transition-colors group"
-                    >
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-yellow-500/20 text-yellow-500 text-sm font-bold shrink-0">
-                        1
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold truncate group-hover:text-primary transition-colors">
-                          {event.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {winner.name} &middot; {format(toRaceDate(race.date), "MMM d")}
-                        </p>
-                      </div>
-                      <Badge variant="outline" className={`text-[10px] shrink-0 ${getDisciplineColor(event.discipline)}`}>
-                        {getDisciplineLabel(event.discipline)}
-                      </Badge>
-                    </Link>
-                  ))}
-                </div>
-              ) : (
-                <Card>
-                  <CardContent className="py-12 text-center">
-                    <p className="text-muted-foreground text-sm">No recent results to show.</p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
           </div>
         </div>
       </main>
