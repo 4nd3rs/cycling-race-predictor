@@ -24,7 +24,6 @@ import {
   makeSlugUnique,
 } from "../../src/lib/url-utils";
 import { scrapeXCOdataRacesList } from "../../src/lib/scraper/xcodata-races";
-import { chromium, type Browser } from "playwright";
 import * as cheerio from "cheerio";
 import { writeScrapeStatus } from "./lib/scrape-status";
 
@@ -323,39 +322,32 @@ function normalizePcsCategory(raw: string): string | null {
 
 async function scrapePcsCalendar(): Promise<ScrapedRace[]> {
   const races: ScrapedRace[] = [];
-  let browser: Browser | null = null;
 
   try {
-    browser = await chromium.launch({ headless: true });
-    const page = await browser.newPage();
-    await page.setExtraHTTPHeaders({
-      "User-Agent":
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      "Accept-Language": "en-US,en;q=0.9",
-    });
+    const token = process.env.SCRAPE_DO_TOKEN;
+    if (!token) throw new Error("SCRAPE_DO_TOKEN not set");
+    const apiUrl = `https://api.scrape.do?token=${token}&url=${encodeURIComponent("https://www.procyclingstats.com/races.php")}&render=true`;
 
-    console.log("  Loading PCS race calendar...");
-    await page.goto("https://www.procyclingstats.com/races.php", {
-      waitUntil: "networkidle",
-      timeout: 30000,
-    });
-    await page.waitForSelector("table", { timeout: 10000 }).catch(() => {});
+    console.log("  Loading PCS race calendar via scrape.do...");
+    const res = await fetch(apiUrl, { signal: AbortSignal.timeout(30000) });
+    if (!res.ok) throw new Error(`scrape.do returned ${res.status}`);
+    const html = await res.text();
+    const $ = cheerio.load(html);
 
-    // PCS table structure: [date_range, start_date, race_name, winner, class]
-    // class=" basic" (note leading space)
-    const rowsToParse = await page.$$eval("table tbody tr", (rows) =>
-      rows.map((row) => {
-        const cells = Array.from(row.querySelectorAll("td")).map(td => td.textContent?.trim() ?? "");
-        const link = row.querySelector("a[href*='/race/']");
-        return {
+    const rowsToParse: Array<{ name: string; url: string; dateRange: string; startDate: string; category: string }> = [];
+    $("table tbody tr").each((_, row) => {
+      const cells = $(row).find("td").map((_, td) => $(td).text().trim()).get();
+      const link = $(row).find("a[href*='/race/']").first();
+      if (cells.length > 2 && cells[2].length > 2) {
+        rowsToParse.push({
           name: cells[2] ?? "",
-          url: link?.getAttribute("href") ?? "",
+          url: link.attr("href") ?? "",
           dateRange: cells[0] ?? "",
           startDate: cells[1] ?? "",
           category: cells[4] ?? "",
-        };
-      }).filter(r => r.name.length > 2)
-    );
+        });
+      }
+    });
 
     console.log(`  PCS: ${rowsToParse.length} raw rows parsed`);
 
@@ -393,8 +385,6 @@ async function scrapePcsCalendar(): Promise<ScrapedRace[]> {
     }
   } catch (err) {
     console.error(`  PCS scrape error: ${err}`);
-  } finally {
-    if (browser) await browser.close();
   }
 
   return races;
@@ -404,73 +394,41 @@ async function scrapePcsCalendar(): Promise<ScrapedRace[]> {
 
 async function scrapeMtbCalendar(): Promise<ScrapedRace[]> {
   const races: ScrapedRace[] = [];
-  let browser: Browser | null = null;
 
   try {
-    browser = await chromium.launch({ headless: true });
-    const page = await browser.newPage();
-    await page.setExtraHTTPHeaders({
-      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
-      "Accept-Language": "en-US,en;q=0.9",
+    // XCOdata is not behind Cloudflare — plain fetch works
+    console.log("  Loading XCOdata race calendar...");
+    const res = await fetch("https://www.xcodata.com/races", {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; Bot/1.0)", "Accept-Language": "en-US,en;q=0.9" },
+      signal: AbortSignal.timeout(20000),
     });
+    if (!res.ok) throw new Error(`XCOdata returned ${res.status}`);
+    const html = await res.text();
+    const $ = cheerio.load(html);
 
-    await page.goto("https://www.xcodata.com/races", { waitUntil: "networkidle", timeout: 30000 });
-    await page.waitForSelector("table", { timeout: 10000 }).catch(() => {});
+    // XCOdata table: each row has [date cell, race card cell, ..., class cell]
+    // Race card is wrapped in an <a> tag containing the race name + date + location
+    const rows: Array<{ date: string; name: string; raceClass: string; url: string }> = [];
+    $("table tbody tr").each((_, tr) => {
+      const cells = $(tr).find("td").map((_, td) => $(td).text().replace(/\s+/g, " ").trim()).get();
+      const link = $(tr).find("a").first();
+      const href = link.attr("href") ?? "";
 
-    // XCOdata table: [date, race name (with link), ..., class]
-    // Note: XCOdata wraps the full card (name + date + location + "Winner") in one <a> tag.
-    // We extract just the race name by:
-    //   1. Trying a heading element inside the link (h1-h5, strong, .name, .title)
-    //   2. Taking the first text node directly under the link
-    //   3. Falling back to the text before the first date pattern (DD Mon YYYY)
-    const rows = await page.$$eval("table tbody tr", (trs) =>
-      trs.map((tr) => {
-        const cells = Array.from(tr.querySelectorAll("td")).map(td => td.textContent?.replace(/\s+/g, " ").trim() ?? "");
-        const link = tr.querySelector("a");
+      // Extract race name: first <a> text, trimmed before date pattern
+      let raceName = link.text().replace(/\s+/g, " ").trim();
+      const dateMatch = raceName.match(/\d{1,2}(?:\s*-\s*\d{1,2})?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i);
+      if (dateMatch) raceName = raceName.substring(0, dateMatch.index).trim();
+      raceName = raceName.replace(/\s+Winner.*$/i, "").trim();
 
-        let raceName = "";
-
-        if (link) {
-          // Strategy 1: heading or named element inside the link
-          const heading = link.querySelector("h1,h2,h3,h4,h5,strong,.name,.title,[class*='name'],[class*='title']");
-          if (heading) {
-            raceName = heading.textContent?.replace(/\s+/g, " ").trim() ?? "";
-          }
-
-          // Strategy 2: first direct text node (not nested elements)
-          if (!raceName) {
-            for (const node of Array.from(link.childNodes)) {
-              if (node.nodeType === 3 /* TEXT_NODE */) {
-                const t = node.textContent?.replace(/\s+/g, " ").trim() ?? "";
-                if (t.length > 2) { raceName = t; break; }
-              }
-            }
-          }
-
-          // Strategy 3: full textContent truncated before first date pattern
-          if (!raceName) {
-            const full = link.textContent?.replace(/[\t\r\n]+/g, " ").replace(/\s{2,}/g, " ").trim() ?? "";
-            const dateMatch = full.match(/\d{1,2}\s*(?:-\s*\d{1,2})?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i);
-            raceName = dateMatch ? full.substring(0, dateMatch.index).trim() : full;
-          }
-        }
-
-        // Fallback to first cell if still empty
-        if (!raceName) {
-          raceName = cells[1]?.split(/\d{2}\s+\w+\s+\d{4}/)?.[0]?.trim() ?? cells[1] ?? "";
-        }
-
-        // Final strip: remove " - Winner", "Winner" suffix if leaked through
-        raceName = raceName.replace(/\s+Winner.*$/i, "").trim();
-
-        return {
+      if (raceName.length > 3 && raceName.length < 200) {
+        rows.push({
           date: cells[0] ?? "",
           name: raceName,
           raceClass: cells[cells.length - 1] ?? "",
-          url: link?.getAttribute("href") ?? "",
-        };
-      }).filter(r => r.name.length > 3 && r.name.length < 200)
-    );
+          url: href,
+        });
+      }
+    });
 
     // Parse XCOdata dates like "24 Jan 2026" or "28 - 30 Jan 2026"
     const monthMap: Record<string, string> = {
@@ -524,8 +482,6 @@ async function scrapeMtbCalendar(): Promise<ScrapedRace[]> {
     }
   } catch (err) {
     console.error(`  XCOdata scrape error: ${err}`);
-  } finally {
-    if (browser) await browser.close();
   }
 
   return races;
