@@ -64,51 +64,41 @@ export function RaceFilters({
 
   const pill = (active: boolean) =>
     cn(
-      "px-3 py-1 text-xs font-semibold rounded-full transition-all duration-150 cursor-pointer whitespace-nowrap",
+      "px-2.5 py-0.5 text-xs font-semibold rounded-full transition-all duration-150 cursor-pointer whitespace-nowrap shrink-0",
       active
         ? "bg-primary text-primary-foreground"
-        : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+        : "text-muted-foreground hover:text-foreground"
     );
 
-  return (
-    <div className="flex flex-wrap items-center gap-4">
-      {/* Discipline */}
-      <div className="flex items-center gap-1">
-        {(["all", "road", "mtb"] as const).map((k) => (
-          <button
-            key={k}
-            onClick={() => { setDiscipline(k); applyFilters(k, gender, country); }}
-            className={pill(discipline === k)}
-          >
-            {k === "all" ? "All" : k === "road" ? "Road" : "MTB"}
-          </button>
-        ))}
-      </div>
+  const divider = <span className="w-px h-3 bg-border/50 shrink-0" />;
 
-      <span className="w-px h-4 bg-border/50 hidden sm:block" />
+  return (
+    <div className="flex items-center gap-2 overflow-x-auto scrollbar-none min-w-0">
+      {/* Discipline */}
+      {(["all", "road", "mtb"] as const).map((k) => (
+        <button key={k} onClick={() => { setDiscipline(k); applyFilters(k, gender, country); }} className={pill(discipline === k)}>
+          {k === "all" ? "All" : k === "road" ? "Road" : "MTB"}
+        </button>
+      ))}
+
+      {divider}
 
       {/* Gender */}
-      <div className="flex items-center gap-1">
-        {(["all", "men", "women"] as const).map((k) => (
-          <button
-            key={k}
-            onClick={() => { setGender(k); applyFilters(discipline, k, country); }}
-            className={pill(gender === k)}
-          >
-            {k === "all" ? "All" : k === "men" ? "Men" : "Women"}
-          </button>
-        ))}
-      </div>
+      {(["all", "men", "women"] as const).map((k) => (
+        <button key={k} onClick={() => { setGender(k); applyFilters(discipline, k, country); }} className={pill(gender === k)}>
+          {k === "all" ? "All" : k === "men" ? "Men" : "Women"}
+        </button>
+      ))}
 
-      <span className="w-px h-4 bg-border/50 hidden sm:block" />
+      {divider}
 
       {/* Country */}
-      <div className="relative">
+      <div className="relative shrink-0">
         <select
           value={country}
           onChange={(e) => { setCountry(e.target.value); applyFilters(discipline, gender, e.target.value); }}
           className={cn(
-            "appearance-none bg-transparent pr-5 text-xs font-semibold transition-colors cursor-pointer focus:outline-none",
+            "appearance-none bg-transparent pr-4 text-xs font-semibold transition-colors cursor-pointer focus:outline-none",
             country ? "text-primary" : "text-muted-foreground hover:text-foreground"
           )}
         >
@@ -117,16 +107,16 @@ export function RaceFilters({
             <option key={code} value={code}>{name}</option>
           ))}
         </select>
-        <span className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-muted-foreground text-[10px]">▾</span>
+        <span className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-muted-foreground text-[9px]">▾</span>
       </div>
 
       {/* Clear */}
       {hasActiveFilter && (
         <>
-          <span className="w-px h-4 bg-border/50 hidden sm:block" />
+          {divider}
           <button
             onClick={() => { setDiscipline("all"); setGender("all"); setCountry(""); setCat("all"); applyFilters("all", "all", "", "all"); }}
-            className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+            className="text-[11px] text-muted-foreground hover:text-foreground transition-colors shrink-0"
           >
             Clear
           </button>
