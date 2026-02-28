@@ -17,30 +17,30 @@ const barlowCondensed = Barlow_Condensed({
 });
 
 export const metadata: Metadata = {
-  title: "Pro Cycling Predictor — AI Race Predictions",
+  title: "Pro Cycling Predictor — Race Briefings on WhatsApp & Telegram",
   description:
-    "AI-powered cycling race predictions using TrueSkill ELO ratings, form analysis, and community intel. Win probabilities, podium chances, and more.",
+    "Follow your favourite races and riders. Get a personalised race briefing on WhatsApp or Telegram before every start — startlists, predictions, rider intel, and weather.",
   metadataBase: new URL("https://procyclingpredictor.com"),
   openGraph: {
-    title: "Pro Cycling Predictor — AI Race Predictions",
+    title: "Pro Cycling Predictor — Race Briefings on WhatsApp & Telegram",
     description:
-      "AI-powered cycling race predictions using TrueSkill ELO ratings, form analysis, and community intel.",
+      "Follow your favourite races and riders. Get a personalised race briefing on WhatsApp or Telegram before every start.",
     type: "website",
     url: "https://procyclingpredictor.com",
     images: [
       {
         url: "/opengraph-image.png",
         width: 1200,
-        height: 300,
-        alt: "Pro Cycling Predictor",
+        height: 630,
+        alt: "Pro Cycling Predictor — Race briefings on WhatsApp & Telegram",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Pro Cycling Predictor — AI Race Predictions",
+    title: "Pro Cycling Predictor — Race Briefings on WhatsApp & Telegram",
     description:
-      "AI-powered cycling race predictions. Win probabilities, podium chances, and community intel.",
+      "Personalised race briefings on WhatsApp or Telegram. Startlists, predictions, rider intel — before every race.",
     images: ["/opengraph-image.png"],
   },
 };
