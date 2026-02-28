@@ -115,13 +115,14 @@ async function sendFollowNotification(
   entityId: string
 ): Promise<void> {
   // Check if user has Telegram connected
-  const [tg] = await db
-    .select({ telegramChatId: userTelegram.telegramChatId })
-    .from(userTelegram)
-    .where(eq(userTelegram.userId, userId))
-    .limit(1);
+  const [[tg], [wa]] = await Promise.all([
+    db.select({ telegramChatId: userTelegram.telegramChatId })
+      .from(userTelegram).where(eq(userTelegram.userId, userId)).limit(1),
+    db.select({ phoneNumber: userWhatsapp.phoneNumber })
+      .from(userWhatsapp).where(eq(userWhatsapp.userId, userId)).limit(1),
+  ]);
 
-  if (!tg?.telegramChatId) return;
+  if (!tg?.telegramChatId && !wa?.phoneNumber) return;
 
   // Look up entity name + link
   let entityName: string | null = null;
@@ -198,15 +199,10 @@ async function sendFollowNotification(
     `<i>Manage your follows at procyclingpredictor.com</i>`,
   ].join("\n");
 
-  await sendTelegramMessage(tg.telegramChatId, message);
+  if (tg?.telegramChatId) await sendTelegramMessage(tg.telegramChatId, message);
+
 
   // Also send via WhatsApp if connected
-  const [wa] = await db
-    .select({ phoneNumber: userWhatsapp.phoneNumber })
-    .from(userWhatsapp)
-    .where(eq(userWhatsapp.userId, userId))
-    .limit(1);
-
   if (wa?.phoneNumber) {
     const waText = [
       `${emoji} *You're now following ${entityName}!*`,
