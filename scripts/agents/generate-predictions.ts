@@ -97,7 +97,9 @@ async function generateForRace(raceId: string): Promise<void> {
     if (racesTotal === 0) {
       // Unranked band: conservative estimate will be ~0–200, always below rated riders
       // (rated floor: mean=1500, σ=350 → conservative = 1500 - 3*350 = 450)
-      const uciBoost = Math.min(uciPoints / 500 * 200, 200);
+      // Scale UCI points logarithmically: 100pts→~70, 500pts→~150, 2000pts→~310, 5000pts→~390
+      // Cap at 390 so even the highest-ranked unranked rider stays below the rated floor (~450)
+      const uciBoost = uciPoints > 0 ? Math.min(Math.log(1 + uciPoints) * 30, 390) : 0;
       skill = { riderId: rider.id, mean: 300 + uciBoost, variance: 100 * 100 };
     } else {
       const mean = parseFloat(stats?.eloMean || "1500");

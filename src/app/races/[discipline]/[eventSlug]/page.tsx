@@ -223,7 +223,7 @@ async function getRaceSpecificNews(eventId: string, raceId: string, gender?: str
           : or(eq(raceNews.raceId, raceId), isNull(raceNews.raceId))
       ))
       .orderBy(desc(raceNews.publishedAt))
-      .limit(3);
+      .limit(8);
   } catch { return []; }
 }
 
@@ -758,17 +758,12 @@ export default async function EventPage({ params }: PageProps) {
                         {raceNews.length > 0 && (
                           <div>
                             <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Latest News</h3>
-                            <div className="space-y-2">
-                              {raceNews.slice(0, 2).map((article) => (
+                            <div className="space-y-1.5">
+                              {raceNews.slice(0, 5).map((article) => (
                                 <a key={article.id} href={article.url || "#"} target="_blank" rel="noopener noreferrer"
-                                  className="flex gap-2.5 items-start hover:bg-muted/30 rounded-lg p-1.5 -m-1.5 transition-colors group">
-                                  {article.imageUrl && (
-                                    <div className="w-14 h-10 rounded overflow-hidden shrink-0 bg-muted/30">
-                                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                                      <img src={article.imageUrl} alt="" className="w-full h-full object-cover" />
-                                    </div>
-                                  )}
+                                  className="block hover:bg-muted/30 rounded-lg px-2 py-1.5 -mx-2 transition-colors group">
                                   <p className="text-[11px] leading-snug line-clamp-2 group-hover:text-primary transition-colors">{article.title}</p>
+                                  <p className="text-[10px] text-muted-foreground/60 mt-0.5 capitalize">{article.source} · {article.publishedAt ? new Date(article.publishedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : ""}</p>
                                 </a>
                               ))}
                             </div>

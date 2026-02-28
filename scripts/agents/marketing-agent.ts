@@ -43,14 +43,16 @@ interface TrackingData {
 }
 
 function loadTracking(): TrackingData {
+  const defaults: TrackingData = { previews: [], results: [], igPreviews: [], igResults: [] };
   if (existsSync(TRACKING_FILE)) {
     try {
-      return JSON.parse(readFileSync(TRACKING_FILE, "utf-8"));
+      const parsed = JSON.parse(readFileSync(TRACKING_FILE, "utf-8"));
+      return { ...defaults, ...parsed };
     } catch {
       // Corrupted file, reset
     }
   }
-  return { previews: [], results: [], igPreviews: [], igResults: [] };
+  return defaults;
 }
 
 function saveTracking(data: TrackingData): void {

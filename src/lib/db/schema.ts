@@ -492,6 +492,17 @@ export const userWhatsapp = pgTable("user_whatsapp", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// ── Notification Log (dedup) ─────────────────────────────────────────────────
+export const notificationLog = pgTable("notification_log", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id").notNull(),
+  channel: varchar("channel", { length: 20 }).notNull(), // "telegram" | "whatsapp"
+  eventType: varchar("event_type", { length: 50 }).notNull(), // "follow", "prediction", "result", "startlist", "intel"
+  entityId: text("entity_id").notNull(), // race/rider ID
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+});
+export type NotificationLog = typeof notificationLog.$inferSelect;
+
 // ============================================================================
 // RELATIONS
 // ============================================================================
