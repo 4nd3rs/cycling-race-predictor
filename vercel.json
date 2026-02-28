@@ -16,6 +16,22 @@
     {
       "path": "/api/cron/sync-mtb-rankings",
       "schedule": "0 10 * * 2"
+    },
+    {
+      "path": "/api/cron/marketing-agent",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/gossip-hunter",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/results-hunter",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/scrape-race-news",
+      "schedule": "0 */3 * * *"
     }
   ]
 }
