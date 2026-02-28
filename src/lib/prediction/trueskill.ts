@@ -174,22 +174,6 @@ function updatePairwise(
   };
 }
 
-/**
- * Apply dynamics factor (increase variance over time)
- * Call this when a rider hasn't raced recently
- */
-export function applyDynamics(skill: RiderSkill, daysSinceRace: number): RiderSkill {
-  // Increase variance based on time since last race
-  const varianceIncrease = TAU * TAU * Math.min(daysSinceRace / 30, 5);
-  return {
-    ...skill,
-    variance: Math.min(
-      skill.variance + varianceIncrease,
-      INITIAL_VARIANCE * INITIAL_VARIANCE
-    ),
-  };
-}
-
 // ============================================================================
 // RACE PROCESSING
 // ============================================================================
@@ -449,18 +433,6 @@ export function calculateAllProbabilities(
 /**
  * Calculate win probabilities for all riders against each other
  * Returns estimated win probability for each rider
- * @deprecated Use calculateAllProbabilities instead for better performance
- */
-export function calculateWinProbabilities(
-  skills: Map<string, RiderSkill>
-): Map<string, number> {
-  const allProbs = calculateAllProbabilities(skills);
-  const winProbs = new Map<string, number>();
-  for (const [riderId, probs] of allProbs) {
-    winProbs.set(riderId, probs.win);
-  }
-  return winProbs;
-}
 
 /**
  * Generate a random number from standard normal distribution
@@ -470,94 +442,4 @@ function gaussianRandom(): number {
   const u1 = Math.random();
   const u2 = Math.random();
   return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-}
-
-/**
- * Calculate expected position for a rider in a race
- */
-export function expectedPosition(
-  riderSkill: RiderSkill,
-  allSkills: Map<string, RiderSkill>
-): number {
-  let betterRiders = 0;
-
-  for (const [otherId, otherSkill] of allSkills) {
-    if (otherId === riderSkill.riderId) continue;
-
-    // Probability that other rider beats this rider
-    const otherWinsProb = winProbability(otherSkill, riderSkill);
-    betterRiders += otherWinsProb;
-  }
-
-  // Expected position is 1 + number of riders expected to beat this one
-  return 1 + betterRiders;
-}
-
-/**
- * Calculate podium probability (top 3) for a rider
- */
-export function podiumProbability(
-  riderSkill: RiderSkill,
-  allSkills: Map<string, RiderSkill>
-): number {
-  const numSimulations = 5000;
-  let podiumCount = 0;
-
-  const skillsArray = Array.from(allSkills.entries());
-
-  for (let sim = 0; sim < numSimulations; sim++) {
-    const performances: Array<{ riderId: string; performance: number }> = [];
-
-    for (const [riderId, skill] of skillsArray) {
-      const performance =
-        skill.mean + Math.sqrt(skill.variance + BETA * BETA) * gaussianRandom();
-      performances.push({ riderId, performance });
-    }
-
-    performances.sort((a, b) => b.performance - a.performance);
-
-    // Check if our rider is in top 3
-    const riderPosition = performances.findIndex(
-      (p) => p.riderId === riderSkill.riderId
-    );
-    if (riderPosition < 3) {
-      podiumCount++;
-    }
-  }
-
-  return podiumCount / numSimulations;
-}
-
-/**
- * Calculate top-10 probability for a rider
- */
-export function top10Probability(
-  riderSkill: RiderSkill,
-  allSkills: Map<string, RiderSkill>
-): number {
-  const numSimulations = 5000;
-  let top10Count = 0;
-
-  const skillsArray = Array.from(allSkills.entries());
-
-  for (let sim = 0; sim < numSimulations; sim++) {
-    const performances: Array<{ riderId: string; performance: number }> = [];
-
-    for (const [riderId, skill] of skillsArray) {
-      const performance =
-        skill.mean + Math.sqrt(skill.variance + BETA * BETA) * gaussianRandom();
-      performances.push({ riderId, performance });
-    }
-
-    performances.sort((a, b) => b.performance - a.performance);
-
-    const riderPosition = performances.findIndex(
-      (p) => p.riderId === riderSkill.riderId
-    );
-    if (riderPosition < 10) {
-      top10Count++;
-    }
-  }
-
-  return top10Count / numSimulations;
 }

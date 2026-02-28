@@ -1,14 +1,18 @@
 const ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
 const AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
-const FROM_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER || "+16812710565";
+const FROM_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER;
+
+if (!FROM_NUMBER) {
+  console.warn("TWILIO_WHATSAPP_NUMBER is not set — WhatsApp messages will fail");
+}
 
 function twilioAuth() {
   return "Basic " + Buffer.from(`${ACCOUNT_SID}:${AUTH_TOKEN}`).toString("base64");
 }
 
 export async function sendWhatsAppMessage(to: string, text: string): Promise<boolean> {
-  if (!ACCOUNT_SID || !AUTH_TOKEN) {
-    console.error("Twilio credentials not set");
+  if (!ACCOUNT_SID || !AUTH_TOKEN || !FROM_NUMBER) {
+    console.error("Twilio credentials not configured (ACCOUNT_SID, AUTH_TOKEN, WHATSAPP_NUMBER required)");
     return false;
   }
 

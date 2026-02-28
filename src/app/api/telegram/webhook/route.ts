@@ -4,6 +4,12 @@ import { eq } from "drizzle-orm";
 import { sendTelegramMessage } from "@/lib/telegram";
 
 export async function POST(req: NextRequest) {
+  // Verify Telegram webhook secret token
+  const secretToken = req.headers.get("x-telegram-bot-api-secret-token");
+  if (process.env.TELEGRAM_WEBHOOK_SECRET && secretToken !== process.env.TELEGRAM_WEBHOOK_SECRET) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const update = await req.json();
 
   const message = update?.message;
