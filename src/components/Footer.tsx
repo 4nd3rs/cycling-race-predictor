@@ -39,12 +39,12 @@ export function Footer() {
             </a>
             <span className="hidden sm:inline text-border">·</span>
             <a
-              href="https://wa.me/16812710565"
+              href="https://wa.me/16812710565?text=hi"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-foreground transition-colors"
             >
-              WhatsApp
+              WhatsApp notifications
             </a>
             <span className="hidden sm:inline text-border">·</span>
             <a
