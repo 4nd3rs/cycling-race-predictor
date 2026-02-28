@@ -241,13 +241,9 @@ export async function notifyRaceEventCombined(
     const chatId = tgByUser.get(userId);
     if (chatId && !(await hasNotified(userId, "telegram", eventType, raceEventId))) {
       const tgBody = userRaces.length > 1
-        ? userRaces.map((r) => `<b>${r.categoryLabel}</b>
-${r.tgSection}`).join("
-
-")
+        ? userRaces.map((r) => `<b>${r.categoryLabel}</b>\n${r.tgSection}`).join("\n\n")
         : userRaces[0].tgSection;
-      const tgMsg = [headerTg, "", tgBody, "", footerTg].filter(Boolean).join("
-");
+      const tgMsg = [headerTg, "", tgBody, "", footerTg].filter(Boolean).join("\n");
       await sendTg(chatId, tgMsg);
       await logNotification(userId, "telegram", eventType, raceEventId);
       sent++;
@@ -257,13 +253,9 @@ ${r.tgSection}`).join("
     const phone = waByUser.get(userId);
     if (phone && !(await hasNotified(userId, "whatsapp", eventType, raceEventId))) {
       const waBody = userRaces.length > 1
-        ? userRaces.map((r) => `*${r.categoryLabel}*
-${r.waSection}`).join("
-
-")
+        ? userRaces.map((r) => `*${r.categoryLabel}*\n${r.waSection}`).join("\n\n")
         : userRaces[0].waSection;
-      const waMsg = [headerWa, "", waBody, "", footerWa].filter(Boolean).join("
-");
+      const waMsg = [headerWa, "", waBody, "", footerWa].filter(Boolean).join("\n");
       await sendWhatsApp(phone, waMsg);
       await logNotification(userId, "whatsapp", eventType, raceEventId);
       sent++;
