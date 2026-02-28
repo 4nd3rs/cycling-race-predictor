@@ -130,7 +130,7 @@ export function RaceFollowButton({
   if (compact) {
     return (
       <button
-        onClick={categories.length === 1 ? () => toggleCategory(categories[0].id) : toggleAll}
+        onClick={toggleAll}
         disabled={state === "toggling"}
         title={isFollowingAny ? "Following — click to unfollow" : "Follow"}
         className={cn("h-5 w-5 flex items-center justify-center text-muted-foreground transition-colors hover:text-primary", isFollowingAny && "text-primary", className)}
@@ -144,7 +144,7 @@ export function RaceFollowButton({
   if (categories.length <= 1) {
     return (
       <button
-        onClick={categories.length === 1 ? () => toggleCategory(categories[0].id) : toggleAll}
+        onClick={toggleAll}
         disabled={state !== "idle"}
         className={cn(
           "inline-flex items-center gap-1 h-6 px-2 rounded text-xs font-medium border transition-colors shrink-0",

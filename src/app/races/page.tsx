@@ -80,10 +80,24 @@ async function getFollowedEventIds(): Promise<Set<string>> {
     if (!userId) return new Set();
     const [user] = await db.select({ id: users.id }).from(users).where(eq(users.clerkId, userId)).limit(1);
     if (!user) return new Set();
-    const follows = await db.select({ entityId: userFollows.entityId })
+    // Include both race_event follows and individual race follows (look up parent event)
+    const follows = await db.select({ entityId: userFollows.entityId, followType: userFollows.followType })
       .from(userFollows)
-      .where(and(eq(userFollows.userId, user.id), eq(userFollows.followType, "race_event")));
-    return new Set(follows.map(f => f.entityId));
+      .where(and(eq(userFollows.userId, user.id)));
+
+    const eventFollowIds = follows.filter(f => f.followType === "race_event").map(f => f.entityId);
+    const raceFollowIds = follows.filter(f => f.followType === "race").map(f => f.entityId);
+
+    // Resolve individual race follows to their parent event IDs
+    let resolvedEventIds: string[] = [];
+    if (raceFollowIds.length > 0) {
+      const parentEvents = await db.select({ eventId: races.raceEventId })
+        .from(races)
+        .where(inArray(races.id, raceFollowIds));
+      resolvedEventIds = parentEvents.map(r => r.eventId).filter((id): id is string => id !== null);
+    }
+
+    return new Set([...eventFollowIds, ...resolvedEventIds]);
   } catch { return new Set(); }
 }
 
