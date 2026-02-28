@@ -14,6 +14,7 @@ import {
   buildCategoryUrl,
   generateCategorySlug,
   getSubDisciplineShortLabel,
+  normalizeUciCategory,
 } from "@/lib/url-utils";
 import { getFlag } from "@/lib/country-flags";
 
@@ -333,14 +334,12 @@ null
       {/* Date */}
       <span className="w-14 shrink-0 text-xs font-mono text-muted-foreground tabular-nums">{dateStr}</span>
 
-      {/* Discipline + UCI category */}
-      <div className="flex items-center gap-1 shrink-0 w-20 sm:w-28">
-        <span className={cn("rounded px-1.5 py-0.5 text-xs font-medium", discColor)}>
+      {/* Discipline + UCI category — single compact pill */}
+      <div className="flex items-center shrink-0 w-16 sm:w-20">
+        <span className={cn("rounded px-1.5 py-0.5 text-xs font-medium whitespace-nowrap", discColor)}>
           {subDiscipline ? getSubDisciplineShortLabel(subDiscipline) : discLabel}
+          {uciCategory && <span className="opacity-70"> {normalizeUciCategory(uciCategory)}</span>}
         </span>
-        {uciCategory && (
-          <span className="text-[10px] text-muted-foreground/70 font-mono truncate">{uciCategory}</span>
-        )}
       </div>
 
       {/* Name + Country flag */}
