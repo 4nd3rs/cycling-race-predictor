@@ -23,6 +23,67 @@ import {
   type RiderSkill,
 } from "../../src/lib/prediction/trueskill";
 import { notifyRaceEventFollowers } from "./lib/notify-followers";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+const genai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+
+/**
+ * Use race news headlines to generate per-rider mean adjustments.
+ * Returns a map of riderId → multiplier (e.g. 1.12 = +12% to mean, 0.88 = -12%).
+ * Max adjustment is ±20%.
+ */
+async function getNewsBasedAdjustments(
+  raceEventId: string | null | undefined,
+  riderNames: Map<string, string>
+): Promise<Map<string, number>> {
+  const adjustments = new Map<string, number>();
+  if (!raceEventId || riderNames.size === 0) return adjustments;
+
+  const articles: Array<{title: string; source: string}> = await sql`
+    SELECT title, source FROM race_news
+    WHERE race_event_id = ${raceEventId}
+    ORDER BY published_at DESC LIMIT 10
+  `;
+  if (articles.length === 0) return adjustments;
+
+  const headlines = articles.map(a => "- " + a.title + " (" + a.source + ")").join("\n");
+  // Top 30 riders with clean names for LLM context
+  const riderList = [...riderNames.values()].slice(0, 30).join(", ");
+
+  const prompt = "Analyze pre-race cycling news to adjust predictions.\n\nHeadlines:\n" + headlines + "\n\nStartlist (first 30): " + riderList + "\n\nFor each rider clearly flagged as a FAVOURITE or in strong form, assign +0.10 to +0.20. For riders confirmed INJURED, SICK, or WITHDRAWN, assign -0.15 to -0.20. Match by surname. Use EXACT names from the startlist. Return ONLY valid JSON like {\"Van Der Poel Mathieu\": 0.18, \"Van Aert Wout\": -0.20}. Return {} if no clear signals.";
+
+  try {
+    const model = genai.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const response = await model.generateContent(prompt);
+    const text = response.response.text();
+    const jsonMatch = text.match(/{[\s\S]*?}/);
+    if (!jsonMatch) return adjustments;
+    const raw = JSON.parse(jsonMatch[0]) as Record<string, number>;
+
+    const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z ]/g,"").replace(/\s+/g," ").trim().toLowerCase();
+    for (const [adjustName, pct] of Object.entries(raw)) {
+      const clampedPct = Math.max(-0.20, Math.min(0.20, Number(pct)));
+      const adjustWords = norm(adjustName).split(" ");
+      for (const [riderId, rName] of riderNames) {
+        const rWords = norm(rName).split(" ");
+        // Match if at least 2 words overlap (handles "Van Der Poel Mathieu" ↔ "Mathieu van der Poel")
+        const overlap = adjustWords.filter(w => w.length > 2 && rWords.includes(w)).length;
+        if (overlap >= 2 || (overlap >= 1 && adjustWords.length === 1)) {
+          adjustments.set(riderId, 1 + clampedPct);
+          break;
+        }
+      }
+    }
+    if (adjustments.size > 0) {
+      const summary = [...adjustments.entries()].map(([id, m]) => riderNames.get(id) + ": " + (m > 1 ? "+" : "") + ((m-1)*100).toFixed(0) + "%").join(", ");
+      console.log("   📰 News adjustments: " + summary);
+    }
+  } catch (e) {
+    console.log("   ⚠️  News adjustment skipped:", (e as Error).message);
+  }
+
+  return adjustments;
+}
 
 const sql = neon(process.env.DATABASE_URL!);
 const db = drizzle(sql, { schema });
@@ -124,6 +185,14 @@ async function generateForRace(raceId: string): Promise<void> {
 
     skillsMap.set(rider.id, skill);
     riderMeta.set(rider.id, { name: rider.name, racesTotal, uciPoints, rumourModifier: rumourSentiment * 0.05 });
+  }
+
+  // Apply race news adjustments (LLM reads headlines, boosts/penalizes named riders)
+  const riderNamesMap = new Map([...riderMeta.entries()].map(([id, m]) => [id, m.name]));
+  const newsAdjustments = await getNewsBasedAdjustments(race.raceEventId, riderNamesMap);
+  for (const [riderId, multiplier] of newsAdjustments) {
+    const skill = skillsMap.get(riderId);
+    if (skill) skillsMap.set(riderId, { ...skill, mean: skill.mean * multiplier });
   }
 
   // Monte-Carlo probability simulation via TrueSkill
