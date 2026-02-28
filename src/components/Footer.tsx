@@ -6,14 +6,14 @@ export function Footer() {
       <div className="mx-auto max-w-6xl px-6 py-8">
         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           {/* Left: Wordmark + Tagline */}
-          <div className="flex flex-col gap-1">
+          <Link href="/" className="flex flex-col gap-1 hover:opacity-80 transition-opacity">
             <span className="font-display text-lg font-bold tracking-tight text-foreground">
               Pro Cycling Predictor
             </span>
             <span className="text-xs text-muted-foreground">
               AI-powered race predictions
             </span>
-          </div>
+          </Link>
 
           {/* Center: Links */}
           <nav className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted-foreground">
