@@ -401,19 +401,30 @@ export default async function Home({ searchParams }: HomePageProps) {
 
         {/* ── VALUE PROP / CTA ─────────────────────────────────────────── */}
         <section className="border-t border-border/50 bg-muted/5">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-12">
-            <div className="grid gap-8 md:grid-cols-3 text-center md:text-left">
-              <div>
-                <h3 className="font-bold text-sm uppercase tracking-wide text-primary mb-2">TrueSkill Predictions</h3>
-                <p className="text-sm text-muted-foreground">ELO-based rankings across road and MTB. Know who's hot before the race starts.</p>
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-14">
+            <div className="max-w-2xl mb-10">
+              <h2 className="text-2xl font-black tracking-tight mb-3">Never miss a race you care about</h2>
+              <p className="text-muted-foreground">
+                Follow your favourite races and riders. Get a personal race briefing sent straight to your{" "}
+                <span className="text-foreground font-semibold">WhatsApp</span> or{" "}
+                <span className="text-foreground font-semibold">Telegram</span> — before every start.
+              </p>
+            </div>
+            <div className="grid gap-6 sm:grid-cols-3">
+              <div className="rounded-lg border border-border/50 p-5 bg-background/40">
+                <div className="text-2xl mb-3">📲</div>
+                <h3 className="font-bold text-sm uppercase tracking-wide text-primary mb-2">Race Briefings on WhatsApp &amp; Telegram</h3>
+                <p className="text-sm text-muted-foreground">Follow a race and get a personalised message before the start — who to watch, key intel, weather. No app needed.</p>
               </div>
-              <div>
-                <h3 className="font-bold text-sm uppercase tracking-wide text-primary mb-2">Race Intelligence</h3>
-                <p className="text-sm text-muted-foreground">Weather analysis, TV schedules, rider intel, and startlists — all in one place.</p>
+              <div className="rounded-lg border border-border/50 p-5 bg-background/40">
+                <div className="text-2xl mb-3">🏆</div>
+                <h3 className="font-bold text-sm uppercase tracking-wide text-primary mb-2">Your Races, Your Riders</h3>
+                <p className="text-sm text-muted-foreground">Pick the races and riders you follow. We track them — you just read the update when it lands in your chat.</p>
               </div>
-              <div>
-                <h3 className="font-bold text-sm uppercase tracking-wide text-primary mb-2">Your Personal Feed</h3>
-                <p className="text-sm text-muted-foreground">Follow the races and riders you care about. Get alerts via Telegram or WhatsApp.</p>
+              <div className="rounded-lg border border-border/50 p-5 bg-background/40">
+                <div className="text-2xl mb-3">⚡</div>
+                <h3 className="font-bold text-sm uppercase tracking-wide text-primary mb-2">Backed by Data</h3>
+                <p className="text-sm text-muted-foreground">TrueSkill predictions, live startlists, rider intel — all distilled into one message, right when it matters.</p>
               </div>
             </div>
           </div>
@@ -422,6 +433,10 @@ export default async function Home({ searchParams }: HomePageProps) {
       {/* Footer */}
       <footer className="border-t border-border/50 py-6">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
+          <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+            <img src="/logo@2x.png" alt="Pro Cycling Predictor" width="24" height="24" className="rounded-sm" />
+            <span className="font-semibold text-foreground text-xs uppercase tracking-wide">Pro Cycling Predictor</span>
+          </Link>
           <p>
             Data from{" "}
             <a
@@ -496,17 +511,16 @@ function NextRaceHero({ event: ev }: { event: HomepageEvent }) {
           )}
         </div>
 
-        <div className="flex items-center gap-3 self-start md:self-end shrink-0">
+        <div className="flex flex-col gap-3 self-start md:self-end shrink-0">
           <RaceFollowButton
             eventId={ev.id}
             eventName={ev.name}
             categories={ev.categories}
             size="default"
-            className="border-white/20 hover:border-white/40"
           />
-          <Button asChild size="lg">
-            <Link href={url}>View Predictions &rarr;</Link>
-          </Button>
+          <Link href={url} className="text-xs text-center text-muted-foreground hover:text-foreground transition-colors">
+            View predictions &rarr;
+          </Link>
         </div>
       </div>
 
