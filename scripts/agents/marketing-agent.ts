@@ -77,28 +77,16 @@ async function getEventSlug(race: typeof races.$inferSelect): Promise<string | n
 
 // Only post Instagram stories for elite road/mtb WorldCup races (skip junior/u23 series)
 function shouldPostToInstagram(race: { name: string; discipline?: string | null; categorySlug?: string | null; uciCategory?: string | null; country?: string | null }): boolean {
-  const name = (race.name || "").toLowerCase();
-  const category = (race.categorySlug || "").toLowerCase();
-  const uci = (race.uciCategory || "").toLowerCase();
   const country = (race.country || "").toUpperCase();
   const isMtb = (race.discipline || "").toLowerCase() === "mtb";
 
-  // Skip junior, u23
-  if (category.includes("junior") || category.includes("u23")) return false;
-  if (name.includes("junior") || name.includes("u23")) return false;
-
-  // MTB: European races only
+  // MTB: European races only (all UCI classes)
   if (isMtb) {
     return EUROPEAN_COUNTRIES.has(country);
   }
 
-  // Road: WorldTour, 1.Pro — all fine
-  if (uci.includes("worldtour") || uci.includes("1.pro") || uci.includes("1.uwt")) return true;
-
-  // Road: recognisable Classics by name
-  if (name.includes("omloop") || name.includes("strade bianche") || name.includes("milan") || name.includes("ronde") || name.includes("paris-roubaix") || name.includes("liege") || name.includes("amstel") || name.includes("fleche")) return true;
-
-  return false;
+  // Road: all UCI classes, all countries
+  return true;
 }
 
 function dayStr(offset: number): string {

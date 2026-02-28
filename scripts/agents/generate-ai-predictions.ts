@@ -101,12 +101,17 @@ RECENT NEWS AND RUMOURS:
 ${newsText}
 
 TASK:
-Rank the top 10 riders for this specific race. Your ranking must account for:
-1. How well each rider's STYLE suits this specific terrain and race profile
-2. Current form and fitness signals from the news
-3. Any reported injuries, illness, or withdrawals
-4. Team dynamics and protected riders
-5. UCI points as a secondary reference only — not the primary factor
+Rank the top 10 riders for this specific race.
+
+If recent news IS available: weight it heavily — injuries, withdrawals, form, and team dynamics all matter.
+If NO news is available: rank by ELO rating adjusted for terrain suitability. State "Based on ELO rating" in the reasoning for those riders.
+
+Your ranking must account for:
+1. How well each rider's STYLE suits this terrain (cobbled classics = rouleur-puncheur, climbs = pure climber, XCO = technical fitness)
+2. Current form and fitness from news (if available)
+3. Any reported injuries, illness, or withdrawals (if available)
+4. ELO rating as strength indicator — use directly when news is absent
+5. For junior/u23 with no news: rank strictly by ELO
 
 For each ranked rider, provide:
 - A brief reason (1 sentence max) explaining why they rank here
