@@ -1,6 +1,6 @@
 # SCRAPE_STATUS.md — Pipeline Status
 
-_Last updated: 2026-02-28 10:05:38 (Stockholm)_
+_Last updated: 2026-02-28 10:29:24 (Stockholm)_
 
 ## 📅 Race Calendar
 - **Last run:** 2026-02-28 07:30:31
@@ -22,14 +22,14 @@ _Last updated: 2026-02-28 10:05:38 (Stockholm)_
 | VTT Chabrières + UCI XCO Junior Series - Elite Women | 2026-03-01 | 0 | ⏭️ no pcsUrl | 2026-02-28 10:05:38 |
 
 ## 🏁 Results
-- **Last run:** 2026-02-28 09:29:23
+- **Last run:** 2026-02-28 10:29:24
 - **Status:** ✅ OK
 - 0 results imported across 2 race(s). 0 race(s) need LLM fallback (no pcsUrl).
 
 | Race | Date | Results | Status | Scraped |
 |------|------|---------|--------|---------|
-| Omloop Het Nieuwsblad 2026 - Elite Men | 2026-02-28 | 0 | ⏳ pending | 2026-02-28 09:29:14 |
-| Omloop Het Nieuwsblad 2026 - Elite Women | 2026-02-28 | 0 | ⏳ pending | 2026-02-28 09:29:19 |
+| Omloop Het Nieuwsblad 2026 - Elite Men | 2026-02-28 | 0 | ⏳ pending | 2026-02-28 10:29:15 |
+| Omloop Het Nieuwsblad 2026 - Elite Women | 2026-02-28 | 0 | ⏳ pending | 2026-02-28 10:29:20 |
 
 ---
 <!-- STATUS_JSON
@@ -94,17 +94,17 @@ _Last updated: 2026-02-28 10:05:38 (Stockholm)_
         "date": "2026-02-28",
         "count": 0,
         "status": "⏳ pending",
-        "scrapedAt": "2026-02-28 09:29:14"
+        "scrapedAt": "2026-02-28 10:29:15"
       },
       {
         "name": "Omloop Het Nieuwsblad 2026 - Elite Women",
         "date": "2026-02-28",
         "count": 0,
         "status": "⏳ pending",
-        "scrapedAt": "2026-02-28 09:29:19"
+        "scrapedAt": "2026-02-28 10:29:20"
       }
     ],
-    "updatedAt": "2026-02-28 09:29:23"
+    "updatedAt": "2026-02-28 10:29:24"
   },
   "calendar": {
     "component": "calendar",

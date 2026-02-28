@@ -126,18 +126,11 @@ function isCategoryIncluded(ageCategory: string): boolean {
 // ─── Calendar scraper ─────────────────────────────────────────────────────────
 // XCOdata is server-side rendered — use fast HTTP fetch for calendar scan.
 // Season filter is broken; 2025 races are in ID range ~6300–8898.
-const SCAN_RATE_MS = 250; // Much faster than Playwright rate limit
-let lastScanTime = 0;
-
 async function fetchRacePage(id: number): Promise<string | null> {
-  const now = Date.now();
-  const wait = SCAN_RATE_MS - (now - lastScanTime);
-  if (wait > 0) await new Promise(r => setTimeout(r, wait));
-  lastScanTime = Date.now();
   try {
     const res = await fetch(`https://www.xcodata.com/race/${id}/`, {
       headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(10000),
     });
     if (!res.ok) return null;
     return res.text();
@@ -153,8 +146,10 @@ function extractRaceInfo(html: string, id: number): XCOdataRaceEntry | null {
   if (!titleRaw || titleRaw.includes("404")) return null;
 
   const titleUpper = titleRaw.toUpperCase();
-  const isXCO = titleUpper.includes("XCO");
-  const isXCC = titleUpper.includes("XCC");
+  // Also check body for XCO/XCC result panes (e.g. World Cup pages have "UCI MTB WORLD CUP" titles)
+  const htmlUpper = html.toUpperCase();
+  const isXCO = titleUpper.includes("XCO") || htmlUpper.includes("RESULTS_XCO_") || htmlUpper.includes("XCO RESULTS") || htmlUpper.includes(">XCO<");
+  const isXCC = titleUpper.includes("XCC") || htmlUpper.includes("RESULTS_XCC_") || htmlUpper.includes("XCC RESULTS") || htmlUpper.includes(">XCC<");
   if (!isXCO && !isXCC) return null;
 
   // Extract date — look for "DD Mon YYYY" pattern in HTML
@@ -202,55 +197,33 @@ async function fetchCalendar(_page: Page): Promise<XCOdataRaceEntry[]> {
 
   const wcNums = wcIds.filter(n => n > 0);
   const minId = wcNums.length > 0 ? Math.max(6200, Math.min(...wcNums) - 300) : 6300;
-  const maxId = wcNums.length > 0 ? Math.min(...wcNums.filter(n => n > 8000)) + 400 : 8700;
+  const maxId = wcNums.length > 0 ? Math.min(...wcNums.filter(n => n > 8000)) + 400 : 8900;
 
-  console.log(`  Scanning IDs ${minId}–${maxId} (${maxId - minId} IDs, step 2, ~${Math.round((maxId-minId)/2*SCAN_RATE_MS/1000)}s)...`);
+  console.log(`  Scanning IDs ${minId}–${maxId} (batch=15 concurrent)...`);
 
   const result: XCOdataRaceEntry[] = [];
-  let scanned = 0;
-  let reached2026 = false;
+  const CONCURRENCY = 15;
+  const allIds = Array.from({ length: Math.ceil((maxId - minId + 1) / 2) }, (_, i) => minId + i * 2);
+  console.log(`  Fetching ${allIds.length} IDs in parallel batches of ${CONCURRENCY}...`);
 
-  for (let id = minId; id <= maxId && !reached2026; id += 2) {
-    scanned++;
-    if (scanned % 100 === 0) process.stdout.write(`  Scanned ${scanned} IDs, found ${result.length} races...`);
-
-    const html = await fetchRacePage(id);
-    if (!html) continue;
-
-    if (html.includes("404 error") || html.includes("page doesn't exist")) continue;
-
-    // Check if we've hit 2026 races (stop scanning)
-    const yearMatch = html.match(/(\d{1,2})\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(202[0-9])/i);
-    if (yearMatch && parseInt(yearMatch[2]) >= 2026) {
-      console.log(`
-  Reached 2026 at ID ${id}, stopping`);
-      reached2026 = true;
-      break;
-    }
-
-    const entry = extractRaceInfo(html, id);
-    if (entry) result.push(entry);
-  }
-
-  // Also scan the late-2025 range separately (8400–8900) which the WC IDs anchor
-  if (!reached2026 && wcNums.some(n => n > 8000)) {
-    const lateMin = Math.max(8200, Math.min(...wcNums.filter(n => n > 8000)) - 300);
-    const lateMax = Math.min(8900, Math.max(...wcNums.filter(n => n > 8000)) + 400);
-    console.log(`
-  Late-season scan: IDs ${lateMin}–${lateMax}...`);
-    for (let id = lateMin; id <= lateMax; id += 2) {
+  for (let i = 0; i < allIds.length; i += CONCURRENCY) {
+    const batch = allIds.slice(i, i + CONCURRENCY);
+    const batchResults = await Promise.all(batch.map(async id => {
       const html = await fetchRacePage(id);
-      if (!html || html.includes("404 error")) continue;
+      return { id, html };
+    }));
+    for (const { id, html } of batchResults) {
+      if (!html || html.includes("404 error") || html.includes("page doesn't exist")) continue;
       const entry = extractRaceInfo(html, id);
-      if (entry) {
-        if (!result.find(r => r.xcodataId === entry.xcodataId)) {
-          result.push(entry);
-        }
-      }
+      if (entry) result.push(entry);
     }
+    if ((i / CONCURRENCY) % 10 === 0) {
+      process.stdout.write(`  Scanned ${Math.min(i + CONCURRENCY, allIds.length)}/${allIds.length}, found ${result.length} races...\r`);
+    }
+    await new Promise(r => setTimeout(r, 150));
   }
+  console.log(`  Scanned ${allIds.length}/${allIds.length}, found ${result.length} races.`);
 
-  // Deduplicate and sort chronologically
   const unique = [...new Map(result.map(r => [r.xcodataId, r])).values()];
   unique.sort((a, b) => a.date.localeCompare(b.date));
 

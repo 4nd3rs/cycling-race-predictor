@@ -180,7 +180,9 @@ async function main() {
     let updated = 0, notFound = 0, created = 0;
 
     for (const entry of entries) {
-      const normName = normaliseUciName(entry.name);
+      // Strip UCI junior marker '*' prefix
+      const cleanName = entry.name.replace(/^\*\s*/, "").trim();
+      const normName = normaliseUciName(cleanName);
 
       // Exact match
       let match = allRiders.find(r => stripAccents(r.name) === normName);
@@ -200,7 +202,7 @@ async function main() {
         // Rider not in DB — create them so future startlist scrapes can match
         // Convert UCI name "LASTNAME Firstname" to "Firstname LASTNAME" for consistency
         const displayName = (() => {
-          const parts = entry.name.trim().split(/\s+/);
+          const parts = cleanName.trim().split(/\s+/);
           const upper: string[] = [], first: string[] = [];
           for (const p of parts) {
             if (/^[A-ZÁÀÂÄÉÈÊËÎÏÔÖÙÛÜÇÆŒÑ\-']+$/.test(p)) upper.push(p);
