@@ -304,9 +304,11 @@ export default async function Home({ searchParams }: HomePageProps) {
       <Header />
       <main className="flex-1">
         {/* ---- TOP FILTER BAR ---- */}
-        <div className="border-b border-border/20 bg-zinc-950/80">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl h-10 flex items-center gap-4 overflow-hidden">
-            <div className="flex-1 min-w-0 overflow-hidden">
+        <div className="border-b border-border/20 bg-zinc-950/80 relative">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl h-10 flex items-center gap-3">
+            <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground shrink-0">Filter</span>
+            <span className="w-px h-3 bg-border/50 shrink-0" />
+            <div className="flex-1 min-w-0">
               <RaceFilters countries={calendarCountries} basePath="/" />
             </div>
             {!userId && (

@@ -79,7 +79,7 @@ export function RaceFilters({ countries, basePath = "/races" }: { countries: Cou
             key={value}
             onClick={() => { setDiscipline(value); apply(value, gender, country); }}
             className={cn(
-              "px-3 h-7 text-xs font-semibold transition-colors border-r border-border/40 last:border-r-0",
+              "px-2.5 h-6 text-[11px] font-semibold transition-colors border-r border-border/40 last:border-r-0",
               discipline === value
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:text-foreground hover:bg-white/5"
@@ -129,7 +129,7 @@ export function RaceFilters({ countries, basePath = "/races" }: { countries: Cou
         <button
           onClick={() => setFilterOpen(o => !o)}
           className={cn(
-            "flex items-center gap-1.5 h-7 px-2.5 rounded border text-xs font-medium transition-colors",
+            "flex items-center gap-1.5 h-6 px-2 rounded border text-[11px] font-medium transition-colors",
             (hasSecondary || filterOpen)
               ? "border-primary/60 text-primary bg-primary/10"
               : "border-border/40 text-muted-foreground hover:text-foreground hover:border-border/70"
@@ -143,7 +143,7 @@ export function RaceFilters({ countries, basePath = "/races" }: { countries: Cou
         </button>
 
         {filterOpen && (
-          <div className="absolute left-0 top-full mt-2 w-52 rounded-lg border border-border/50 bg-zinc-900 shadow-xl p-3 z-50 space-y-3">
+          <div className="absolute left-0 top-full mt-1 w-52 rounded-lg border border-border/50 bg-zinc-900 shadow-2xl p-3 z-[200] space-y-3">
             <div>
               <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1.5">Gender</p>
               <div className="flex gap-1">
