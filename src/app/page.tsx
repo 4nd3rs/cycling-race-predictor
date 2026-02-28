@@ -15,6 +15,9 @@ import { EventListView } from "@/components/event-card";
 import { MyFeedWidget } from "@/components/my-feed-widget";
 import { RaceFilters } from "@/components/race-filters";
 import { RaceFollowButton } from "@/components/race-follow-button";
+import { DisciplineSwitch } from "@/components/discipline-switch";
+import { auth } from "@clerk/nextjs/server";
+import { SignInButton } from "@clerk/nextjs";
 
 // ---------------------------------------------------------------------------
 // HYPE SCORING — only prestigious races on the homepage
@@ -279,6 +282,7 @@ interface HomePageProps {
 
 export default async function Home({ searchParams }: HomePageProps) {
   const { d, gender: genderParam, country: countryParam, cat: catParam } = await searchParams;
+  const { userId } = await auth();
   const filterDiscipline = d && d !== "all" ? d : null;
   const filterGender = genderParam && genderParam !== "all" ? genderParam : null;
   const filterCountry = countryParam || null;
@@ -298,6 +302,21 @@ export default async function Home({ searchParams }: HomePageProps) {
     <div className="min-h-screen flex flex-col overflow-x-hidden">
       <Header />
       <main className="flex-1">
+        {/* ---- DISCIPLINE SWITCH ---- */}
+        <div className="border-b border-border/30 bg-background/60">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-3 flex items-center justify-between gap-4">
+            <DisciplineSwitch current={d ?? "all"} />
+            {!userId && (
+              <p className="text-xs text-muted-foreground hidden sm:block">
+                <SignInButton mode="modal">
+                  <button className="underline hover:text-foreground transition-colors">Sign in free</button>
+                </SignInButton>
+                {" "}to personalise your feed
+              </p>
+            )}
+          </div>
+        </div>
+
         {/* ---- NEXT RACE SPOTLIGHT ---- */}
         <section className="border-b border-border/50">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-10 md:py-16">
