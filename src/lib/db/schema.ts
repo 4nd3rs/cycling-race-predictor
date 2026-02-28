@@ -548,6 +548,8 @@ export const raceNews = pgTable(
     category: varchar("category", { length: 30 }).default("news"), // 'news' | 'preview' | 'startlist' | 'social'
     publishedAt: timestamp("published_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    content: text("content"),
+    contentFetchedAt: timestamp("content_fetched_at", { withTimezone: true }),
   },
   (table) => [
     index("idx_race_news_event_id").on(table.raceEventId),

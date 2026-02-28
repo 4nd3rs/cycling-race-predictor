@@ -26,6 +26,7 @@ import {
 import { scrapeXCOdataRacesList } from "../../src/lib/scraper/xcodata-races";
 import * as cheerio from "cheerio";
 import { writeScrapeStatus } from "./lib/scrape-status";
+import { normalizeCountry } from "./lib/normalize";
 
 const sql = neon(process.env.DATABASE_URL!);
 const db = drizzle(sql, { schema });
@@ -256,7 +257,7 @@ async function upsertRace(race: ScrapedRace): Promise<"inserted" | "existed" | "
         endDate: race.endDate || null,
         discipline: race.discipline,
         subDiscipline: race.subDiscipline || null,
-        country: race.country || null,
+        country: normalizeCountry(race.country) ?? null,
         sourceUrl: race.sourceUrl || race.pcsUrl || null,
         sourceType: race.pcsUrl ? "pcs" : "agent",
         series: race.series || null,
@@ -288,7 +289,7 @@ async function upsertRace(race: ScrapedRace): Promise<"inserted" | "existed" | "
           ageCategory: "elite",
           gender,
           uciCategory: race.uciCategory || null,
-          country: race.country || null,
+          country: normalizeCountry(race.country) ?? null,
           raceEventId: newEvent.id,
           pcsUrl: race.pcsUrl || null,
           status: "active",

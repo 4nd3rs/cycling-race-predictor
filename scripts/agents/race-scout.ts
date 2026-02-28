@@ -4,6 +4,7 @@ config({ path: ".env.local" });
 import { db, raceEvents, races } from "./lib/db";
 import { and, ilike, eq } from "drizzle-orm";
 import { generateEventSlug, generateCategorySlug, makeSlugUnique } from "../../src/lib/url-utils";
+import { normalizeCountry } from "./lib/normalize";
 
 interface RaceInput {
   name: string;
@@ -90,7 +91,7 @@ async function processRace(input: RaceInput): Promise<"inserted" | "skipped" | "
           endDate: input.endDate || null,
           discipline: input.discipline,
           subDiscipline: input.subDiscipline || null,
-          country: input.country || null,
+          country: normalizeCountry(input.country) ?? null,
           sourceUrl: input.sourceUrl || input.pcsUrl || null,
           sourceType: "agent",
         })
@@ -134,7 +135,7 @@ async function processRace(input: RaceInput): Promise<"inserted" | "skipped" | "
         ageCategory,
         gender,
         uciCategory: input.uciCategory || null,
-        country: input.country || null,
+        country: normalizeCountry(input.country) ?? null,
         raceEventId: eventId,
         pcsUrl: input.pcsUrl || null,
         status: "active",

@@ -1,6 +1,6 @@
 # SCRAPE_STATUS.md — Pipeline Status
 
-_Last updated: 2026-02-28 20:18:08 (Stockholm)_
+_Last updated: 2026-02-28 21:18:07 (Stockholm)_
 
 ## 📅 Race Calendar
 - **Last run:** 2026-02-28 19:54:28
@@ -36,14 +36,9 @@ _Last updated: 2026-02-28 20:18:08 (Stockholm)_
 | Taça Brasil de Cross-Country RJ - Elite Men | 2026-03-06 | 0 | ⏭️ no pcsUrl | 2026-02-28 18:06:30 |
 
 ## 🏁 Results
-- **Last run:** 2026-02-28 20:18:08
+- **Last run:** 2026-02-28 21:18:07
 - **Status:** ✅ OK
-- 0 results imported across 2 race(s). 2 race(s) need LLM fallback (no pcsUrl).
-
-| Race | Date | Results | Status | Scraped |
-|------|------|---------|--------|---------|
-| Gran Premio Zaragoza XCC - Elite Men | 2026-02-28 | 0 | ⏭️ no pcsUrl | 2026-02-28 20:18:08 |
-| Gran Premio Zaragoza XCC - Elite Women | 2026-02-28 | 0 | ⏭️ no pcsUrl | 2026-02-28 20:18:08 |
+- No races needing results
 
 ---
 <!-- STATUS_JSON
@@ -199,24 +194,8 @@ _Last updated: 2026-02-28 20:18:08 (Stockholm)_
   "results": {
     "component": "results",
     "status": "ok",
-    "summary": "0 results imported across 2 race(s). 2 race(s) need LLM fallback (no pcsUrl).",
-    "raceRows": [
-      {
-        "name": "Gran Premio Zaragoza XCC - Elite Men",
-        "date": "2026-02-28",
-        "count": 0,
-        "status": "⏭️ no pcsUrl",
-        "scrapedAt": "2026-02-28 20:18:08"
-      },
-      {
-        "name": "Gran Premio Zaragoza XCC - Elite Women",
-        "date": "2026-02-28",
-        "count": 0,
-        "status": "⏭️ no pcsUrl",
-        "scrapedAt": "2026-02-28 20:18:08"
-      }
-    ],
-    "updatedAt": "2026-02-28 20:18:08"
+    "summary": "No races needing results",
+    "updatedAt": "2026-02-28 21:18:07"
   },
   "calendar": {
     "component": "calendar",

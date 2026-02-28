@@ -128,10 +128,10 @@ function countryToFlag(code?: string | null) {
 }
 
 function getEloTier(elo: number) {
-  if (elo >= 1500) return { label: "Elite", color: "bg-purple-500" };
-  if (elo >= 1200) return { label: "Pro", color: "bg-blue-500" };
-  if (elo >= 900) return { label: "Strong", color: "bg-green-500" };
-  if (elo >= 600) return { label: "Average", color: "bg-gray-400" };
+  if (elo > 1700) return { label: "Elite", color: "bg-purple-500" };
+  if (elo > 1500) return { label: "Pro", color: "bg-blue-500" };
+  if (elo > 1300) return { label: "Strong", color: "bg-green-500" };
+  if (elo > 1100) return { label: "Average", color: "bg-gray-400" };
   return { label: "Developing", color: "bg-gray-300" };
 }
 
@@ -212,7 +212,10 @@ export default async function RiderDetailPage({ params }: PageProps) {
     return [...otherEntries, ...byCategory.values()];
   })();
 
-  const birthDate = rider.birthDate ? new Date(rider.birthDate) : null;
+  // Parse date string as local date to avoid UTC timezone shift
+  const birthDate = rider.birthDate
+    ? (() => { const [y,m,d] = rider.birthDate.split("-").map(Number); return new Date(y, m-1, d); })()
+    : null;
   const now = new Date();
   const age = birthDate
     ? Math.floor(
@@ -315,7 +318,7 @@ export default async function RiderDetailPage({ params }: PageProps) {
 
                 <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                   {age && <span>{age} years old</span>}
-                  {rider.birthDate && <span>· {format(new Date(rider.birthDate), "d MMM yyyy")}</span>}
+                  {birthDate && <span>· {format(birthDate, "d MMM yyyy")}</span>}
                   {currentTeam && (
                     <span className="flex items-center gap-1">
                       ·&nbsp;

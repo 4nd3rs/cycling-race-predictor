@@ -6,6 +6,7 @@
  */
 
 import * as cheerio from "cheerio";
+import { normalizeCountry } from "../../../scripts/agents/lib/normalize";
 
 const PCS_BASE_URL = "https://www.procyclingstats.com";
 const RATE_LIMIT_MS = parseInt(process.env.PCS_RATE_LIMIT_MS || "1200", 10); // Default 1.2s between requests
@@ -116,7 +117,8 @@ export async function scrapeRider(pcsId: string): Promise<PCSRider | null> {
 
     // Extract nationality from flag image
     const flagImg = $(".rdr-info-cont .flag").attr("class");
-    const nationality = flagImg?.match(/flag ([a-z]{2})/)?.[1]?.toUpperCase() || null;
+    const rawNat = flagImg?.match(/flag ([a-z]{2})/)?.[1]?.toUpperCase() || null;
+    const nationality = normalizeCountry(rawNat);
 
     // Extract birth date
     const infoText = $(".rdr-info-cont").text();
@@ -439,7 +441,8 @@ export async function scrapeUpcomingRaces(
 
       // Extract country from flag
       const flagClass = $row.find(".flag").attr("class");
-      const country = flagClass?.match(/flag ([a-z]{2})/)?.[1]?.toUpperCase() || null;
+      const rawCountry = flagClass?.match(/flag ([a-z]{2})/)?.[1]?.toUpperCase() || null;
+      const country = normalizeCountry(rawCountry);
 
       // Extract category
       const category = $row.find("td").eq(2).text().trim() || null;
@@ -666,7 +669,7 @@ export async function scrapeRacePage(raceUrl: string): Promise<{
     const largeFlagMatch = largeFlagClass.match(/flag\s+(?:w32\s+)?(?:c24\s+)?([a-z]{2})/i) ||
                            largeFlagClass.match(/flag\s+([a-z]{2})/i);
     if (largeFlagMatch) {
-      country = largeFlagMatch[1].toUpperCase();
+      country = normalizeCountry(largeFlagMatch[1].toUpperCase());
     }
 
     // Fallback: look for flag in the main content area (skip header/nav)
@@ -676,7 +679,7 @@ export async function scrapeRacePage(raceUrl: string): Promise<{
           const flagClass = $(el).attr("class") || "";
           const match = flagClass.match(/flag\s+([a-z]{2})/i);
           if (match && match[1] !== "gb") { // Skip GB which is often in nav
-            country = match[1].toUpperCase();
+            country = normalizeCountry(match[1].toUpperCase());
           }
         }
       });

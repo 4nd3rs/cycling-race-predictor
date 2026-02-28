@@ -14,9 +14,42 @@ import { raceEvents, raceNews } from "../../src/lib/db/schema";
 const sql = neon(process.env.DATABASE_URL!);
 const db = drizzle(sql);
 
+/** Fetch article text from a direct URL (non-Google-News). Returns null on failure. */
+async function fetchArticleContent(url: string): Promise<string | null> {
+  if (!url || url.includes("news.google.com")) return null;
+  try {
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml",
+      },
+      redirect: "follow",
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (!res.ok) return null;
+    const ct = res.headers.get("content-type") || "";
+    if (!ct.includes("html")) return null;
+    const html = await res.text();
+    let text = html
+      .replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<nav[\s\S]*?<\/nav>/gi, " ").replace(/<footer[\s\S]*?<\/footer>/gi, " ")
+      .replace(/<\/?(?:p|div|h[1-6]|li|br|blockquote)[^>]*>/gi, "\n")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&amp;/g, "&").replace(/&nbsp;/g, " ").replace(/[ \t]+/g, " ")
+      .replace(/\n{3,}/g, "\n\n").trim();
+    const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 40);
+    if (lines.length > 0) text = lines.join("\n");
+    return text.length > 100 ? text.substring(0, 4000) : null;
+  } catch {
+    return null;
+  }
+}
+
 const RSS_FEEDS = [
   { name: "cyclingnews", url: "https://www.cyclingnews.com/feeds.xml" },
   { name: "inrng", url: "https://inrng.com/feed/" },
+  { name: "velonews", url: "https://velo.outsideonline.com/feed/" },
+  { name: "procycling", url: "https://www.procycling.co.uk/feed/" },
 ];
 
 interface RSSItem {
@@ -175,6 +208,7 @@ async function scrapeForEvent(eventSlug: string) {
       for (const { item, score } of scored) {
         console.log(`   [${score}] ${item.title.substring(0, 70)}...`);
         try {
+          const articleContent = await fetchArticleContent(item.link);
           await db
             .insert(raceNews)
             .values({
@@ -186,8 +220,11 @@ async function scrapeForEvent(eventSlug: string) {
               source: feed.name,
               category: item.title.toLowerCase().includes("preview") ? "preview" : "news",
               publishedAt: item.pubDate ? new Date(item.pubDate) : new Date(),
+              content: articleContent || null,
+              contentFetchedAt: articleContent !== null ? new Date() : null,
             })
             .onConflictDoNothing();
+          if (articleContent) console.log(`     📄 Content fetched: ${articleContent.length} chars`);
           totalInserted++;
         } catch (e: unknown) {
           if (e instanceof Error && !e.message.includes("duplicate")) {

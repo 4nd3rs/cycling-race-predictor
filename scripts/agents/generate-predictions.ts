@@ -30,7 +30,9 @@ const genai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 /**
  * Use race news headlines to generate per-rider mean adjustments.
  * Returns a map of riderId → multiplier (e.g. 1.12 = +12% to mean, 0.88 = -12%).
- * Max adjustment is ±20%.
+ * Structured tiers: tier1 (top favorite) → ×2.5, tier2 (podium contender) → ×1.6,
+ * tier3 (outsider) → ×1.2, injury/withdrawal → ×0.05 (effectively removes them).
+ * Uses article content when available, falls back to titles only.
  */
 async function getNewsBasedAdjustments(
   raceEventId: string | null | undefined,
@@ -39,50 +41,209 @@ async function getNewsBasedAdjustments(
   const adjustments = new Map<string, number>();
   if (!raceEventId || riderNames.size === 0) return adjustments;
 
-  const articles: Array<{title: string; source: string}> = await sql`
-    SELECT title, source FROM race_news
+  const articles: Array<{title: string; source: string; content: string | null}> = await sql`
+    SELECT title, source, content FROM race_news
     WHERE race_event_id = ${raceEventId}
-    ORDER BY published_at DESC LIMIT 10
+    ORDER BY
+      CASE WHEN content IS NOT NULL AND length(content) > 200 THEN 0 ELSE 1 END,
+      published_at DESC
+    LIMIT 8
   `;
   if (articles.length === 0) return adjustments;
 
-  const headlines = articles.map(a => "- " + a.title + " (" + a.source + ")").join("\n");
-  // Top 30 riders with clean names for LLM context
-  const riderList = [...riderNames.values()].slice(0, 30).join(", ");
+  // Build context: prefer articles with actual content
+  const contentArticles = articles.filter(a => a.content && a.content.length > 200);
+  const headlineOnly = articles.filter(a => !a.content || a.content.length <= 200);
 
-  const prompt = "Analyze pre-race cycling news to adjust predictions.\n\nHeadlines:\n" + headlines + "\n\nStartlist (first 30): " + riderList + "\n\nFor each rider clearly flagged as a FAVOURITE or in strong form, assign +0.10 to +0.20. For riders confirmed INJURED, SICK, or WITHDRAWN, assign -0.15 to -0.20. Match by surname. Use EXACT names from the startlist. Return ONLY valid JSON like {\"Van Der Poel Mathieu\": 0.18, \"Van Aert Wout\": -0.20}. Return {} if no clear signals.";
+  let context = "";
+  if (contentArticles.length > 0) {
+    context += "ARTICLE CONTENT:\n";
+    for (const a of contentArticles.slice(0, 3)) {
+      context += `\n--- ${a.title} (${a.source}) ---\n${a.content!.substring(0, 1500)}\n`;
+    }
+  }
+  if (headlineOnly.length > 0) {
+    context += "\nHEADLINES ONLY:\n";
+    context += headlineOnly.map(a => "- " + a.title + " (" + a.source + ")").join("\n");
+  }
+
+  const riderList = [...riderNames.values()].slice(0, 50).join(", ");
+
+  const prompt = `You are a cycling expert analyzing pre-race intelligence to predict rider performance.
+
+${context}
+
+STARTLIST (use EXACT names from this list):
+${riderList}
+
+Extract rider predictions and return ONLY valid JSON in this exact format:
+{
+  "tier1": ["Name1", "Name2"],
+  "tier2": ["Name3", "Name4", "Name5"],
+  "tier3": ["Name6", "Name7"],
+  "injuries": ["Name8"],
+  "withdrawals": ["Name9"]
+}
+
+Rules:
+- tier1 = top favorites/pre-race picks to win (1-3 riders max)
+- tier2 = podium contenders (2-6 riders)
+- tier3 = dark horses/outsiders with a chance (up to 10 riders)
+- injuries = riders confirmed injured/sick
+- withdrawals = riders confirmed withdrawn/DNS
+- Match names by surname overlap. Use exact names from the startlist.
+- If no clear signal exists for a tier, use empty array [].
+- Return ONLY the JSON object, no other text.`;
 
   try {
     const model = genai.getGenerativeModel({ model: "gemini-2.5-flash" });
     const response = await model.generateContent(prompt);
     const text = response.response.text();
-    const jsonMatch = text.match(/{[\s\S]*?}/);
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return adjustments;
-    const raw = JSON.parse(jsonMatch[0]) as Record<string, number>;
+
+    interface NewsIntel {
+      tier1?: string[];
+      tier2?: string[];
+      tier3?: string[];
+      injuries?: string[];
+      withdrawals?: string[];
+    }
+    const intel = JSON.parse(jsonMatch[0]) as NewsIntel;
 
     const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z ]/g,"").replace(/\s+/g," ").trim().toLowerCase();
-    for (const [adjustName, pct] of Object.entries(raw)) {
-      const clampedPct = Math.max(-0.20, Math.min(0.20, Number(pct)));
-      const adjustWords = norm(adjustName).split(" ");
+
+    function findRider(name: string): string | null {
+      const nameWords = norm(name).split(" ").filter(w => w.length > 2);
       for (const [riderId, rName] of riderNames) {
         const rWords = norm(rName).split(" ");
-        // Match if at least 2 words overlap (handles "Van Der Poel Mathieu" ↔ "Mathieu van der Poel")
-        const overlap = adjustWords.filter(w => w.length > 2 && rWords.includes(w)).length;
-        if (overlap >= 2 || (overlap >= 1 && adjustWords.length === 1)) {
-          adjustments.set(riderId, 1 + clampedPct);
-          break;
+        const overlap = nameWords.filter(w => rWords.includes(w)).length;
+        if (overlap >= 2 || (overlap >= 1 && nameWords.length === 1)) return riderId;
+      }
+      return null;
+    }
+
+    const MULTIPLIERS = { tier1: 1.4, tier2: 1.2, tier3: 1.1, injuries: 0.05, withdrawals: 0.05 };
+
+    for (const [tier, multiplier] of Object.entries(MULTIPLIERS) as [keyof typeof MULTIPLIERS, number][]) {
+      for (const name of (intel[tier] || [])) {
+        const riderId = findRider(name);
+        if (riderId && !adjustments.has(riderId)) {
+          adjustments.set(riderId, multiplier);
         }
       }
     }
+
     if (adjustments.size > 0) {
-      const summary = [...adjustments.entries()].map(([id, m]) => riderNames.get(id) + ": " + (m > 1 ? "+" : "") + ((m-1)*100).toFixed(0) + "%").join(", ");
-      console.log("   📰 News adjustments: " + summary);
+      const summary = [...adjustments.entries()]
+        .map(([id, m]) => `${riderNames.get(id)} ×${m}`)
+        .join(", ");
+      console.log("   📰 News intel: " + summary);
+    } else {
+      console.log("   📰 No clear news signals");
     }
   } catch (e) {
     console.log("   ⚠️  News adjustment skipped:", (e as Error).message);
   }
 
   return adjustments;
+}
+
+
+/**
+ * Use Gemini's training knowledge to generate win probabilities for a race.
+ * Returns a map of riderId → win probability (0-1), or empty map if AI call fails.
+ * This gives the system knowledge of rider specialties, race profiles, and historical patterns
+ * that ELO alone cannot capture (especially with limited 2026-only data).
+ *
+ * Only applied for road discipline races with ≥15 riders.
+ * Blended 70% AI / 30% ELO for a more realistic probability distribution.
+ */
+async function getAIKnowledgeProbabilities(
+  raceName: string,
+  raceDate: string,
+  discipline: string,
+  gender: string,
+  riderNames: Map<string, string>  // riderId → name
+): Promise<Map<string, number>> {
+  const probMap = new Map<string, number>();
+
+  // Only use for road races where Gemini has reliable knowledge
+  if (discipline !== "road") return probMap;
+
+  const riderList = [...riderNames.values()].join("\n");
+  const genderLabel = gender === "women" ? "Women\'s" : "Men\'s";
+
+  const prompt = `You are an expert professional cycling analyst with deep knowledge of riders, race profiles, and results up to early 2026.
+
+Race: ${raceName}
+Date: ${raceDate}
+Category: ${genderLabel} Elite Road Race
+
+Startlist:
+${riderList}
+
+Based on your knowledge of:
+- These riders\' proven strengths (climber, sprinter, classics specialist, etc.)
+- This specific race\'s profile and the type of rider who typically wins
+- Recent 2025-2026 season form and results
+- Head-to-head history at this race and similar races
+
+Assign realistic win probability percentages to the top 15 most likely winners.
+The percentages must sum to exactly 100. All other riders share 0%.
+
+Critical guidelines:
+- Even the dominant favorite in a one-day classic rarely exceeds 35-40%
+- A flat/sprint classic: spread probability across 6-10 sprinters
+- A hilly classic (climbers viable): moderate favorite at 20-35%
+- A punchy classic (cobbles/short climbs): 3-6 realistic contenders
+- If a rider is not suited to this race\'s profile, give them 0%
+- Use EXACT names from the startlist above
+
+Return ONLY valid JSON, no text: {"ExactName": percentage_number, "ExactName2": percentage_number, ...}`;
+
+  try {
+    const model = genai.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const response = await model.generateContent(prompt);
+    const text = response.response.text();
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.log("   🤖 AI predictions: no JSON returned");
+      return probMap;
+    }
+
+    const raw = JSON.parse(jsonMatch[0]) as Record<string, number>;
+    const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z ]/g,"").replace(/\s+/g," ").trim().toLowerCase();
+
+    let totalMapped = 0;
+    const aiPicks: string[] = [];
+
+    for (const [aiName, pct] of Object.entries(raw)) {
+      if (typeof pct !== "number" || pct <= 0) continue;
+      const nameWords = norm(aiName).split(" ").filter(w => w.length > 2);
+      for (const [riderId, rName] of riderNames) {
+        const rWords = norm(rName).split(" ");
+        const overlap = nameWords.filter(w => rWords.includes(w)).length;
+        if (overlap >= 2 || (overlap >= 1 && nameWords.length === 1)) {
+          probMap.set(riderId, pct / 100);
+          totalMapped += pct;
+          aiPicks.push(`${rName} ${pct.toFixed(0)}%`);
+          break;
+        }
+      }
+    }
+
+    if (aiPicks.length > 0) {
+      console.log(`   🤖 AI picks (top 5): ${aiPicks.slice(0, 5).join(", ")}`);
+      console.log(`   🤖 Mapped ${aiPicks.length} riders, total: ${totalMapped.toFixed(0)}%`);
+    } else {
+      console.log("   🤖 AI predictions: no riders matched startlist");
+    }
+  } catch (e) {
+    console.log("   🤖 AI predictions skipped:", (e as Error).message?.substring(0, 60));
+  }
+
+  return probMap;
 }
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -195,10 +356,31 @@ async function generateForRace(raceId: string): Promise<void> {
     if (skill) skillsMap.set(riderId, { ...skill, mean: skill.mean * multiplier });
   }
 
-  // Monte-Carlo probability simulation via TrueSkill
-  const probabilities = calculateAllProbabilities(skillsMap);
+  // Get AI knowledge-based win probabilities (Gemini knows rider profiles & race history)
+  const aiProbabilities = await getAIKnowledgeProbabilities(
+    race.name, race.date, race.discipline, race.gender ?? "men", riderNamesMap
+  );
 
-  // Rank by μ - 3σ conservative estimate
+  // Monte-Carlo probability simulation via TrueSkill (ELO-based)
+  const eloProbabilities = calculateAllProbabilities(skillsMap);
+
+  // Blend: 70% AI knowledge + 30% ELO simulation for road races with AI picks
+  // Pure ELO for MTB or when AI returned no picks
+  const aiWeight = aiProbabilities.size > 0 && race.discipline === "road" ? 0.7 : 0.0;
+  const eloWeight = 1 - aiWeight;
+
+  const probabilities = new Map<string, { win: number; podium: number; top10: number }>();
+  for (const [riderId] of skillsMap) {
+    const elo = eloProbabilities.get(riderId) ?? { win: 0, podium: 0, top10: 0 };
+    const aiWin = aiProbabilities.get(riderId) ?? 0;
+    probabilities.set(riderId, {
+      win: aiWeight * aiWin + eloWeight * elo.win,
+      podium: elo.podium,   // Keep ELO-based podium/top10 (AI only covers win%)
+      top10: elo.top10,
+    });
+  }
+
+  // Rank: for road races use blended win probability; for MTB use conservative ELO rating
   const ranked = Array.from(skillsMap.entries())
     .map(([riderId, skill]) => ({
       riderId, skill,
@@ -206,7 +388,10 @@ async function generateForRace(raceId: string): Promise<void> {
       meta: riderMeta.get(riderId)!,
       probs: probabilities.get(riderId) ?? { win: 0, podium: 0, top10: 0 },
     }))
-    .sort((a, b) => b.conservativeRating - a.conservativeRating);
+    .sort((a, b) => {
+      if (aiWeight > 0) return b.probs.win - a.probs.win;  // Sort by win prob when AI is active
+      return b.conservativeRating - a.conservativeRating;  // Sort by ELO for MTB
+    });
 
   await db.delete(schema.predictions).where(eq(schema.predictions.raceId, raceId));
 

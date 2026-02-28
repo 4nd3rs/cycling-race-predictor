@@ -1,3 +1,4 @@
+import { normalizeCountry } from "../../../scripts/agents/lib/normalize";
 /**
  * PDF Startlist Parser
  *
@@ -82,7 +83,7 @@ function parseRiderLine(
   if (!natMatch || natMatch.index === undefined) return null;
 
   const namesPart = rest.substring(0, natMatch.index + 1);
-  const nationality = natMatch[2];
+  const nationality = normalizeCountry(natMatch[2]) ?? natMatch[2];
   const teamName = rest.substring(natMatch.index + natMatch[0].length).trim();
 
   // Step 4: Split last name from first name
