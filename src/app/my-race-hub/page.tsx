@@ -174,6 +174,10 @@ export default async function MyRaceHubPage({ searchParams }: { searchParams: Pr
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
 
+  // Ensure user exists in our DB (creates on first login with new Clerk instance)
+  await getAuthUser();
+
+
   const data = await getPageData(userId);
   if (!data) redirect("/sign-in");
 
