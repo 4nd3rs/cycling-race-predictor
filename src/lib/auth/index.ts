@@ -37,14 +37,21 @@ export async function getAuthUser(): Promise<AuthUser | null> {
       return null;
     }
 
+    const email = clerkUser.emailAddresses[0]?.emailAddress || null;
+
+    // Use ON CONFLICT to handle duplicate email (e.g. migrating from dev→prod Clerk instance)
     const [newUser] = await db
       .insert(users)
       .values({
         clerkId: userId,
-        email: clerkUser.emailAddresses[0]?.emailAddress || null,
+        email,
         name: `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() || null,
         avatarUrl: clerkUser.imageUrl || null,
         tier: (clerkUser.publicMetadata?.tier as string) || "free",
+      })
+      .onConflictDoUpdate({
+        target: users.email,
+        set: { clerkId: userId, updatedAt: new Date() },
       })
       .returning();
 
