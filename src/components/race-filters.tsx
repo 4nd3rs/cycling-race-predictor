@@ -60,49 +60,77 @@ export function RaceFilters({
     router.push(`${basePath}?${buildParams(d, g, c, ct).toString()}`);
   }
 
-  const seg = (active: boolean) =>
-    cn("px-3 py-1.5 rounded-md text-sm font-medium transition-colors cursor-pointer",
-      active ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground");
+  const hasActiveFilter = discipline !== "all" || gender !== "all" || !!country;
+
+  const pill = (active: boolean) =>
+    cn(
+      "px-3 py-1 text-xs font-semibold rounded-full transition-all duration-150 cursor-pointer whitespace-nowrap",
+      active
+        ? "bg-primary text-primary-foreground"
+        : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+    );
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      <div className="flex items-center gap-0.5 bg-muted/30 rounded-lg p-1">
+    <div className="flex flex-wrap items-center gap-4">
+      {/* Discipline */}
+      <div className="flex items-center gap-1">
         {(["all", "road", "mtb"] as const).map((k) => (
-          <button key={k} onClick={() => { setDiscipline(k); applyFilters(k, gender, country); }} className={seg(discipline === k)}>
+          <button
+            key={k}
+            onClick={() => { setDiscipline(k); applyFilters(k, gender, country); }}
+            className={pill(discipline === k)}
+          >
             {k === "all" ? "All" : k === "road" ? "Road" : "MTB"}
           </button>
         ))}
       </div>
 
-      <div className="flex items-center gap-0.5 bg-muted/30 rounded-lg p-1">
+      <span className="w-px h-4 bg-border/50 hidden sm:block" />
+
+      {/* Gender */}
+      <div className="flex items-center gap-1">
         {(["all", "men", "women"] as const).map((k) => (
-          <button key={k} onClick={() => { setGender(k); applyFilters(discipline, k, country); }} className={seg(gender === k)}>
+          <button
+            key={k}
+            onClick={() => { setGender(k); applyFilters(discipline, k, country); }}
+            className={pill(gender === k)}
+          >
             {k === "all" ? "All" : k === "men" ? "Men" : "Women"}
           </button>
         ))}
       </div>
 
+      <span className="w-px h-4 bg-border/50 hidden sm:block" />
+
+      {/* Country */}
       <div className="relative">
         <select
           value={country}
           onChange={(e) => { setCountry(e.target.value); applyFilters(discipline, gender, e.target.value); }}
-          className="appearance-none rounded-lg border border-border/50 bg-background px-3 py-1.5 pr-7 text-sm text-foreground cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary/50"
+          className={cn(
+            "appearance-none bg-transparent pr-5 text-xs font-semibold transition-colors cursor-pointer focus:outline-none",
+            country ? "text-primary" : "text-muted-foreground hover:text-foreground"
+          )}
         >
-          <option value="">All Countries</option>
+          <option value="">Country</option>
           {countries.map(({ code, name }) => (
             <option key={code} value={code}>{name}</option>
           ))}
         </select>
-        <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">▾</span>
+        <span className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-muted-foreground text-[10px]">▾</span>
       </div>
 
-      {(discipline !== "all" || gender !== "all" || country || cat !== "all") && (
-        <button
-          onClick={() => { setDiscipline("all"); setGender("all"); setCountry(""); setCat("all"); applyFilters("all", "all", "", "all"); }}
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2"
-        >
-          Clear
-        </button>
+      {/* Clear */}
+      {hasActiveFilter && (
+        <>
+          <span className="w-px h-4 bg-border/50 hidden sm:block" />
+          <button
+            onClick={() => { setDiscipline("all"); setGender("all"); setCountry(""); setCat("all"); applyFilters("all", "all", "", "all"); }}
+            className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Clear
+          </button>
+        </>
       )}
     </div>
   );

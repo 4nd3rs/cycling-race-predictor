@@ -304,16 +304,16 @@ export default async function Home({ searchParams }: HomePageProps) {
       <Header />
       <main className="flex-1">
         {/* ---- TOP FILTER BAR ---- */}
-        <div className="border-b border-border/30 bg-background/60">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="border-b border-border/20 bg-zinc-950/80">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl h-10 flex items-center justify-between gap-4">
             <RaceFilters countries={calendarCountries} basePath="/" />
             {!userId && (
-              <p className="text-xs text-muted-foreground hidden sm:block">
-                <SignInButton mode="modal">
-                  <button className="underline hover:text-foreground transition-colors">Sign in free</button>
-                </SignInButton>
-                {" "}to personalise your feed
-              </p>
+              <SignInButton mode="modal">
+                <button className="hidden sm:flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap group">
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary group-hover:scale-125 transition-transform" />
+                  Sign in to personalise
+                </button>
+              </SignInButton>
             )}
           </div>
         </div>
