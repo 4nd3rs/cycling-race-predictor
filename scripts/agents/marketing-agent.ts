@@ -3,7 +3,8 @@ config({ path: ".env.local" });
 
 import { execSync } from "child_process";
 import { readFileSync, writeFileSync, existsSync } from "fs";
-import { db, races, raceResults } from "./lib/db";
+import { db, races, raceResults, raceEvents } from "./lib/db";
+import { eq as eqOp } from "drizzle-orm";
 import { and, gte, lte, eq, sql } from "drizzle-orm";
 
 const TRACKING_FILE = "/tmp/marketing-posted.json";
@@ -37,6 +38,8 @@ function getIntelForRace(raceName: string, intel: IntelItem[]): IntelItem[] {
 interface TrackingData {
   previews: string[]; // race IDs
   results: string[];  // race IDs
+  igPreviews: string[]; // Instagram story previews
+  igResults: string[];  // Instagram story results
 }
 
 function loadTracking(): TrackingData {
@@ -47,11 +50,34 @@ function loadTracking(): TrackingData {
       // Corrupted file, reset
     }
   }
-  return { previews: [], results: [] };
+  return { previews: [], results: [], igPreviews: [], igResults: [] };
 }
 
 function saveTracking(data: TrackingData): void {
   writeFileSync(TRACKING_FILE, JSON.stringify(data, null, 2));
+}
+
+async function getEventSlug(race: typeof races.$inferSelect): Promise<string | null> {
+  if (!race.raceEventId) return null;
+  try {
+    const [event] = await db.select({ slug: raceEvents.slug }).from(raceEvents).where(eqOp(raceEvents.id, race.raceEventId)).limit(1);
+    return event?.slug ?? null;
+  } catch { return null; }
+}
+
+// Only post Instagram stories for elite road/mtb WorldCup races (skip junior/u23 series)
+function shouldPostToInstagram(race: { name: string; discipline?: string | null; categorySlug?: string | null; uciCategory?: string | null }): boolean {
+  const name = (race.name || "").toLowerCase();
+  const category = (race.categorySlug || "").toLowerCase();
+  const uci = (race.uciCategory || "").toLowerCase();
+  // Skip junior, u23, junior-series
+  if (category.includes("junior") || category.includes("u23")) return false;
+  if (name.includes("junior") || name.includes("u23")) return false;
+  // Only WorldTour, 1.Pro, 1.UWT, or top MTB (UCI XCO World Cup / C1)
+  if (uci.includes("worldtour") || uci.includes("1.pro") || uci.includes("1.uwt") || uci.includes("world cup") || uci.includes("c1")) return true;
+  // Also allow if no category but it's a recognisable major race
+  if (name.includes("omloop") || name.includes("strade bianche") || name.includes("milan") || name.includes("ronde") || name.includes("paris-roubaix") || name.includes("liege") || name.includes("amstel") || name.includes("fleche")) return true;
+  return false;
 }
 
 function dayStr(offset: number): string {
@@ -112,6 +138,23 @@ async function main() {
     } catch (err) {
       console.error(`❌ Failed to post preview for ${race.name}:`, err);
     }
+
+    // Instagram Stories — elite races only
+    const igPreviewSlug = await getEventSlug(race);
+    if (igPreviewSlug && shouldPostToInstagram(race) && !tracking.igPreviews.includes(race.id)) {
+      console.log(`📸 Posting Instagram Story preview: ${race.name}`);
+      try {
+        execSync(
+          `node_modules/.bin/tsx scripts/agents/post-to-instagram.ts --event ${igPreviewSlug} --type preview --stories`,
+          { encoding: "utf-8", stdio: "inherit", cwd: process.cwd(), timeout: 120000 }
+        );
+        tracking.igPreviews.push(race.id);
+        saveTracking(tracking);
+        console.log(`✅ Instagram Story preview posted: ${race.name}\n`);
+      } catch (err) {
+        console.error(`❌ Instagram Story preview failed for ${race.name}:`, (err as any)?.message?.slice(0, 200));
+      }
+    }
   }
 
   // ─── 2. RESULTS: Races completed yesterday ────────────────────
@@ -149,6 +192,23 @@ async function main() {
       console.log(`✅ Result posted: ${race.name}\n`);
     } catch (err) {
       console.error(`❌ Failed to post result for ${race.name}:`, err);
+    }
+
+    // Instagram Stories — elite races only
+    const igResultSlug = await getEventSlug(race);
+    if (igResultSlug && shouldPostToInstagram(race) && !tracking.igResults.includes(race.id)) {
+      console.log(`📸 Posting Instagram Story result: ${race.name}`);
+      try {
+        execSync(
+          `node_modules/.bin/tsx scripts/agents/post-to-instagram.ts --event ${igResultSlug} --type results --stories`,
+          { encoding: "utf-8", stdio: "inherit", cwd: process.cwd(), timeout: 120000 }
+        );
+        tracking.igResults.push(race.id);
+        saveTracking(tracking);
+        console.log(`✅ Instagram Story result posted: ${race.name}\n`);
+      } catch (err) {
+        console.error(`❌ Instagram Story result failed for ${race.name}:`, (err as any)?.message?.slice(0, 200));
+      }
     }
   }
 
