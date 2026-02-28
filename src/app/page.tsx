@@ -15,7 +15,6 @@ import { EventListView } from "@/components/event-card";
 import { MyFeedWidget } from "@/components/my-feed-widget";
 import { RaceFilters } from "@/components/race-filters";
 import { RaceFollowButton } from "@/components/race-follow-button";
-import { DisciplineSwitch } from "@/components/discipline-switch";
 import { auth } from "@clerk/nextjs/server";
 import { SignInButton } from "@clerk/nextjs";
 
@@ -64,9 +63,11 @@ interface HomepageEvent {
 // DATA FETCHING
 // ---------------------------------------------------------------------------
 
-async function getHighHypeRaces(): Promise<{ hero: HomepageEvent | null; calendar: HomepageEvent[] }> {
+async function getHighHypeRaces(discipline?: string | null): Promise<{ hero: HomepageEvent | null; calendar: HomepageEvent[] }> {
   const today = new Date().toISOString().split("T")[0];
   try {
+    const conditions: Parameters<typeof and>[0][] = [gte(raceEvents.date, today), eq(races.status, "active")];
+    if (discipline && discipline !== "all") conditions.push(eq(raceEvents.discipline, discipline as any));
     const result = await db
       .select({
         race: races,
@@ -75,7 +76,7 @@ async function getHighHypeRaces(): Promise<{ hero: HomepageEvent | null; calenda
       })
       .from(races)
       .innerJoin(raceEvents, eq(races.raceEventId, raceEvents.id))
-      .where(and(gte(raceEvents.date, today), eq(races.status, "active")))
+      .where(and(...conditions))
       .orderBy(raceEvents.date)
       .limit(150);
 
@@ -290,7 +291,7 @@ export default async function Home({ searchParams }: HomePageProps) {
   const hasFilters = !!(filterDiscipline || filterGender || filterCountry || filterCat);
 
   const [{ hero: nextRace, calendar: highHypeRaces }, latestIntel, recentResults, filteredRaces, calendarCountries] = await Promise.all([
-    getHighHypeRaces(),
+    getHighHypeRaces(filterDiscipline),
     getLatestIntel(),
     getRecentResults(),
     hasFilters ? getFilteredCalendarEvents(filterDiscipline, filterGender, filterCountry, filterCat) : Promise.resolve([]),
@@ -302,10 +303,10 @@ export default async function Home({ searchParams }: HomePageProps) {
     <div className="min-h-screen flex flex-col overflow-x-hidden">
       <Header />
       <main className="flex-1">
-        {/* ---- DISCIPLINE SWITCH ---- */}
+        {/* ---- TOP FILTER BAR ---- */}
         <div className="border-b border-border/30 bg-background/60">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-3 flex items-center justify-between gap-4">
-            <DisciplineSwitch current={d ?? "all"} />
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-3 flex flex-wrap items-center justify-between gap-3">
+            <RaceFilters countries={calendarCountries} basePath="/" />
             {!userId && (
               <p className="text-xs text-muted-foreground hidden sm:block">
                 <SignInButton mode="modal">
@@ -341,9 +342,6 @@ export default async function Home({ searchParams }: HomePageProps) {
               <Link href="/races" className="text-sm text-primary hover:text-primary/80 transition-colors">
                 View all races &rarr;
               </Link>
-            </div>
-            <div className="mb-4">
-              <RaceFilters countries={calendarCountries} basePath="/" />
             </div>
             {upcomingRaces.length > 0 ? (
               <EventListView events={upcomingRaces} />
