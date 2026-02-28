@@ -148,10 +148,7 @@ async function getLatestIntel() {
 }
 
 async function getRecentResults() {
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const cutoff = thirtyDaysAgo.toISOString().split("T")[0];
-
+  const today = new Date().toISOString().split("T")[0];
   try {
     const result = await db
       .select({
@@ -166,8 +163,7 @@ async function getRecentResults() {
       .where(
         and(
           eq(raceResults.position, 1),
-          gte(races.date, cutoff),
-          lt(races.date, new Date().toISOString().split("T")[0])
+          lt(races.date, today)
         )
       )
       .orderBy(desc(races.date))
