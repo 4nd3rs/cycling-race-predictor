@@ -142,14 +142,14 @@ const IMPORTS: ImportConfig[] = [
 async function main() {
   console.log(`\n🚴 Supercup 2026 Import [${DRY_RUN ? "DRY RUN" : "LIVE"}]\n`);
 
-  const data = JSON.parse(fs.readFileSync("/tmp/supercup_results_v2.json", "utf-8"));
+  const data = JSON.parse(fs.readFileSync("/tmp/supercup_results_v3.json", "utf-8"));
   let totalInserted = 0, totalSkipped = 0, totalErrors = 0;
 
   for (const cfg of IMPORTS) {
     const fileSections = data[cfg.fileKey] || {};
 
     for (const categorySlug of cfg.categories) {
-      const results: { pos: number; name: string; team: string }[] = fileSections[categorySlug] || [];
+      const results: { pos: number; name: string; team: string; time_seconds?: number; time_gap_seconds?: number }[] = fileSections[categorySlug] || [];
       if (results.length === 0) {
         console.log(`⚠️  ${cfg.fileKey}/${categorySlug}: no results`);
         continue;
