@@ -43,7 +43,7 @@ function getHypeScore(uciCategory: string | null | undefined): number {
   return 30;
 }
 
-const MIN_HYPE = 50; // Skip C2 and unknown category races
+const MIN_HYPE = 0; // Predict all races with sufficient startlist data (ELO fallback for low-profile races)
 const MIN_STARTLIST = 5; // Skip if less than 5 riders
 
 async function run() {

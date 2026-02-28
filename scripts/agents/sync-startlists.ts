@@ -371,12 +371,13 @@ async function main() {
     maxDateObj.setDate(maxDateObj.getDate() + daysAheadArg);
     const maxDate = maxDateObj.toISOString().split("T")[0];
 
+    // Fetch all upcoming races — those with pcsUrl will be scraped via Playwright,
+    // those without will be skipped by the scraper (MTB C1/C2 handled by cron agent web search)
     races = await db.query.races.findMany({
       where: and(
         eq(schema.races.status, "active"),
         gte(schema.races.date, today),
         lte(schema.races.date, maxDate),
-        isNotNull(schema.races.pcsUrl)
       ),
       orderBy: (r, { asc }) => [asc(r.date)],
       limit: limitArg,
