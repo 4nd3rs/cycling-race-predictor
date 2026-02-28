@@ -19,12 +19,13 @@ async function getMyFeed(clerkId: string) {
   // Get all follows
   const follows = await db.select().from(userFollows).where(eq(userFollows.userId, user.id));
   const raceEventFollowIds = follows.filter(f => f.followType === "race_event").map(f => f.entityId);
+  const raceFollowIds = follows.filter(f => f.followType === "race").map(f => f.entityId);
   const riderFollowIds = follows.filter(f => f.followType === "rider").map(f => f.entityId);
 
-  if (raceEventFollowIds.length === 0 && riderFollowIds.length === 0) return { empty: true, events: [], riderRaces: [] };
+  if (raceEventFollowIds.length === 0 && raceFollowIds.length === 0 && riderFollowIds.length === 0) return { empty: true, events: [], riderRaces: [] };
 
-  // 1. Upcoming followed events
-  const followedEvents = raceEventFollowIds.length > 0
+  // 1a. Upcoming followed race_events
+  const followedByEvent = raceEventFollowIds.length > 0
     ? await db
         .select({ event: raceEvents, race: races })
         .from(raceEvents)
@@ -33,6 +34,20 @@ async function getMyFeed(clerkId: string) {
         .orderBy(raceEvents.date)
         .limit(20)
     : [];
+
+  // 1b. Upcoming events from followed individual races (followType="race")
+  const followedByRace = raceFollowIds.length > 0
+    ? await db
+        .select({ event: raceEvents, race: races })
+        .from(races)
+        .innerJoin(raceEvents, eq(races.raceEventId, raceEvents.id))
+        .where(and(inArray(races.id, raceFollowIds), gte(raceEvents.date, today)))
+        .orderBy(raceEvents.date)
+        .limit(20)
+    : [];
+
+  // Merge both sets
+  const followedEvents = [...followedByEvent, ...followedByRace];
 
   // Deduplicate events (multiple categories per event)
   const eventMap = new Map<string, typeof followedEvents[0]["event"] & { categories: string[] }>();
