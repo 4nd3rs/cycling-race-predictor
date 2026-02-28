@@ -22,6 +22,7 @@ type RiderRow = {
   racesTotal: number;
   discipline: string;
   gender: string | null;
+  uciPoints: number;
 };
 
 async function getTopByCategory(
@@ -44,6 +45,7 @@ async function getTopByCategory(
         racesTotal: riderDisciplineStats.racesTotal,
         discipline: riderDisciplineStats.discipline,
         gender: riderDisciplineStats.gender,
+        uciPoints: riderDisciplineStats.uciPoints,
       })
       .from(riderDisciplineStats)
       .innerJoin(riders, eq(riderDisciplineStats.riderId, riders.id))
@@ -54,7 +56,7 @@ async function getTopByCategory(
           eq(riderDisciplineStats.gender, gender)
         )
       )
-      .orderBy(desc(riderDisciplineStats.currentElo))
+      .orderBy(desc(riderDisciplineStats.uciPoints))
       .limit(limit);
 
     return results.map((r) => ({
@@ -63,6 +65,7 @@ async function getTopByCategory(
       winsTotal: r.winsTotal || 0,
       podiumsTotal: r.podiumsTotal || 0,
       racesTotal: r.racesTotal || 0,
+      uciPoints: r.uciPoints || 0,
     }));
   } catch {
     return [];
@@ -85,6 +88,7 @@ async function searchRiders(query: string): Promise<RiderRow[]> {
         racesTotal: riderDisciplineStats.racesTotal,
         discipline: riderDisciplineStats.discipline,
         gender: riderDisciplineStats.gender,
+        uciPoints: riderDisciplineStats.uciPoints,
       })
       .from(riders)
       .leftJoin(
@@ -93,7 +97,7 @@ async function searchRiders(query: string): Promise<RiderRow[]> {
       )
       .leftJoin(teams, eq(riderDisciplineStats.teamId, teams.id))
       .where(ilike(riders.name, `%${query}%`))
-      .orderBy(desc(riderDisciplineStats.currentElo))
+      .orderBy(desc(riderDisciplineStats.uciPoints))
       .limit(60);
 
     return results.map((r) => ({
@@ -104,6 +108,7 @@ async function searchRiders(query: string): Promise<RiderRow[]> {
       racesTotal: r.racesTotal || 0,
       discipline: r.discipline || "—",
       gender: r.gender || "—",
+      uciPoints: r.uciPoints || 0,
     }));
   } catch {
     return [];
@@ -197,8 +202,8 @@ function RiderTableRow({
           </span>
         </td>
       )}
-      <td className={`px-4 py-3 text-sm text-right font-mono font-semibold ${eloColor(rider.currentElo)}`}>
-        {Math.round(rider.currentElo)}
+      <td className="px-4 py-3 text-sm text-right font-mono font-semibold text-blue-300">
+        {rider.uciPoints > 0 ? rider.uciPoints.toLocaleString() : "—"}
       </td>
       <td className="px-4 py-3 text-sm text-center text-muted-foreground">
         {rider.winsTotal || "—"}
@@ -230,7 +235,7 @@ function RiderTable({
       <h2 className="text-lg font-bold mb-3 flex items-center gap-2">
         <span>{icon}</span>
         <span>{title}</span>
-        <span className="text-xs text-muted-foreground font-normal ml-1">by ELO rating</span>
+        <span className="text-xs text-muted-foreground font-normal ml-1">by UCI points</span>
       </h2>
       <div className="rounded-xl border border-white/10 overflow-hidden bg-white/2">
         <table className="w-full text-sm">
@@ -243,7 +248,7 @@ function RiderTable({
               {showDiscipline && (
                 <th className="px-4 py-2.5 text-xs font-medium text-muted-foreground text-center">Cat</th>
               )}
-              <th className="px-4 py-2.5 text-xs font-medium text-muted-foreground text-right">ELO</th>
+              <th className="px-4 py-2.5 text-xs font-medium text-muted-foreground text-right">UCI Pts</th>
               <th className="px-4 py-2.5 text-xs font-medium text-muted-foreground text-center w-12">W</th>
               <th className="px-4 py-2.5 text-xs font-medium text-muted-foreground text-center w-12">Pod</th>
               <th className="px-4 py-2.5 text-xs font-medium text-muted-foreground text-center w-14 hidden md:table-cell">Races</th>
@@ -314,7 +319,7 @@ export default async function RidersPage({ searchParams }: PageProps) {
           <div>
             <h1 className="text-3xl font-bold">Riders</h1>
             <p className="text-muted-foreground mt-1">
-              Top ranked professional cyclists by ELO rating
+              Top ranked professional cyclists by UCI points
             </p>
           </div>
           <form className="w-full md:w-72">
