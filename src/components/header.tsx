@@ -62,7 +62,7 @@ export function Header() {
         </nav>
 
         {/* Spacer */}
-        <div className="flex-1 md:hidden" />
+        <div className="flex-1" />
 
         {/* My Race Hub — primary CTA, always visible when signed in */}
         {isLoaded && isSignedIn && (
