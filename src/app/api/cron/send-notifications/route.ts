@@ -454,9 +454,15 @@ async function processRace(race: RaceCandidate): Promise<{ sent: number; skipped
 
 // ── Main handler ──────────────────────────────────────────────────────────────
 
-export async function GET() {
+export async function GET(request: Request) {
   if (!(await verifyCronAuth())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Test mode: ?test=true — sends a real WA message to all connected users
+  const url = new URL(request.url);
+  if (url.searchParams.get("test") === "true") {
+    return handleTestMode();
   }
 
   // Quiet hours: skip if UTC hour < 7 or > 22
@@ -497,6 +503,65 @@ export async function GET() {
   }
 }
 
-export async function POST() {
-  return GET();
+export async function POST(request: Request) {
+  return GET(request);
+}
+
+// ── Test handler ──────────────────────────────────────────────────────────────
+
+async function handleTestMode(): Promise<NextResponse> {
+  // Find all WhatsApp-connected users
+  const waUsers = await db
+    .select({ userId: userWhatsapp.userId, phone: userWhatsapp.phoneNumber })
+    .from(userWhatsapp)
+    .limit(20);
+
+  if (waUsers.length === 0) {
+    return NextResponse.json({ success: false, message: "No WhatsApp-connected users found" });
+  }
+
+  const testMessage = `🚴 <b>Pro Cycling Predictor — Test Notification</b>
+
+This is a test of your personalised race alerts.
+
+When races are upcoming, you'll receive:
+• Preview (2 days before) with our top predictions
+• Race day reminder
+• Results summary after the finish
+
+Next up: <b>Strade Bianche 2026</b> — Saturday 7 March.
+
+procyclingpredictor.com`;
+
+  const testMessagePlain = `Pro Cycling Predictor — Test Notification
+
+This is a test of your personalised race alerts.
+
+When races are upcoming, you'll receive:
+• Preview (2 days before) with our top predictions
+• Race day reminder  
+• Results summary after the finish
+
+Next up: Strade Bianche 2026 — Saturday 7 March.
+
+procyclingpredictor.com`;
+
+  const results: Array<{ phone: string; ok: boolean }> = [];
+
+  await Promise.allSettled(
+    waUsers.map(async (u) => {
+      if (!u.phone) return;
+      const ok = await sendWhatsApp(u.phone, testMessagePlain);
+      results.push({ phone: u.phone.replace(/\d(?=\d{4})/g, "*"), ok });
+    })
+  );
+
+  const sent = results.filter(r => r.ok).length;
+  return NextResponse.json({
+    success: true,
+    mode: "test",
+    usersFound: waUsers.length,
+    sent,
+    results,
+  });
 }
