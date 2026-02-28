@@ -68,8 +68,8 @@ export async function POST(req: NextRequest) {
 
   // Only notify on a new follow (not a duplicate)
   if (result.length > 0) {
-    // Fire-and-forget — don't block the response
-    sendFollowNotification(user.id, followType, entityId).catch((err) =>
+    // Await so Vercel doesn't kill the function before it completes
+    await sendFollowNotification(user.id, followType, entityId).catch((err) =>
       console.error("Follow notification failed:", err)
     );
   }
