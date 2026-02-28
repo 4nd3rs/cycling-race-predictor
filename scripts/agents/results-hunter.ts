@@ -3,7 +3,7 @@ config({ path: ".env.local" });
 
 import { db, races, riders, raceResults, teams } from "./lib/db";
 import { and, ilike, eq, asc } from "drizzle-orm";
-import { notifyRaceEventFollowers, notifyRiderFollowers, getRaceEventId, getRaceEventInfo } from "./lib/notify-followers";
+import { notifyRaceEventFollowers, notifyRaceEventCombined, notifyRiderFollowers, getRaceEventId, getRaceEventInfo, type RaceSection } from "./lib/notify-followers";
 
 interface ResultInput {
   raceName: string;
@@ -255,15 +255,24 @@ async function main() {
         .map((r, i) => `${["🥇","🥈","🥉"][i]} ${r.name}`)
         .join("\n");
 
-      // Notify race followers
-      const raceMsg = [
+      // Notify race followers (combined per-user)
+      const raceGender = (await db.select({ gender: races.gender }).from(races).where(eq(races.id, raceId)).limit(1))[0]?.gender;
+      const genderLabel = raceGender === "women" ? "👩 Elite Women" : "👨 Elite Men";
+      const section: RaceSection = {
+        raceId,
+        categoryLabel: genderLabel,
+        tgSection: podiumLines,
+        waSection: podiumLines.replace(/<[^>]+>/g, ""),
+      };
+      const raceNotified = await notifyRaceEventCombined(
+        raceEventId,
+        [section],
         `🏆 <b>Results are in for ${eventInfo.name}!</b>`,
-        ``,
-        podiumLines,
-        ``,
+        `🏆 Results are in for ${eventInfo.name}!`,
         `👉 <a href="${raceUrl}">Full results on Pro Cycling Predictor</a>`,
-      ].join("\n");
-      const raceNotified = await notifyRaceEventFollowers(raceEventId, raceMsg);
+        `👉 ${raceUrl}`,
+        `result`
+      );
       if (raceNotified > 0) console.error(`📨 Notified ${raceNotified} race follower(s)`);
 
       // Notify followers of each top-3 rider individually
