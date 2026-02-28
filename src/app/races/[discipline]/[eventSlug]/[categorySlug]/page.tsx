@@ -757,7 +757,7 @@ export default async function CategoryPage({ params }: PageProps) {
                       {getProfileIcon(race.profileType)} {race.profileType}
                     </span>
                   )}
-                  {race.raceType === "one_day" && <span>🏁 One-day classic</span>}
+                  {race.raceType === "one_day" && discipline !== "mtb" && <span>🏁 One-day classic</span>}
                   {race.raceType === "stage_race" && <span>📅 Stage race</span>}
                   {event.externalLinks?.raceStart && (
                     <span>🕐 Start {event.externalLinks.raceStart}</span>
@@ -925,7 +925,7 @@ export default async function CategoryPage({ params }: PageProps) {
               {/* Course info card */}
               <div className="rounded-lg border border-border/30 bg-muted/20 p-4 text-sm text-muted-foreground">
                 <p>Course profile and race maps available on ProCyclingStats.</p>
-                {race.raceType === "one_day" && race.distanceKm && (
+                {race.raceType === "one_day" && discipline !== "mtb" && race.distanceKm && (
                   <p className="mt-1">📏 {parseFloat(String(race.distanceKm)).toFixed(0)} km one-day race</p>
                 )}
               </div>
