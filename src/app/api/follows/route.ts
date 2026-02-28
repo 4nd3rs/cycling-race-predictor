@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
-import { db, userFollows, riders, raceEvents, races, teams, userTelegram } from "@/lib/db";
+import { db, userFollows, riders, raceEvents, races, teams, userTelegram, userWhatsapp } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import { sendTelegramMessage } from "@/lib/telegram";
+import { sendWhatsAppMessage } from "@/lib/whatsapp";
 
 export async function GET() {
   const user = await requireAuth();
@@ -198,4 +199,24 @@ async function sendFollowNotification(
   ].join("\n");
 
   await sendTelegramMessage(tg.telegramChatId, message);
+
+  // Also send via WhatsApp if connected
+  const [wa] = await db
+    .select({ phoneNumber: userWhatsapp.phoneNumber })
+    .from(userWhatsapp)
+    .where(eq(userWhatsapp.userId, userId))
+    .limit(1);
+
+  if (wa?.phoneNumber) {
+    const waText = [
+      `${emoji} *You're now following ${entityName}!*`,
+      ``,
+      `You'll get WhatsApp updates for this ${typeLabel} — predictions, results, and breaking news.`,
+      ``,
+      `👉 ${entityUrl}`,
+      ``,
+      `Manage your follows at procyclingpredictor.com`,
+    ].join("\n");
+    await sendWhatsAppMessage(wa.phoneNumber, waText);
+  }
 }
