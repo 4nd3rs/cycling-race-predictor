@@ -491,42 +491,29 @@ async function scrapeMtbCalendar(): Promise<ScrapedRace[]> {
 
 async function scrapeUciCalendar(): Promise<ScrapedRace[]> {
   const races: ScrapedRace[] = [];
-  let browser: Browser | null = null;
 
   try {
-    browser = await chromium.launch({ headless: true });
-    const page = await browser.newPage();
-    await page.setExtraHTTPHeaders({
-      "User-Agent":
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    });
+    const token = process.env.SCRAPE_DO_TOKEN;
+    if (!token) throw new Error("SCRAPE_DO_TOKEN not set");
 
-    console.log("  Loading UCI official calendar (optional)...");
-    await page.goto("https://www.uci.org/calendar", {
-      waitUntil: "domcontentloaded",
-      timeout: 20000,
-    });
-
-    // UCI calendar is heavily JS-rendered — wait a bit
-    await page.waitForTimeout(5000);
+    console.log("  Loading UCI official calendar (optional) via scrape.do...");
+    const apiUrl = `https://api.scrape.do?token=${token}&url=${encodeURIComponent("https://www.uci.org/calendar")}&render=true`;
+    const res = await fetch(apiUrl, { signal: AbortSignal.timeout(30000) });
+    if (!res.ok) throw new Error(`scrape.do returned ${res.status}`);
+    const html = await res.text();
+    const $ = cheerio.load(html);
 
     // Try to extract any visible race entries
-    const uciRaces = await page
-      .$$eval(".calendar-list-item, .event-row, [class*='event']", (items) => {
-        return items
-          .map((item) => {
-            const name = item.querySelector("h3, .event-name, .title")?.textContent?.trim() || "";
-            const date = item.querySelector("time, .date, [class*='date']")?.textContent?.trim() || "";
-            const country = item.querySelector(".country, [class*='country']")?.textContent?.trim() || "";
-            return { name, date, country };
-          })
-          .filter((r) => r.name);
-      })
-      .catch(() => [] as Array<{ name: string; date: string; country: string }>);
+    const uciRaces: Array<{ name: string; date: string; country: string }> = [];
+    $(".calendar-list-item, .event-row, [class*='event']").each((_, item) => {
+      const name = $(item).find("h3, .event-name, .title").first().text().trim();
+      const date = $(item).find("time, .date, [class*='date']").first().text().trim();
+      const country = $(item).find(".country, [class*='country']").first().text().trim();
+      if (name) uciRaces.push({ name, date, country });
+    });
 
     console.log(`  UCI: ${uciRaces.length} entries found`);
 
-    // Parse whatever we get (best effort)
     for (const entry of uciRaces) {
       const dateStr = parsePcsDate(entry.date);
       if (!dateStr || !isInDateRange(dateStr)) continue;
@@ -542,8 +529,6 @@ async function scrapeUciCalendar(): Promise<ScrapedRace[]> {
   } catch (err) {
     // UCI scraping is optional — skip gracefully
     console.log(`  UCI calendar scrape skipped: ${err instanceof Error ? err.message : err}`);
-  } finally {
-    if (browser) await browser.close();
   }
 
   return races;

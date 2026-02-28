@@ -32,6 +32,18 @@
     {
       "path": "/api/cron/scrape-race-news",
       "schedule": "15 */2 * * *"
+    },
+    {
+      "path": "/api/cron/sync-startlists",
+      "schedule": "30 */2 * * *"
+    },
+    {
+      "path": "/api/cron/sync-race-calendar",
+      "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/send-notifications",
+      "schedule": "0 */2 * * *"
     }
   ]
 }

@@ -15,7 +15,6 @@ import { neon } from "@neondatabase/serverless";
 import { eq, gte, lte, and, isNotNull, ilike, or, asc } from "drizzle-orm";
 import * as schema from "../../src/lib/db/schema";
 import * as cheerio from "cheerio";
-import * as cheerio from "cheerio";
 import { writeScrapeStatus, type RaceRow } from "./lib/scrape-status";
 import { notifyRiderFollowers, getRaceEventInfo } from "./lib/notify-followers";
 

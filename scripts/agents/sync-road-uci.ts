@@ -14,7 +14,8 @@ import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
 import { eq, and } from "drizzle-orm";
 import * as schema from "../../src/lib/db/schema";
-import { chromium } from "playwright";
+import * as cheerio from "cheerio";
+import { scrapeDo } from "../../src/lib/scraper/scrape-do";
 
 const sql = neon(process.env.DATABASE_URL!);
 const db = drizzle(sql, { schema });
@@ -46,38 +47,24 @@ async function scrapeRankingsPage(
 ): Promise<RankingEntry[]> {
   const entries: RankingEntry[] = [];
 
-  const browser = await chromium.launch({ headless: true });
   try {
-    const page = await browser.newPage();
-    await page.setExtraHTTPHeaders({
-      "User-Agent":
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      "Accept-Language": "en-US,en;q=0.9",
-    });
-
     console.log(`  Loading: ${url}`);
-    await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
-    await page.waitForSelector("table", { timeout: 10000 }).catch(() => {});
+    const html = await scrapeDo(url);
+    const $ = cheerio.load(html);
 
     // PCS table: [rank, prev, diff, "LASTNAME Firstname", team, points]
-    const rows = await page.$$eval("table tbody tr", (trs) =>
-      trs.map((tr) => {
-        const cells = Array.from(tr.querySelectorAll("td")).map(td => td.textContent?.trim() ?? "");
-        return cells;
-      })
-    );
-
-    for (const cells of rows) {
-      if (entries.length >= maxEntries) break;
-      if (cells.length < 4) continue;
+    $("table tbody tr").each((_, row) => {
+      if (entries.length >= maxEntries) return false;
+      const cells = $(row).find("td").map((__, td) => $(td).text().trim()).get();
+      if (cells.length < 4) return;
 
       const rank = parseInt(cells[0]);
-      if (!rank || rank === 0) continue;
+      if (!rank || rank === 0) return;
 
       // cells[3] = "VAN DER POEL Mathieu" — PCS ALL CAPS SURNAME + First name
       // Convert to "Mathieu van der Poel" format
       const rawName = cells[3];
-      if (!rawName || rawName.length < 3) continue;
+      if (!rawName || rawName.length < 3) return;
 
       const parts = rawName.split(" ");
       const firstName = parts[parts.length - 1]; // Last token = first name
@@ -93,11 +80,9 @@ async function scrapeRankingsPage(
       const team = cells[4] || "";
 
       entries.push({ rank, riderName, team, uciPoints, nationality: "" });
-    }
+    });
   } catch (err: any) {
     console.error(`  Error scraping ${url}: ${err.message}`);
-  } finally {
-    await browser.close();
   }
 
   return entries;

@@ -24,8 +24,8 @@ import {
   makeSlugUnique,
 } from "../../src/lib/url-utils";
 import { scrapeXCOdataRacesList } from "../../src/lib/scraper/xcodata-races";
-import { chromium, type Browser } from "playwright";
 import * as cheerio from "cheerio";
+import { scrapeDo } from "../../src/lib/scraper/scrape-do";
 
 const sql = neon(process.env.DATABASE_URL!);
 const db = drizzle(sql, { schema });
@@ -284,78 +284,32 @@ function normalizePcsCategory(raw: string): string | null {
 
 async function scrapePcsCalendar(): Promise<ScrapedRace[]> {
   const races: ScrapedRace[] = [];
-  let browser: Browser | null = null;
 
   try {
-    browser = await chromium.launch({ headless: true });
-    const page = await browser.newPage();
-    await page.setExtraHTTPHeaders({
-      "User-Agent":
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      "Accept-Language": "en-US,en;q=0.9",
-    });
+    console.log("  Loading PCS race calendar via scrape.do...");
+    const html = await scrapeDo("https://www.procyclingstats.com/races.php");
+    const $ = cheerio.load(html);
 
-    console.log("  Loading PCS race calendar...");
-    await page.goto("https://www.procyclingstats.com/races.php", {
-      waitUntil: "domcontentloaded",
-      timeout: 30000,
-    });
-
-    await page
-      .waitForSelector("table.tablesorter, table.basic, .racelisttable, table.sortTabl", {
-        timeout: 15000,
-      })
-      .catch(() => {});
-
-    const pcsRaces = await page.$$eval(
-      "table tbody tr, ul.raceList li",
-      (rows) => {
-        return rows
-          .map((row) => {
-            const cells = row.querySelectorAll("td, .race-item");
-            const link = row.querySelector('a[href*="/race/"]');
-            return {
-              name: link?.textContent?.trim() || "",
-              url: link?.getAttribute("href") || "",
-              date: cells[0]?.textContent?.trim() || "",
-              country: cells[1]?.textContent?.trim() || "",
-              category: cells[2]?.textContent?.trim() || "",
-            };
-          })
-          .filter((r) => r.name && r.url);
+    const rowsToParse: Array<{ name: string; url: string; dateRange: string; startDate: string; category: string }> = [];
+    $("table tbody tr").each((_, row) => {
+      const cells = $(row).find("td").map((__, td) => $(td).text().trim()).get();
+      const link = $(row).find("a[href*='/race/']").first();
+      if (cells.length > 2 && cells[2].length > 2) {
+        rowsToParse.push({
+          name: cells[2] ?? "",
+          url: link.attr("href") ?? "",
+          dateRange: cells[0] ?? "",
+          startDate: cells[1] ?? "",
+          category: cells[4] ?? "",
+        });
       }
-    );
-
-    let rowsToParse = pcsRaces;
-
-    if (rowsToParse.length === 0) {
-      console.log("  PCS table empty, trying cheerio fallback...");
-      const html = await page.content();
-      const $ = cheerio.load(html);
-      const cheerioRaces: typeof pcsRaces = [];
-
-      $("table tbody tr").each((_, tr) => {
-        const cells = $(tr).find("td");
-        const link = $(tr).find('a[href*="/race/"]').first();
-        if (link.length) {
-          cheerioRaces.push({
-            name: link.text().trim(),
-            url: link.attr("href") || "",
-            date: cells.eq(0).text().trim(),
-            country: cells.eq(1).text().trim(),
-            category: cells.eq(2).text().trim(),
-          });
-        }
-      });
-
-      rowsToParse = cheerioRaces;
-    }
+    });
 
     console.log(`  PCS: ${rowsToParse.length} raw rows parsed`);
 
     for (const row of rowsToParse) {
       try {
-        const dateStr = parsePcsDate(row.date);
+        const dateStr = parsePcsDate(row.startDate || row.dateRange);
         if (!dateStr || !isInDateRange(dateStr)) continue;
 
         const category = normalizePcsCategory(row.category || "");
@@ -369,12 +323,9 @@ async function scrapePcsCalendar(): Promise<ScrapedRace[]> {
             : `https://www.procyclingstats.com/${row.url.replace(/^\//, "")}`;
         }
 
-        const country = row.country?.replace(/[^A-Za-z]/g, "").toUpperCase().slice(0, 3) || undefined;
-
         races.push({
           name: row.name,
           date: dateStr,
-          country,
           uciCategory: category,
           pcsUrl,
           sourceUrl: pcsUrl,
@@ -386,8 +337,6 @@ async function scrapePcsCalendar(): Promise<ScrapedRace[]> {
     }
   } catch (err) {
     console.error(`  PCS scrape error: ${err}`);
-  } finally {
-    if (browser) await browser.close();
   }
 
   return races;
