@@ -138,7 +138,7 @@ export default function AboutPage() {
             racing.
           </p>
           <a
-            href="https://discord.gg/placeholder"
+            href="https://discord.gg/YaKmfkHqYu"
             target="_blank"
             rel="noopener noreferrer"
             className="mt-6 inline-flex items-center gap-2 rounded-md bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"

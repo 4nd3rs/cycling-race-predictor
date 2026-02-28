@@ -30,7 +30,7 @@ export function Footer() {
             </Link>
             <span className="hidden sm:inline text-border">·</span>
             <a
-              href="https://discord.gg/placeholder"
+              href="https://discord.gg/YaKmfkHqYu"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-foreground transition-colors"
