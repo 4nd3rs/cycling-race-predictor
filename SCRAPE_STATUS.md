@@ -1,6 +1,6 @@
 # SCRAPE_STATUS.md — Pipeline Status
 
-_Last updated: 2026-02-28 07:30:31 (Stockholm)_
+_Last updated: 2026-02-28 08:06:13 (Stockholm)_
 
 ## 📅 Race Calendar
 - **Last run:** 2026-02-28 07:30:31
@@ -8,18 +8,18 @@ _Last updated: 2026-02-28 07:30:31 (Stockholm)_
 - Road (PCS): 19 found, 0 new, 19 existed. MTB (XCOdata): 83 found, 2 new, 81 existed.
 
 ## 📋 Startlists
-- **Last run:** 2026-02-28 06:06:50
+- **Last run:** 2026-02-28 08:06:13
 - **Status:** ✅ OK
 - 0 new riders added, 0 updated across 6 race(s)
 
 | Race | Date | Riders | Status | Scraped |
 |------|------|---------|--------|---------|
-| Omloop Het Nieuwsblad 2026 - Elite Women | 2026-02-28 | 136 | ✅ up to date | 2026-02-28 06:05:10 |
-| Omloop Het Nieuwsblad 2026 - Elite Men | 2026-02-28 | 175 | ✅ up to date | 2026-02-28 06:05:52 |
-| Strade Bianche - Elite Men | 2026-03-07 | 61 | ✅ up to date | 2026-02-28 06:06:06 |
-| Strade Bianche - Elite Women | 2026-03-07 | 0 | ⚠️ empty | 2026-02-28 06:06:19 |
-| Paris-Nice - Elite Women | 2026-03-08 | 0 | ⚠️ empty | 2026-02-28 06:06:33 |
-| Paris-Nice - Elite Men | 2026-03-08 | 84 | ✅ up to date | 2026-02-28 06:06:50 |
+| Omloop Het Nieuwsblad 2026 - Elite Men | 2026-02-28 | 175 | ✅ up to date | 2026-02-28 08:05:29 |
+| Omloop Het Nieuwsblad 2026 - Elite Women | 2026-02-28 | 136 | ✅ up to date | 2026-02-28 08:06:13 |
+| Gran Premio Zaragoza XCO - Elite Men | 2026-03-01 | 0 | ⏭️ no pcsUrl | 2026-02-28 08:06:13 |
+| Gran Premio Zaragoza XCO - Elite Women | 2026-03-01 | 0 | ⏭️ no pcsUrl | 2026-02-28 08:06:13 |
+| VTT Chabrières + UCI XCO Junior Series - Elite Men | 2026-03-01 | 0 | ⏭️ no pcsUrl | 2026-02-28 08:06:13 |
+| VTT Chabrières + UCI XCO Junior Series - Elite Women | 2026-03-01 | 0 | ⏭️ no pcsUrl | 2026-02-28 08:06:13 |
 
 ## 🏁 Results
 - **Last run:** 2026-02-28 07:29:23
@@ -40,49 +40,49 @@ _Last updated: 2026-02-28 07:30:31 (Stockholm)_
     "summary": "0 new riders added, 0 updated across 6 race(s)",
     "raceRows": [
       {
-        "name": "Omloop Het Nieuwsblad 2026 - Elite Women",
-        "date": "2026-02-28",
-        "count": 136,
-        "status": "✅ up to date",
-        "scrapedAt": "2026-02-28 06:05:10"
-      },
-      {
         "name": "Omloop Het Nieuwsblad 2026 - Elite Men",
         "date": "2026-02-28",
         "count": 175,
         "status": "✅ up to date",
-        "scrapedAt": "2026-02-28 06:05:52"
+        "scrapedAt": "2026-02-28 08:05:29"
       },
       {
-        "name": "Strade Bianche - Elite Men",
-        "date": "2026-03-07",
-        "count": 61,
+        "name": "Omloop Het Nieuwsblad 2026 - Elite Women",
+        "date": "2026-02-28",
+        "count": 136,
         "status": "✅ up to date",
-        "scrapedAt": "2026-02-28 06:06:06"
+        "scrapedAt": "2026-02-28 08:06:13"
       },
       {
-        "name": "Strade Bianche - Elite Women",
-        "date": "2026-03-07",
+        "name": "Gran Premio Zaragoza XCO - Elite Men",
+        "date": "2026-03-01",
         "count": 0,
-        "status": "⚠️ empty",
-        "scrapedAt": "2026-02-28 06:06:19"
+        "status": "⏭️ no pcsUrl",
+        "scrapedAt": "2026-02-28 08:06:13"
       },
       {
-        "name": "Paris-Nice - Elite Women",
-        "date": "2026-03-08",
+        "name": "Gran Premio Zaragoza XCO - Elite Women",
+        "date": "2026-03-01",
         "count": 0,
-        "status": "⚠️ empty",
-        "scrapedAt": "2026-02-28 06:06:33"
+        "status": "⏭️ no pcsUrl",
+        "scrapedAt": "2026-02-28 08:06:13"
       },
       {
-        "name": "Paris-Nice - Elite Men",
-        "date": "2026-03-08",
-        "count": 84,
-        "status": "✅ up to date",
-        "scrapedAt": "2026-02-28 06:06:50"
+        "name": "VTT Chabrières + UCI XCO Junior Series - Elite Men",
+        "date": "2026-03-01",
+        "count": 0,
+        "status": "⏭️ no pcsUrl",
+        "scrapedAt": "2026-02-28 08:06:13"
+      },
+      {
+        "name": "VTT Chabrières + UCI XCO Junior Series - Elite Women",
+        "date": "2026-03-01",
+        "count": 0,
+        "status": "⏭️ no pcsUrl",
+        "scrapedAt": "2026-02-28 08:06:13"
       }
     ],
-    "updatedAt": "2026-02-28 06:06:50"
+    "updatedAt": "2026-02-28 08:06:13"
   },
   "results": {
     "component": "results",

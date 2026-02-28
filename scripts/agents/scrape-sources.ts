@@ -54,7 +54,7 @@ function loadTodayIntel(): IntelItem[] {
 
 function appendIntel(items: IntelItem[]) {
   if (!existsSync(INTEL_DIR)) mkdirSync(INTEL_DIR, { recursive: true });
-  const existing = readFileSync(INTEL_FILE, "utf-8").split("\n").filter(Boolean);
+  const existing = existsSync(INTEL_FILE) ? readFileSync(INTEL_FILE, "utf-8").split("\n").filter(Boolean) : [];
   const existingUrls = new Set(existing.map((l) => { try { return JSON.parse(l).url; } catch { return ""; } }));
   const newLines = items.filter((i) => !existingUrls.has(i.url)).map((i) => JSON.stringify(i));
   if (newLines.length > 0) {

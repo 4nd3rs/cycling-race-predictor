@@ -1,8 +1,9 @@
 {
   "lastChecks": {
-    "news": 1772197213,
-    "enrichment": 1772197213,
-    "predictions": 1772172915
+    "scrapeNews": 1740726360,
+    "riderEnrichment": 1740726360,
+    "scrapeMultiSource": 1740726360,
+    "predictions": 1740726360
   },
-  "lastEnrichmentCount": 28
+  "heartbeatCount": 1
 }
