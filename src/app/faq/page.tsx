@@ -1,47 +1,52 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "FAQ — Pro Cycling Predictor",
   description:
-    "Frequently asked questions about Pro Cycling Predictor, TrueSkill ELO ratings, prediction accuracy, and race coverage.",
+    "Frequently asked questions about Pro Cycling Predictor — race briefings on WhatsApp and Telegram, TrueSkill predictions, and race coverage.",
 };
 
-const faqs: { q: string; a: string }[] = [
+const faqs: { q: string; a: string | React.ReactNode }[] = [
   {
     q: "What is Pro Cycling Predictor?",
-    a: "Pro Cycling Predictor is an AI-powered prediction engine for professional cycling. We use historical results and statistical models to generate win and podium probabilities for upcoming road and mountain bike races.",
+    a: "Pro Cycling Predictor sends you personalised race briefings on WhatsApp or Telegram before every race you follow. Follow the races and riders you care about, and we'll do the rest — startlists, predictions, rider intel, and weather, delivered straight to your chat.",
+  },
+  {
+    q: "How do the notifications work?",
+    a: "Sign up, connect your WhatsApp or Telegram, and follow the races and riders you want to track. Before each race starts, you'll receive a personalised briefing with everything you need to know — who's on the startlist, who the data favours, and what the intel says. No app to open, no feed to check.",
+  },
+  {
+    q: "Which platforms are supported for notifications?",
+    a: "WhatsApp and Telegram. Both are free to use. You can connect one or both — briefings will be sent to whichever you've connected.",
+  },
+  {
+    q: "What's in a race briefing?",
+    a: "Each briefing includes: the confirmed startlist, TrueSkill win/podium predictions for the key riders, recent rider intel (form, injuries, team news), and a weather check for race day. It's everything you'd want to know before the gun fires — in one short message.",
   },
   {
     q: "How are predictions made?",
-    a: "We combine TrueSkill ELO ratings with race profile analysis and recent form data. When a race startlist is confirmed, we run each rider's skill distribution through a simulation that accounts for course type, recent results, and race importance to produce win%, podium%, and top-10% probabilities.",
+    a: "We use TrueSkill ELO — a Bayesian skill model adapted from multiplayer gaming — combined with race profile analysis and recent form. When a startlist is confirmed, we generate win%, podium%, and top-10% probabilities for every starter. These predictions power the briefings you receive.",
   },
   {
     q: "What is TrueSkill ELO?",
-    a: "TrueSkill is a Bayesian rating system originally developed by Microsoft for multiplayer games. Unlike traditional ELO, it models each rider as a skill distribution — a mean rating plus an uncertainty value. This means the system can express confidence in its estimates: a veteran with hundreds of results has low uncertainty, while a neo-pro has high uncertainty. We've adapted TrueSkill for the multi-rider, multi-placement nature of cycling races.",
+    a: "TrueSkill is a rating system originally developed by Microsoft. Unlike traditional ELO, it models each rider as a skill distribution with a mean rating and an uncertainty value. A veteran with hundreds of results has low uncertainty; a neo-pro has high uncertainty. Every race result updates each rider's rating.",
   },
   {
     q: "How accurate are the predictions?",
-    a: "Cycling is inherently unpredictable — crashes, mechanicals, weather, and tactics all play a role. Our predictions should be read as probabilities, not certainties. A rider with a 15% win probability is the favorite, but they'll still lose more often than they win. Over time, our calibration is improving — the predicted probabilities should match real-world outcomes at scale.",
+    a: "Cycling is unpredictable — crashes, tactics, weather, and form all play a role. Our predictions are probabilities, not certainties. A rider with a 15% win probability is the favourite, but they'll still lose more often than they win. Over time, calibration improves as more race data accumulates.",
   },
   {
     q: "What races are covered?",
-    a: "We cover the full UCI WorldTour and ProSeries road calendar, including Grand Tours, Monument classics, and stage races. We also cover UCI Mountain Bike Cross-Country (XCO) World Cup events and World Championships. Coverage is expanding with each season.",
+    a: "The full UCI WorldTour and ProSeries road calendar — Grand Tours, Monuments, stage races. Plus UCI Mountain Bike Cross-Country (XCO) World Cup and World Championships. Women's WorldTour is also covered with separate rating pools.",
   },
   {
-    q: "Does it cover women's racing?",
-    a: "Yes. We cover the UCI Women's WorldTour and major women's ProSeries events. The same TrueSkill model and prediction pipeline applies to both men's and women's racing with separate rating pools.",
-  },
-  {
-    q: "What is the intel/gossip section?",
-    a: "The intel section surfaces community-sourced news, rumors, and race context — things like injury updates, team tactics, weather conditions, or course changes that pure data can't capture. Think of it as the conversation you'd overhear at the team bus. It's curated by AI from news sources and community submissions.",
-  },
-  {
-    q: "How do I give feedback?",
-    a: "Join our Discord community — we'd love to hear from you. Whether it's a bug report, a feature request, or just a prediction you disagree with, all feedback helps us improve.",
+    q: "What is the intel section?",
+    a: "Intel surfaces community-sourced news, rumours, and race context — injury updates, team tactics, course changes — things pure data can't capture. Curated by AI from news sources. It feeds into your pre-race briefings.",
   },
   {
     q: "Is it free?",
-    a: "Pro Cycling Predictor is free to use during the beta period. We're focused on building the best prediction tool possible before thinking about monetization. Join the Discord to stay updated on what's coming next.",
+    a: "Yes, free during beta. We're focused on making the briefings as useful as possible before thinking about pricing. Join the Discord to stay updated.",
   },
 ];
 
@@ -50,12 +55,20 @@ export default function FAQPage() {
     <main className="min-h-screen">
       {/* Hero */}
       <section className="border-b border-border/50 bg-zinc-950">
-        <div className="mx-auto max-w-4xl px-6 py-20 text-center">
+        <div className="mx-auto max-w-4xl px-6 pt-8 pb-0">
+          <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="size-3.5">
+              <path fillRule="evenodd" d="M14 8a.75.75 0 0 1-.75.75H4.56l3.22 3.22a.75.75 0 1 1-1.06 1.06l-4.5-4.5a.75.75 0 0 1 0-1.06l4.5-4.5a.75.75 0 0 1 1.06 1.06L4.56 7.25H13.25A.75.75 0 0 1 14 8Z" clipRule="evenodd" />
+            </svg>
+            Back to races
+          </Link>
+        </div>
+        <div className="mx-auto max-w-4xl px-6 py-16 text-center">
           <h1 className="font-display text-4xl font-bold tracking-tight sm:text-5xl">
             Frequently Asked <span className="text-primary">Questions</span>
           </h1>
           <p className="mt-4 text-lg text-muted-foreground">
-            Everything you need to know about how it works.
+            Everything you need to know about race briefings, notifications, and predictions.
           </p>
         </div>
       </section>
@@ -102,6 +115,23 @@ export default function FAQPage() {
           </a>
         </div>
       </div>
+
+      {/* Footer */}
+      <footer className="border-t border-border/50 py-6">
+        <div className="mx-auto max-w-4xl px-6 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
+          <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+            <img src="/logo@2x.png" alt="Pro Cycling Predictor" width="24" height="24" className="rounded-sm" />
+            <span className="font-semibold text-foreground text-xs uppercase tracking-wide">Pro Cycling Predictor</span>
+          </Link>
+          <p>
+            Data from{" "}
+            <a href="https://www.procyclingstats.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
+              ProCyclingStats
+            </a>
+          </p>
+          <Link href="/" className="hover:text-foreground transition-colors">← Back to races</Link>
+        </div>
+      </footer>
     </main>
   );
 }
