@@ -51,7 +51,7 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: "Content-Security-Policy",
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://clerk.accounts.dev https://*.clerk.accounts.dev https://js.stripe.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https: http:; connect-src 'self' https://*.clerk.accounts.dev https://api.stripe.com https://*.vercel.app wss://*.pusher.com; frame-src https://js.stripe.com https://hooks.stripe.com https://clerk.accounts.dev https://*.clerk.accounts.dev;",
+            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://clerk.procyclingpredictor.com https://*.clerk.accounts.dev https://js.stripe.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https: http:; connect-src 'self' https://clerk.procyclingpredictor.com https://*.clerk.accounts.dev https://api.stripe.com https://*.vercel.app wss://*.pusher.com; frame-src https://js.stripe.com https://hooks.stripe.com https://clerk.procyclingpredictor.com https://*.clerk.accounts.dev https://accounts.google.com;",
           },
           {
             key: "X-DNS-Prefetch-Control",
