@@ -609,7 +609,11 @@ export default async function CategoryPage({ params }: PageProps) {
   // Get race intel (rumours for riders on the startlist) + weather in parallel
   const [raceIntel, weather, latestNews] = await Promise.all([
     getRaceIntel(race.id),
-    getRaceWeather(event.country, race.date),
+    (() => {
+      // Only fetch weather for upcoming races
+      const rd = new Date(String(race.date).split("T")[0] + "T12:00:00Z");
+      return rd > new Date() ? getRaceWeather(event.country, race.date) : Promise.resolve(null);
+    })(),
     getRaceNews(event.id, race.id),
   ]);
 
