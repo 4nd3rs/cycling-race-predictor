@@ -59,6 +59,7 @@ interface RankEntry {
   rank: number;
   name: string;
   nation: string;
+  team: string;
   points: number;
 }
 
@@ -72,7 +73,7 @@ function parseRows(rows: string[][]): RankEntry[] {
     const nation = row[6]?.trim() ?? "";
     const points = parseFloat(row[9]) || 0;
     if (!name || points === 0) continue;
-    entries.push({ rank, name, nation, points });
+    entries.push({ rank, name, nation, team: row[7]?.trim() ?? "", points });
   }
   return entries;
 }
@@ -162,7 +163,7 @@ async function main() {
   const allRiders = await db.query.riders.findMany({ columns: { id: true, name: true } });
   console.log(`Loaded ${allRiders.length} riders from DB\n`);
 
-  let totalUpdated = 0, totalNotFound = 0;
+  let totalUpdated = 0, totalCreated = 0, totalNotFound = 0;
 
   for (const cat of CATEGORIES) {
     console.log(`Scraping ${cat.dropdownName}...`);
@@ -176,7 +177,7 @@ async function main() {
     const entries = await scrapeFullRanking(page, rankingUrl);
     console.log(`  Fetched ${entries.length} riders from UCI`);
 
-    let updated = 0, notFound = 0;
+    let updated = 0, notFound = 0, created = 0;
 
     for (const entry of entries) {
       const normName = normaliseUciName(entry.name);
@@ -195,14 +196,44 @@ async function main() {
         if (candidates.length === 1) match = candidates[0];
       }
 
-      if (!match) { notFound++; continue; }
+      if (!match) {
+        // Rider not in DB — create them so future startlist scrapes can match
+        // Convert UCI name "LASTNAME Firstname" to "Firstname LASTNAME" for consistency
+        const displayName = (() => {
+          const parts = entry.name.trim().split(/\s+/);
+          const upper: string[] = [], first: string[] = [];
+          for (const p of parts) {
+            if (/^[A-ZÁÀÂÄÉÈÊËÎÏÔÖÙÛÜÇÆŒÑ\-']+$/.test(p)) upper.push(p);
+            else first.push(p);
+          }
+          if (!first.length) first.push(upper.pop()!);
+          // Title-case the surname
+          const surname = upper.map(w => w[0] + w.slice(1).toLowerCase()).join(" ");
+          return [...first, surname].join(" ");
+        })();
+
+        const [newRider] = await db.insert(schema.riders).values({
+          name: displayName,
+          nationality: entry.nation,
+        }).onConflictDoNothing().returning({ id: schema.riders.id });
+
+        if (newRider) {
+          allRiders.push({ id: newRider.id, name: displayName });
+          match = { id: newRider.id, name: displayName };
+          created++;
+        } else {
+          notFound++;
+          continue;
+        }
+      }
 
       await upsertPoints(match.id, cat.ageCategory, cat.gender, entry.rank, entry.points);
       updated++;
     }
 
-    console.log(`  ✅ ${updated} updated, ${notFound} not matched in DB`);
+    console.log(`  ✅ ${updated} updated, ${created} created, ${notFound} still not matched`);
     totalUpdated += updated;
+    totalCreated += created;
     totalNotFound += notFound;
 
     // Go back to overview for next category
@@ -211,7 +242,7 @@ async function main() {
   }
 
   await browser.close();
-  console.log(`\nDone — ${totalUpdated} updated, ${totalNotFound} not in DB`);
+  console.log(`\nDone — ${totalUpdated} updated, ${totalCreated} new riders created, ${totalNotFound} still unmatched`);
 }
 
 main().catch(console.error);
