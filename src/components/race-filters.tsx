@@ -143,7 +143,7 @@ export function RaceFilters({ countries, basePath = "/races" }: { countries: Cou
         </button>
 
         {filterOpen && (
-          <div className="absolute left-0 top-full mt-1 w-52 rounded-lg border border-border/50 bg-zinc-900 shadow-2xl p-3 z-[200] space-y-3">
+          <div className="absolute right-0 top-full mt-1 w-52 rounded-lg border border-border/50 bg-zinc-900 shadow-2xl p-3 z-[200] space-y-3">
             <div>
               <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1.5">Gender</p>
               <div className="flex gap-1">
