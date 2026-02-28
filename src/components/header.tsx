@@ -41,6 +41,9 @@ export function Header() {
             <span className="font-display text-[11px] font-semibold uppercase tracking-[0.12em] text-foreground">Pro Cycling</span>
             <span className="font-display text-[19px] font-extrabold uppercase tracking-tight text-primary leading-none">Predictor</span>
           </div>
+          <span className="hidden sm:inline-flex items-center rounded-full border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-primary leading-none">
+            Beta
+          </span>
         </Link>
 
         {/* Desktop nav — visible md+ */}
