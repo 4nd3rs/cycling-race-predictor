@@ -48,7 +48,6 @@ export default function AboutPage() {
           </p>
           <div className="mt-8 grid gap-6 sm:grid-cols-3">
             <div className="rounded-xl border border-border/50 bg-card p-6">
-              <div className="text-2xl mb-3">📲</div>
               <h3 className="font-semibold text-sm uppercase tracking-wide text-primary mb-2">WhatsApp &amp; Telegram</h3>
               <p className="text-sm text-muted-foreground">
                 No app to install. Connect once, follow the races you care about, and
@@ -56,7 +55,6 @@ export default function AboutPage() {
               </p>
             </div>
             <div className="rounded-xl border border-border/50 bg-card p-6">
-              <div className="text-2xl mb-3">🏆</div>
               <h3 className="font-semibold text-sm uppercase tracking-wide text-primary mb-2">Personalised to you</h3>
               <p className="text-sm text-muted-foreground">
                 Follow specific races and riders. Your briefings are filtered to what
@@ -64,7 +62,6 @@ export default function AboutPage() {
               </p>
             </div>
             <div className="rounded-xl border border-border/50 bg-card p-6">
-              <div className="text-2xl mb-3">⚡</div>
               <h3 className="font-semibold text-sm uppercase tracking-wide text-primary mb-2">Before every race</h3>
               <p className="text-sm text-muted-foreground">
                 Timed to land a few hours before the race starts — so you're always

@@ -412,17 +412,14 @@ export default async function Home({ searchParams }: HomePageProps) {
             </div>
             <div className="grid gap-6 sm:grid-cols-3">
               <div className="rounded-lg border border-border/50 p-5 bg-background/40">
-                <div className="text-2xl mb-3">📲</div>
                 <h3 className="font-bold text-sm uppercase tracking-wide text-primary mb-2">Race Briefings on WhatsApp &amp; Telegram</h3>
                 <p className="text-sm text-muted-foreground">Follow a race and get a personalised message before the start — who to watch, key intel, weather. No app needed.</p>
               </div>
               <div className="rounded-lg border border-border/50 p-5 bg-background/40">
-                <div className="text-2xl mb-3">🏆</div>
                 <h3 className="font-bold text-sm uppercase tracking-wide text-primary mb-2">Your Races, Your Riders</h3>
                 <p className="text-sm text-muted-foreground">Pick the races and riders you follow. We track them — you just read the update when it lands in your chat.</p>
               </div>
               <div className="rounded-lg border border-border/50 p-5 bg-background/40">
-                <div className="text-2xl mb-3">⚡</div>
                 <h3 className="font-bold text-sm uppercase tracking-wide text-primary mb-2">Backed by Data</h3>
                 <p className="text-sm text-muted-foreground">TrueSkill predictions, live startlists, rider intel — all distilled into one message, right when it matters.</p>
               </div>
