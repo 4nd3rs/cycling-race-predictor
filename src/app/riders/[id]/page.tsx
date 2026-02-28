@@ -60,9 +60,11 @@ async function getRiderResults(riderId: string) {
       .select({
         result: raceResults,
         race: races,
+        event: raceEvents,
       })
       .from(raceResults)
       .innerJoin(races, eq(raceResults.raceId, races.id))
+      .innerJoin(raceEvents, eq(races.raceEventId, raceEvents.id))
       .where(eq(raceResults.riderId, riderId))
       .orderBy(desc(races.date))
       .limit(20);
@@ -497,8 +499,12 @@ export default async function RiderDetailPage({ params }: PageProps) {
               <h2 className="text-base font-bold mb-3">🏁 Recent Results</h2>
               {resultsData.length > 0 ? (
                 <div className="rounded-xl border border-border/50 divide-y divide-border/30">
-                  {resultsData.map(({ result, race }) => (
-                    <Link key={result.id} href={`/races/${race.id}`}
+                  {resultsData.map(({ result, race, event }) => {
+                    const resultHref = event?.slug && race.categorySlug
+                      ? `/races/${race.discipline}/${event.slug}/${race.categorySlug}`
+                      : `/races/${race.discipline}`;
+                    return (
+                    <Link key={result.id} href={resultHref}
                       className="flex items-center gap-3 py-2.5 px-3 hover:bg-muted/50 transition-colors">
                       <div className="w-10 shrink-0 text-center">
                         {result.dnf ? (
@@ -516,7 +522,8 @@ export default async function RiderDetailPage({ params }: PageProps) {
                         <p className="text-xs text-muted-foreground">{format(new Date(race.date + "T12:00:00"), "d MMM yyyy")}</p>
                       </div>
                     </Link>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="rounded-xl border border-border/50 py-10 text-center text-sm text-muted-foreground">
