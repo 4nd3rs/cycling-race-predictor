@@ -139,6 +139,51 @@ export default function AboutPage() {
           </p>
         </section>
 
+        {/* Creator */}
+        <section>
+          <h2 className="font-display text-2xl font-bold tracking-tight">
+            Who built this
+          </h2>
+          <div className="mt-4 flex items-center gap-4">
+            <a
+              href="https://www.instagram.com/anders.m.andersen/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 group"
+            >
+              <div className="h-14 w-14 rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 p-0.5">
+                <div className="h-full w-full rounded-full bg-background flex items-center justify-center text-xl font-bold text-foreground group-hover:opacity-80 transition-opacity">
+                  A
+                </div>
+              </div>
+            </a>
+            <div>
+              <p className="font-semibold text-foreground">
+                <a
+                  href="https://www.instagram.com/anders.m.andersen/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-primary transition-colors"
+                >
+                  Anders Andersen
+                </a>
+              </p>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Creator &amp; developer. Cyclist, data nerd, and the person behind Pro Cycling Predictor.{" "}
+                <a
+                  href="https://www.instagram.com/anders.m.andersen/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-foreground transition-colors"
+                >
+                  @anders.m.andersen
+                </a>{" "}
+                on Instagram.
+              </p>
+            </div>
+          </div>
+        </section>
+
         {/* Beta notice */}
         <section className="rounded-xl border border-primary/30 bg-primary/5 p-8 text-center">
           <h2 className="font-display text-2xl font-bold tracking-tight">
