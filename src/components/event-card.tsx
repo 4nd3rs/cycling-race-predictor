@@ -5,7 +5,7 @@ import { RaceFollowButton } from "@/components/race-follow-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { format, formatDistanceToNow, isPast, isFuture, isToday } from "date-fns";
+import { format, formatDistanceToNow, isPast, isFuture, isToday, isTomorrow, differenceInCalendarDays } from "date-fns";
 import { toRaceDate, toDateStr } from "@/lib/utils";
 import { formatCategoryDisplay } from "@/lib/category-utils";
 import { EventEditDialog } from "./event-edit-dialog";
@@ -299,7 +299,12 @@ export function EventListRow({
 
   const eventUrl = slug ? buildEventUrl(discipline, slug) : `/races/${id}`;
 
-  const dateStr = format(startDate, "MMM d");
+  const isTomorrowEvent = isTomorrow(startDate);
+  const dateStr = isEventToday
+    ? "Today"
+    : isTomorrowEvent
+    ? "Tomorrow"
+    : format(startDate, "MMM d");
   const discColor = DISC_COLORS[discipline] ?? "bg-zinc-500/20 text-zinc-400";
   const discLabel = { road: "Road", mtb: "MTB", gravel: "Gravel", cyclocross: "CX" }[discipline] ?? discipline;
 
@@ -317,9 +322,11 @@ export function EventListRow({
   ) : isCompleted ? (
     <span className="rounded px-1.5 py-0.5 text-xs text-muted-foreground bg-muted/40 shrink-0">Done</span>
   ) : (
+    (isEventToday || isTomorrowEvent) ? null : (
     <span className="rounded px-1.5 py-0.5 text-xs text-green-400 bg-green-500/10 border border-green-500/20 whitespace-nowrap shrink-0 tabular-nums">
-      {formatDistanceToNow(startDate, { addSuffix: true })}
+      {`in ${differenceInCalendarDays(startDate, new Date())}d`}
     </span>
+    )
   );
 
   return (
@@ -328,10 +335,10 @@ export function EventListRow({
       isEventToday && "bg-red-500/5 border-l-2 border-l-red-500"
     )}>
       {/* Date */}
-      <span className="w-12 shrink-0 text-xs font-mono text-muted-foreground tabular-nums">{dateStr}</span>
+      <span className="w-14 shrink-0 text-xs font-mono text-muted-foreground tabular-nums">{dateStr}</span>
 
       {/* Discipline + UCI category */}
-      <div className="hidden sm:flex items-center gap-1 shrink-0 w-28">
+      <div className="flex items-center gap-1 shrink-0 w-20 sm:w-28">
         <span className={cn("rounded px-1.5 py-0.5 text-xs font-medium", discColor)}>
           {subDiscipline ? getSubDisciplineShortLabel(subDiscipline) : discLabel}
         </span>
