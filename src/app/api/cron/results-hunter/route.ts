@@ -7,7 +7,7 @@ import {
   raceResults,
   teams,
 } from "@/lib/db";
-import { and, ilike, eq, lt, asc } from "drizzle-orm";
+import { and, ilike, eq, lt, gte, asc, desc } from "drizzle-orm";
 import { scrapeRaceResults } from "@/lib/scraper/pcs";
 import {
   notifyRaceEventCombined,
@@ -90,15 +90,19 @@ export async function GET() {
   try {
     // Find active races with dates in the past that still have no results
     const today = new Date().toISOString().split("T")[0];
+    // Only look at races in the last 14 days, newest first
+    const cutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
     const racesWithoutResults = await db
       .select()
       .from(races)
       .where(
         and(
           lt(races.date, today),
+          gte(races.date, cutoff),
           eq(races.status, "active")
         )
       )
+      .orderBy(desc(races.date))
       .limit(10);
 
     for (const race of racesWithoutResults) {
