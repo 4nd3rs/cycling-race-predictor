@@ -17,7 +17,27 @@ import { neon } from "@neondatabase/serverless";
 import { eq, and, gte, lte, or, isNull, ne } from "drizzle-orm";
 import * as schema from "../../src/lib/db/schema";
 import * as cheerio from "cheerio";
-import { scrapeDo } from "../../src/lib/scraper/scrape-do";
+/** Fetch XCOdata pages directly — no Cloudflare, no scrape.do needed */
+async function fetchXCO(url: string, attempt = 1): Promise<string> {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+      signal: AbortSignal.timeout(20000),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.text();
+  } catch (e: any) {
+    if (attempt < 3) {
+      await new Promise(r => setTimeout(r, attempt * 3000));
+      return fetchXCO(url, attempt + 1);
+    }
+    throw e;
+  }
+}
 import { spawn } from "child_process";
 import { processRaceElo } from "../../src/lib/prediction/process-race-elo";
 import { writeScrapeStatus, type RaceRow } from "./lib/scrape-status";
@@ -100,7 +120,7 @@ async function getXCORaceList(): Promise<XCOListEntry[]> {
   console.log("   📋 Fetching XCOdata race list…");
   let html: string;
   try {
-    html = await scrapeDo("https://www.xcodata.com/races", { render: true, timeout: 30000 });
+    html = await fetchXCO("https://www.xcodata.com/races");
   } catch (e: any) {
     console.error("   ❌ Failed to fetch XCOdata race list:", e.message);
     return [];
@@ -230,7 +250,7 @@ async function scrapeXCORaceResults(xcoId: string, attempt = 1): Promise<XCOResu
   if (!html) {
     console.log(`   📄 Fetching XCOdata: ${url}${attempt > 1 ? ` (attempt ${attempt})` : ""}`);
     try {
-      html = await scrapeDo(url, { render: true, timeout: 30000 });
+      html = await fetchXCO(url);
       xcoPageCache.set(xcoId, html);
     } catch (e: any) {
       if (attempt < 3) {

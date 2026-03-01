@@ -397,12 +397,39 @@ async function scrapePcsCalendar(): Promise<ScrapedRace[]> {
     const token = process.env.SCRAPE_DO_TOKEN;
     if (!token) throw new Error("SCRAPE_DO_TOKEN not set");
     const pcsCalUrl = `https://www.procyclingstats.com/races.php?year=${new Date().getFullYear()}&circuit=&class=&filter=Filter&s=startdate`;
-    const apiUrl = `https://api.scrape.do?token=${token}&url=${encodeURIComponent(pcsCalUrl)}&render=true`;
 
-    console.log("  Loading PCS race calendar via scrape.do...");
-    const res = await fetch(apiUrl, { signal: AbortSignal.timeout(30000) });
-    if (!res.ok) throw new Error(`scrape.do returned ${res.status}`);
-    const html = await res.text();
+    console.log("  Loading PCS race calendar...");
+    // Try plain fetch first (free) — PCS calendar page works without JS rendering
+    // Fall back to scrape.do if blocked
+    let html = "";
+    const plainRes = await fetch(pcsCalUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+      signal: AbortSignal.timeout(20000),
+    }).catch(() => null);
+
+    if (plainRes?.ok) {
+      const candidate = await plainRes.text();
+      // Verify we got actual race data (not a Cloudflare challenge)
+      if (candidate.includes("races.php") && candidate.includes("<table")) {
+        html = candidate;
+        console.log("  Using plain fetch (no credits used)");
+      }
+    }
+
+    if (!html) {
+      // Fallback to scrape.do
+      const token = process.env.SCRAPE_DO_TOKEN;
+      if (!token) throw new Error("Plain fetch failed and SCRAPE_DO_TOKEN not set");
+      const apiUrl = `https://api.scrape.do?token=${token}&url=${encodeURIComponent(pcsCalUrl)}&render=true`;
+      const sdRes = await fetch(apiUrl, { signal: AbortSignal.timeout(30000) });
+      if (!sdRes.ok) throw new Error(`scrape.do returned ${sdRes.status}`);
+      html = await sdRes.text();
+      console.log("  Used scrape.do fallback");
+    }
     const $ = cheerio.load(html);
 
     const rowsToParse: Array<{ name: string; url: string; dateRange: string; startDate: string; category: string }> = [];

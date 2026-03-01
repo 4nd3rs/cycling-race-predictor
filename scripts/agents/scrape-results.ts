@@ -19,11 +19,51 @@ config({ path: ".env.local" });
 
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
-import { eq, and, gte, lte, or, isNull, ne, sql } from "drizzle-orm";
+import { eq, and, gte, lte, or, isNull, ne, sql, isNotNull } from "drizzle-orm";
 import { spawn } from "child_process";
 import * as schema from "../../src/lib/db/schema";
 import * as cheerio from "cheerio";
-import { scrapeDo } from "../../src/lib/scraper/scrape-do";
+import { chromium, type Browser } from "playwright";
+
+const CHROME_PATH = `${process.env.HOME}/Library/Caches/ms-playwright/chromium-1208/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing`;
+
+let _browser: Browser | null = null;
+
+async function getBrowser(): Promise<Browser> {
+  if (_browser) return _browser;
+  _browser = await chromium.launch({
+    headless: true,
+    executablePath: CHROME_PATH,
+  });
+  return _browser;
+}
+
+async function closeBrowser(): Promise<void> {
+  if (_browser) { await _browser.close().catch(() => {}); _browser = null; }
+}
+
+/** Fetch a PCS page via local Playwright — free, no scrape.do credits */
+async function fetchPCS(url: string, attempt = 1): Promise<string> {
+  const browser = await getBrowser();
+  const page = await browser.newPage();
+  try {
+    await page.setExtraHTTPHeaders({
+      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+      "Accept-Language": "en-US,en;q=0.9",
+    });
+    await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+    return await page.content();
+  } catch (e: any) {
+    if (attempt < 3) {
+      await page.close().catch(() => {});
+      await new Promise(r => setTimeout(r, attempt * 5000));
+      return fetchPCS(url, attempt + 1);
+    }
+    throw e;
+  } finally {
+    await page.close().catch(() => {});
+  }
+}
 import { writeScrapeStatus, type RaceRow } from "./lib/scrape-status";
 /** Run a script in background without blocking — fire and forget */
 function fireAndForget(cmd: string, args: string[]): void {
@@ -102,7 +142,7 @@ async function scrapeResultsFromPage(
   console.log(`   📄 Fetching: ${url}${attempt > 1 ? ` (attempt ${attempt})` : ""}`);
   let html: string;
   try {
-    html = await scrapeDo(url, { render: true, timeout: 30000 });
+    html = await fetchPCS(url);
   } catch (err: any) {
     if (attempt < 3) {
       console.warn(`   ⚠️  scrape.do failed (${err.message}), retrying in ${attempt * 5}s…`);
@@ -190,7 +230,7 @@ async function scrapeResultsFromPage(
 
 async function detectStageCount(pcsUrl: string): Promise<number> {
   try {
-    const html = await scrapeDo(pcsUrl, { render: true, timeout: 20000 });
+    const html = await fetchPCS(pcsUrl);
     const $ = cheerio.load(html);
     const nums: number[] = [];
     $("a[href*='/stage-']").each((_, el) => {
@@ -348,7 +388,7 @@ function slugifyRaceName(name: string): string {
 
 async function tryPCSUrl(url: string): Promise<number> {
   try {
-    const html = await scrapeDo(url, { render: true, timeout: 20000 });
+    const html = await fetchPCS(url);
     const $ = cheerio.load(html);
     const title = $("title").text().toLowerCase();
     if (title.includes("not found") || title.includes("error")) return 0;
@@ -690,7 +730,7 @@ async function main() {
   }
 }
 
-main().catch(err => {
+main().finally(() => closeBrowser()).catch(err => {
   console.error("Fatal:", err);
   process.exit(1);
 });
