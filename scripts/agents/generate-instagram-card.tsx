@@ -348,26 +348,21 @@ function ResultsCard({ event, race, results }: any) {
           {race?.date ? fmtDate(race.date) : ""}
         </span>
       </div>
-      {/* Results block — fills remaining space evenly */}
+      {/* Results block — uniform list, podium highlighted by size + photo */}
       <div style={{ display: "flex", flexDirection: "column", padding: "0 88px 0 96px", flex: 1, justifyContent: "space-between" }}>
         <div style={{ display: "flex", flexDirection: "column" }}>
-          <div style={{ height: 1, background: DIMMED, marginBottom: 14 }} />
-          <span style={{ fontSize: 25, fontWeight: 700, color: WHITE, letterSpacing: "0.14em", fontFamily: "Inter" }}>TOP 10</span>
+          <div style={{ height: 1, background: DIMMED, marginBottom: 12 }} />
+          <span style={{ fontSize: 22, fontWeight: 700, color: WHITE, letterSpacing: "0.14em", fontFamily: "Inter" }}>TOP 10</span>
         </div>
         {results.slice(0, 10).map((r: any, i: number) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <span style={{ fontSize: i < 3 ? 28 : 22, fontWeight: 800, color: WHITE, width: 32, flexShrink: 0, fontFamily: "Inter" }}>
-              {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`}
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <span style={{ fontSize: i < 3 ? 38 : 30, fontWeight: 800, color: i < 3 ? RED : WHITE, width: 44, flexShrink: 0, fontFamily: "Barlow Condensed", lineHeight: 1 }}>
+              {i + 1}.
             </span>
-            {i < 3 && <RiderAvatar photoDataUri={r._photoDataUri ?? null} name={r.rider_name} size={68} />}
-            <div style={{ display: "flex", flexDirection: "column" }}>
-              <span style={{ fontSize: i === 0 ? 49 : i < 3 ? 42 : 34, fontWeight: 800, color: WHITE, lineHeight: 1 }}>
-                {r.rider_name}
-              </span>
-              {r.nationality && i < 3 && (
-                <span style={{ fontSize: 18, color: MUTED, fontFamily: "Inter", marginTop: 2 }}>{r.nationality}</span>
-              )}
-            </div>
+            {i < 3 && <RiderAvatar photoDataUri={r._photoDataUri ?? null} name={r.rider_name} size={52} />}
+            <span style={{ fontSize: i === 0 ? 48 : i < 3 ? 42 : 34, fontWeight: 800, color: WHITE, lineHeight: 1, flex: 1 }}>
+              {r.rider_name}
+            </span>
           </div>
         ))}
       </div>
