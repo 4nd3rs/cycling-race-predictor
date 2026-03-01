@@ -51,6 +51,34 @@ async function fetchImageAsDataUri(url: string): Promise<string | null> {
   }
 }
 
+async function fetchWikipediaPhoto(name: string): Promise<string | null> {
+  try {
+    // Try exact name first, then name variants
+    const slug = name.trim().replace(/ /g, "_");
+    const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(slug)}`, {
+      signal: AbortSignal.timeout(5000),
+      headers: { "User-Agent": "PCP-CardGenerator/1.0" },
+    });
+    if (!res.ok) return null;
+    const data = await res.json() as any;
+    const photoUrl = data?.thumbnail?.source ?? data?.originalimage?.source ?? null;
+    if (!photoUrl) return null;
+    return fetchImageAsDataUri(photoUrl);
+  } catch {
+    return null;
+  }
+}
+
+async function resolveRiderPhoto(photoUrl: string | null, name: string): Promise<string | null> {
+  // 1. Try stored photo_url
+  if (photoUrl) {
+    const uri = await fetchImageAsDataUri(photoUrl);
+    if (uri) return uri;
+  }
+  // 2. Wikipedia fallback by rider name
+  return fetchWikipediaPhoto(name);
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtDate(d: string | Date | null | undefined) {
   if (!d) return "";
@@ -369,7 +397,7 @@ async function main() {
   const rows = cardType === "preview" ? preds : results;
   console.log(`Fetching photos for ${rows.length} riders...`);
   const photoUris = await Promise.all(
-    rows.map((r: any) => r.photo_url ? fetchImageAsDataUri(r.photo_url) : Promise.resolve(null))
+    rows.map((r: any) => resolveRiderPhoto(r.photo_url ?? null, r.rider_name ?? r.name ?? ""))
   );
   rows.forEach((r: any, i: number) => { r._photoDataUri = photoUris[i]; });
 
