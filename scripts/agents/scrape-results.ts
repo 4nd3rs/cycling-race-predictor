@@ -23,45 +23,18 @@ import { eq, and, gte, lte, or, isNull, ne, sql, isNotNull } from "drizzle-orm";
 import { spawn } from "child_process";
 import * as schema from "../../src/lib/db/schema";
 import * as cheerio from "cheerio";
-import { chromium, type Browser } from "playwright";
+import { scrapeDo } from "../../src/lib/scraper/scrape-do";
 
-const CHROME_PATH = `${process.env.HOME}/Library/Caches/ms-playwright/chromium-1208/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing`;
-
-let _browser: Browser | null = null;
-
-async function getBrowser(): Promise<Browser> {
-  if (_browser) return _browser;
-  _browser = await chromium.launch({
-    headless: true,
-    executablePath: CHROME_PATH,
-  });
-  return _browser;
-}
-
-async function closeBrowser(): Promise<void> {
-  if (_browser) { await _browser.close().catch(() => {}); _browser = null; }
-}
-
-/** Fetch a PCS page via local Playwright — free, no scrape.do credits */
+/** Fetch a PCS page via scrape.do (Cloudflare bypass) with retry */
 async function fetchPCS(url: string, attempt = 1): Promise<string> {
-  const browser = await getBrowser();
-  const page = await browser.newPage();
   try {
-    await page.setExtraHTTPHeaders({
-      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-      "Accept-Language": "en-US,en;q=0.9",
-    });
-    await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
-    return await page.content();
+    return await scrapeDo(url, { render: true, timeout: 30000 });
   } catch (e: any) {
     if (attempt < 3) {
-      await page.close().catch(() => {});
       await new Promise(r => setTimeout(r, attempt * 5000));
       return fetchPCS(url, attempt + 1);
     }
     throw e;
-  } finally {
-    await page.close().catch(() => {});
   }
 }
 import { writeScrapeStatus, type RaceRow } from "./lib/scrape-status";
@@ -730,7 +703,7 @@ async function main() {
   }
 }
 
-main().finally(() => closeBrowser()).catch(err => {
+main().catch(err => {
   console.error("Fatal:", err);
   process.exit(1);
 });
