@@ -19,7 +19,7 @@ const args = process.argv.slice(2);
 const eventSlug = args[args.indexOf("--event") + 1] ?? null;
 const cardType: "preview" | "results" = (args[args.indexOf("--type") + 1] as any) ?? "preview";
 const gender: "men" | "women" = (args[args.indexOf("--gender") + 1] as any) ?? "men";
-const isStories = args.includes("--stories");
+const isStories = args.includes("--stories"); // keep flag for non-IG surfaces (Telegram, web); IG always uses stories via post-to-instagram.ts
 const outPath = args[args.indexOf("--out") + 1] ?? `/tmp/pcp-instagram-${cardType}-${gender}-${isStories ? "story" : "feed"}-${Date.now()}.png`;
 
 if (!eventSlug) {

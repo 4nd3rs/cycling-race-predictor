@@ -171,7 +171,7 @@ async function main() {
         console.log(`📸 Posting Instagram Story preview (${gender}): ${race.name}`);
         try {
           execSync(
-            `node_modules/.bin/tsx scripts/agents/post-to-instagram.ts --event ${igPreviewSlug} --type preview --gender ${gender} --stories`,
+            `node_modules/.bin/tsx scripts/agents/post-to-instagram.ts --event ${igPreviewSlug} --type preview --gender ${gender}`,
             { encoding: "utf-8", stdio: "inherit", cwd: process.cwd(), timeout: 120000 }
           );
           console.log(`✅ Instagram Story preview (${gender}) posted: ${race.name}\n`);
@@ -240,7 +240,7 @@ async function main() {
         console.log(`📸 Posting Instagram Story result (${gender}): ${race.name}`);
         try {
           execSync(
-            `node_modules/.bin/tsx scripts/agents/post-to-instagram.ts --event ${igResultSlug} --type results --gender ${gender} --stories`,
+            `node_modules/.bin/tsx scripts/agents/post-to-instagram.ts --event ${igResultSlug} --type results --gender ${gender}`,
             { encoding: "utf-8", stdio: "inherit", cwd: process.cwd(), timeout: 120000 }
           );
           console.log(`✅ Instagram Story result (${gender}) posted: ${race.name}\n`);

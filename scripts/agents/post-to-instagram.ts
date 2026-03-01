@@ -21,7 +21,8 @@ import { neon } from "@neondatabase/serverless";
 
 const args = process.argv.slice(2);
 const get = (flag: string) => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : null; };
-const isStories = args.includes("--stories");
+// Instagram is Stories-only — feed posts are reserved for other surfaces
+const isStories = true;
 
 const ACCOUNT_ID = process.env.INSTAGRAM_ACCOUNT_ID!;
 const ACCESS_TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN;
