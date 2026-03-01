@@ -93,9 +93,16 @@ async function fetchData(sql: ReturnType<typeof neon>) {
       FROM predictions p
       JOIN riders r ON r.id = p.rider_id
       WHERE p.race_id = ${race.id} AND p.win_probability IS NOT NULL
-      ORDER BY p.win_probability DESC LIMIT 5
+      ORDER BY p.win_probability DESC LIMIT 20
     ` : [];
-    return { event, race, preds, results: [] };
+    // Deduplicate by rider name, keeping highest probability entry
+    const seen = new Set<string>();
+    const dedupedPreds = preds.filter((p: any) => {
+      if (seen.has(p.rider_name)) return false;
+      seen.add(p.rider_name);
+      return true;
+    }).slice(0, 5);
+    return { event, race, preds: dedupedPreds, results: [] };
   } else {
     const results = race ? await sql`
       SELECT rr.position, r.name AS rider_name, r.nationality, r.photo_url
@@ -213,7 +220,7 @@ function PreviewCard({ event, race, preds }: any) {
                   <RiderAvatar photoDataUri={p._photoDataUri ?? null} name={p.rider_name} size={68} />
                   <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-                      <span style={{ fontSize: 38, fontWeight: 800, color: i === 0 ? WHITE : "#C8C0B8", lineHeight: 1 }}>{p.rider_name}</span>
+                      <span style={{ fontSize: 49, fontWeight: 800, color: i === 0 ? WHITE : "#C8C0B8", lineHeight: 1 }}>{p.rider_name}</span>
                       <span style={{ fontSize: 34, fontWeight: 800, color: i === 0 ? RED : "#8A3020", lineHeight: 1, marginLeft: 16 }}>{pct}%</span>
                     </div>
                     <ProbBar pct={pct} width={700} />
@@ -239,31 +246,31 @@ function PreviewCard({ event, race, preds }: any) {
       <div style={{ position: "absolute", left: 0, top: 8, bottom: 0, width: 8, background: RED }} />
       {/* Header block — fixed height */}
       <div style={{ display: "flex", flexDirection: "column", padding: "44px 88px 0 96px", flexShrink: 0 }}>
-        <span style={{ fontSize: 18, fontWeight: 700, color: RED, letterSpacing: "0.18em", fontFamily: "Inter", marginBottom: 14 }}>
+        <span style={{ fontSize: 28, fontWeight: 700, color: RED, letterSpacing: "0.18em", fontFamily: "Inter", marginBottom: 14 }}>
           {gender === "women" ? "WOMEN  ·  RACE PREVIEW" : "RACE PREVIEW"}
         </span>
         <span style={{ fontSize: nameFontSize, fontWeight: 800, color: WHITE, textTransform: "uppercase", lineHeight: 1.0, letterSpacing: "-0.01em", marginBottom: 18 }}>
           {String(event.name).toUpperCase()}
         </span>
-        <span style={{ fontSize: 19, fontWeight: 700, color: RED, letterSpacing: "0.1em", fontFamily: "Inter", marginBottom: 6 }}>{metaParts}</span>
-        <span style={{ fontSize: 20, fontWeight: 700, color: RED, fontFamily: "Inter", marginBottom: 0 }}>{race?.date ? fmtDate(race.date) : ""}</span>
+        <span style={{ fontSize: 30, fontWeight: 700, color: RED, letterSpacing: "0.1em", fontFamily: "Inter", marginBottom: 6 }}>{metaParts}</span>
+        <span style={{ fontSize: 31, fontWeight: 700, color: RED, fontFamily: "Inter", marginBottom: 0 }}>{race?.date ? fmtDate(race.date) : ""}</span>
       </div>
       {/* Predictions block — fills remaining space with even distribution */}
       <div style={{ display: "flex", flexDirection: "column", padding: "0 88px 0 96px", flex: 1, justifyContent: "space-between" }}>
         <div style={{ display: "flex", flexDirection: "column" }}>
           <div style={{ height: 1, background: DIMMED, marginBottom: 14 }} />
-          <span style={{ fontSize: 15, fontWeight: 700, color: WHITE, letterSpacing: "0.14em", fontFamily: "Inter" }}>TOP PREDICTIONS</span>
+          <span style={{ fontSize: 25, fontWeight: 700, color: WHITE, letterSpacing: "0.14em", fontFamily: "Inter" }}>TOP PREDICTIONS</span>
         </div>
         {preds.slice(0, 5).map((p: any, i: number) => {
           const pct = Math.round(Number(p.win_probability) * 100);
           return (
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 14 }}>
-              <span style={{ fontSize: 18, fontWeight: 700, color: WHITE, width: 22, flexShrink: 0, fontFamily: "Inter" }}>{i + 1}</span>
-              <RiderAvatar photoDataUri={p._photoDataUri ?? null} name={p.rider_name} size={54} />
+              <span style={{ fontSize: 28, fontWeight: 700, color: WHITE, width: 32, flexShrink: 0, fontFamily: "Inter" }}>{i + 1}</span>
+              <RiderAvatar photoDataUri={p._photoDataUri ?? null} name={p.rider_name} size={76} />
               <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
                 <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: 32, fontWeight: 800, color: i === 0 ? WHITE : "#C8C0B8", lineHeight: 1 }}>{p.rider_name}</span>
-                  <span style={{ fontSize: 26, fontWeight: 800, color: i === 0 ? RED : "#8A3020", lineHeight: 1, marginLeft: 12 }}>{pct}%</span>
+                  <span style={{ fontSize: 49, fontWeight: 800, color: i === 0 ? WHITE : "#C8C0B8", lineHeight: 1 }}>{p.rider_name}</span>
+                  <span style={{ fontSize: 42, fontWeight: 800, color: i === 0 ? RED : "#8A3020", lineHeight: 1, marginLeft: 12 }}>{pct}%</span>
                 </div>
                 <ProbBar pct={pct} width={440} />
               </div>
