@@ -61,16 +61,22 @@ const UCI_ROAD_CATS: Record<string, string> = {
   "2.2": "2.2",
   "1.2": "1.2",
   nc: "NC",
+  cc: "CC",         // Continental Championships
+  "2.ncup": "2.NCup",
+  "1.ncup": "1.NCup",
+  "jr": "Junior",
+  "cn": "CN",
 };
 
-/** Minimum categories to import (skip 2.1, 2.2, etc. by default) */
+/** All UCI road categories — import everything PCS lists */
 const MIN_ROAD_CATS = new Set([
-  "WorldTour",
-  "2.Pro",
-  "1.Pro",
-  "2.HC",
-  "1.HC",
-  "1.1",
+  "WorldTour", "2.Pro", "1.Pro",
+  "2.HC", "1.HC",
+  "2.1", "1.1",
+  "2.2", "1.2",
+  "NC", "CC", "CN",
+  "2.NCup", "1.NCup",
+  "Junior",
 ]);
 
 
@@ -318,6 +324,8 @@ function normalizePcsCategory(raw: string): string | null {
   if (lower.includes("uwt") || lower.includes("wt") || lower.includes("worldtour")) return "WorldTour";
   // Pro series
   if (lower.includes("pro")) return lower.startsWith("2") ? "2.Pro" : "1.Pro";
+  // Unknown category — still import it, mark as-is
+  if (lower.length > 0 && lower !== "-" && lower !== "") return raw.trim().toUpperCase();
   return null;
 }
 
@@ -327,7 +335,8 @@ async function scrapePcsCalendar(): Promise<ScrapedRace[]> {
   try {
     const token = process.env.SCRAPE_DO_TOKEN;
     if (!token) throw new Error("SCRAPE_DO_TOKEN not set");
-    const apiUrl = `https://api.scrape.do?token=${token}&url=${encodeURIComponent("https://www.procyclingstats.com/races.php")}&render=true`;
+    const pcsCalUrl = `https://www.procyclingstats.com/races.php?year=${new Date().getFullYear()}&circuit=&class=&filter=Filter&s=startdate`;
+    const apiUrl = `https://api.scrape.do?token=${token}&url=${encodeURIComponent(pcsCalUrl)}&render=true`;
 
     console.log("  Loading PCS race calendar via scrape.do...");
     const res = await fetch(apiUrl, { signal: AbortSignal.timeout(30000) });
@@ -357,8 +366,9 @@ async function scrapePcsCalendar(): Promise<ScrapedRace[]> {
         const dateStr = parsePcsDate(row.startDate || row.dateRange);
         if (!dateStr || !isInDateRange(dateStr)) continue;
 
-        const category = normalizePcsCategory(row.category || "");
-        if (!category || !MIN_ROAD_CATS.has(category)) continue;
+        const category = normalizePcsCategory(row.category || "") ?? "Unknown";
+        // Skip only if no category could be determined at all
+        if (!category) continue;
 
         // Build PCS URL
         let pcsUrl: string | undefined;
