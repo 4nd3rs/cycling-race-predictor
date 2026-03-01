@@ -141,7 +141,7 @@ function buildPrompt(
   raceUrl: string,
 ): string {
   const isMTB = ["mtb", "xco"].includes(race.discipline);
-  const dateStr = new Date(race.date + "T12:00:00Z").toLocaleDateString("en-GB", {
+  const dateStr = new Date(race.date.slice(0, 10) + "T12:00:00Z").toLocaleDateString("en-GB", {
     weekday: "long", day: "numeric", month: "long", timeZone: "UTC",
   });
 
@@ -269,7 +269,7 @@ async function findRaceCandidates(): Promise<RaceCandidate[]> {
     if (!r.date || !r.raceEventId) continue;
 
     // Race datetime assumed to be noon UTC on race day
-    const raceTime = new Date(r.date + "T12:00:00Z").getTime();
+    const raceTime = new Date(r.date.slice(0, 10) + "T12:00:00Z").getTime();
     const hoursUntilRace = (raceTime - now) / (60 * 60 * 1000);
     const hoursSinceRace = -hoursUntilRace;
 
