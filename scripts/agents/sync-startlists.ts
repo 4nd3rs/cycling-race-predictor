@@ -8,7 +8,7 @@
  */
 
 import { config } from "dotenv";
-import { execSync } from "child_process";
+import { spawn } from "child_process";
 config({ path: ".env.local" });
 
 import { drizzle } from "drizzle-orm/neon-http";
@@ -406,15 +406,11 @@ async function main() {
 
   // Regen predictions when startlists change
   if (totalInserted > 0 || totalUpdated > 0) {
-    try {
-      execSync(
-        `node_modules/.bin/tsx scripts/agents/generate-predictions.ts --days 14`,
-        { cwd: process.cwd(), stdio: "pipe" }
-      );
-      console.log(`🔮 Predictions regenerated for upcoming races`);
-    } catch (err: any) {
-      console.warn(`⚠️  Prediction regen failed: ${(err as any).message?.slice(0, 100)}`);
-    }
+    const predChild = spawn("node_modules/.bin/tsx", ["scripts/agents/generate-predictions.ts", "--days", "14"], {
+      cwd: process.cwd(), stdio: "ignore", detached: true,
+    });
+    predChild.unref();
+    console.log(`🔮 Predictions refresh queued for upcoming races`);
   }
 }
 

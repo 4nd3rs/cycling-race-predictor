@@ -20,11 +20,22 @@ config({ path: ".env.local" });
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
 import { eq, and, gte, lte, or, isNull, ne, sql } from "drizzle-orm";
-import { execSync } from "child_process";
+import { spawn } from "child_process";
 import * as schema from "../../src/lib/db/schema";
 import * as cheerio from "cheerio";
 import { scrapeDo } from "../../src/lib/scraper/scrape-do";
 import { writeScrapeStatus, type RaceRow } from "./lib/scrape-status";
+/** Run a script in background without blocking — fire and forget */
+function fireAndForget(cmd: string, args: string[]): void {
+  const child = spawn("node_modules/.bin/tsx", [cmd, ...args], {
+    cwd: process.cwd(),
+    stdio: "ignore",
+    detached: true,
+  });
+  child.unref();
+}
+
+
 import { processRaceElo } from "../../src/lib/prediction/process-race-elo";
 
 const sqlClient = neon(process.env.DATABASE_URL!);
@@ -349,6 +360,11 @@ async function tryPCSUrl(url: string): Promise<number> {
 
 async function discoverPCSUrl(race: RaceToProcess): Promise<string | null> {
   if (race.discipline === "mtb") return null;
+  // Only attempt discovery for races within 14 days — avoid burning scrape.do for distant races
+  const raceMs = new Date(race.date).getTime();
+  const daysUntil = (raceMs - Date.now()) / 86400000;
+  const daysSince = (Date.now() - raceMs) / 86400000;
+  if (daysUntil > 14 || daysSince > 7) return null; // too far in future or too old
   const year = race.date.substring(0, 4);
   const slug = slugifyRaceName(race.name);
   if (!slug) return null;
@@ -509,27 +525,18 @@ async function processRace(
         console.warn(`   ⚠️  ELO update failed: ${err.message}`);
       }
 
-      // Refresh predictions for upcoming races of same discipline after ELO shift
+      // Fire-and-forget: refresh predictions + trigger marketing (non-blocking)
       if (!dryRun) {
-        try {
-          execSync(
-            `node_modules/.bin/tsx scripts/agents/generate-predictions.ts --discipline ${race.discipline} --days 30`,
-            { cwd: process.cwd(), stdio: "pipe" }
-          );
-          console.log(`   🔮 Predictions refreshed for upcoming ${race.discipline} races`);
-        } catch (err: any) {
-          console.warn(`   ⚠️  Prediction refresh failed: ${(err as any).message?.slice(0, 100)}`);
-        }
+        // Refresh predictions for upcoming races of same discipline
+        fireAndForget("scripts/agents/generate-predictions.ts", ["--discipline", race.discipline, "--days", "30"]);
+        console.log(`   🔮 Predictions refresh queued for ${race.discipline}`);
 
-        // Trigger marketing post for this race's results
-        try {
-          execSync(
-            `node_modules/.bin/tsx scripts/agents/marketing-agent.ts`,
-            { cwd: process.cwd(), stdio: "pipe", timeout: 60000 }
-          );
-          console.log(`   📣 Marketing agent triggered`);
-        } catch (err: any) {
-          console.warn(`   ⚠️  Marketing agent failed: ${(err as any).message?.slice(0, 100)}`);
+        // Marketing: only for WorldTour / 2.Pro / 1.Pro / major MTB — skip NC/2.2/lower
+        const significantCats = new Set(["WorldTour", "2.Pro", "1.Pro", "2.HC", "1.HC", "1.1", "2.1"]);
+        const isSignificant = race.discipline === "mtb" || significantCats.has((race as any).uciCategory ?? "");
+        if (isSignificant) {
+          fireAndForget("scripts/agents/marketing-agent.ts", []);
+          console.log(`   📣 Marketing agent queued`);
         }
       }
     }

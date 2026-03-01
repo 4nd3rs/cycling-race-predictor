@@ -18,9 +18,16 @@ import { eq, and, gte, lte, or, isNull, ne } from "drizzle-orm";
 import * as schema from "../../src/lib/db/schema";
 import * as cheerio from "cheerio";
 import { scrapeDo } from "../../src/lib/scraper/scrape-do";
-import { execSync } from "child_process";
+import { spawn } from "child_process";
 import { processRaceElo } from "../../src/lib/prediction/process-race-elo";
 import { writeScrapeStatus, type RaceRow } from "./lib/scrape-status";
+function fireAndForget(cmd: string, args: string[]): void {
+  const child = spawn("node_modules/.bin/tsx", [cmd, ...args], {
+    cwd: process.cwd(), stdio: "ignore", detached: true,
+  });
+  child.unref();
+}
+
 
 const sqlClient = neon(process.env.DATABASE_URL!);
 const db = drizzle(sqlClient, { schema });
@@ -419,28 +426,12 @@ async function processRace(race: DBRace): Promise<{ inserted: number; status: st
       console.warn(`   ⚠️  ELO update failed: ${e.message}`);
     }
 
-    // Refresh predictions for upcoming MTB races after ELO shift
+    // Fire-and-forget: predictions refresh + marketing (non-blocking)
     if (!dryRun) {
-      try {
-        execSync(
-          `node_modules/.bin/tsx scripts/agents/generate-predictions.ts --discipline mtb --days 30`,
-          { cwd: process.cwd(), stdio: "pipe" }
-        );
-        console.log(`   🔮 Predictions refreshed for upcoming MTB races`);
-      } catch (err: any) {
-        console.warn(`   ⚠️  Prediction refresh failed: ${(err as any).message?.slice(0, 100)}`);
-      }
-
-      // Trigger marketing post for MTB results
-      try {
-        execSync(
-          `node_modules/.bin/tsx scripts/agents/marketing-agent.ts`,
-          { cwd: process.cwd(), stdio: "pipe", timeout: 60000 }
-        );
-        console.log(`   📣 Marketing agent triggered`);
-      } catch (err: any) {
-        console.warn(`   ⚠️  Marketing agent failed: ${(err as any).message?.slice(0, 100)}`);
-      }
+      fireAndForget("scripts/agents/generate-predictions.ts", ["--discipline", "mtb", "--days", "30"]);
+      console.log(`   🔮 Predictions refresh queued for MTB`);
+      fireAndForget("scripts/agents/marketing-agent.ts", []);
+      console.log(`   📣 Marketing agent queued`);
     }
   }
 

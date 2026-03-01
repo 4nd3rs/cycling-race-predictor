@@ -248,6 +248,15 @@ function parseRaceCategories(name: string): Array<{ gender: string; ageCategory:
 
 async function upsertRace(race: ScrapedRace): Promise<"inserted" | "existed" | "error"> {
   try {
+    // Validate inputs
+    if (!race.name || race.name.trim().length < 3) {
+      console.log(`  ⊘ Skipped: empty/too-short name`);
+      return "error";
+    }
+    if (!race.date || isNaN(new Date(race.date).getTime())) {
+      console.log(`  ⊘ Skipped: invalid date "${race.date}" for ${race.name}`);
+      return "error";
+    }
     // Check for existing race/event
     const exists = await raceExists(race.name, race.date);
 
