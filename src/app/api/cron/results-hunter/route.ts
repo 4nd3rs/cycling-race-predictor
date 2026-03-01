@@ -112,7 +112,8 @@ export async function GET() {
       }
 
       try {
-        const scrapedResults = await scrapeRaceResults(race.pcsUrl);
+        const resultUrl = race.pcsUrl.endsWith("/result") ? race.pcsUrl : `${race.pcsUrl}/result`;
+        const scrapedResults = await scrapeRaceResults(resultUrl);
 
         if (scrapedResults.length === 0) {
           results.push({ race: race.name, status: "no_results_found" });
