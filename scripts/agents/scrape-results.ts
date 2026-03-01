@@ -107,12 +107,12 @@ async function scrapeResultsFromPage(
     table.find("tbody tr").each((_, row) => {
       const cells = $(row).find("td");
       const posText = cells.eq(rnkIdx >= 0 ? rnkIdx : 0).text().trim();
-      const riderLink = $(row).find("a[href*='/rider/']").first();
+      const riderLink = $(row).find("a[href*='rider/']").first();
       const riderName = riderLink.text().trim();
       const riderHref = riderLink.attr("href") || "";
       const riderPcsId = riderHref.split("rider/")[1]?.split("/")[0] || "";
       if (!riderName || !riderPcsId) return;
-      const teamName = $(row).find("a[href*='/team/']").text().trim() || null;
+      const teamName = $(row).find("a[href*='team/']").text().trim() || null;
       const timeText = timeIdx >= 0 ? cells.eq(timeIdx).text().trim() : "";
       const gapText = gapIdx >= 0 ? cells.eq(gapIdx).text().trim() : "";
       results.push({
