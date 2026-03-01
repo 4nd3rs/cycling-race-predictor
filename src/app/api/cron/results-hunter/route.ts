@@ -103,7 +103,7 @@ export async function GET() {
         )
       )
       .orderBy(desc(races.date))
-      .limit(10);
+      .limit(20); // Fetch more since many will be skipped (no pcs_url)
 
     for (const race of racesWithoutResults) {
       if (!race.pcsUrl) {
@@ -157,11 +157,13 @@ export async function GET() {
           insertedCount++;
         }
 
-        // Mark race as completed
-        await db
-          .update(races)
-          .set({ status: "completed", updatedAt: new Date() })
-          .where(eq(races.id, race.id));
+        // Only mark completed if we actually inserted results
+        if (insertedCount > 0) {
+          await db
+            .update(races)
+            .set({ status: "completed", updatedAt: new Date() })
+            .where(eq(races.id, race.id));
+        }
 
         results.push({
           race: race.name,
