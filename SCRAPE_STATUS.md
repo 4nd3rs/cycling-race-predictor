@@ -1,6 +1,6 @@
 # SCRAPE_STATUS.md — Pipeline Status
 
-_Last updated: 2026-02-28 21:18:07 (Stockholm)_
+_Last updated: 2026-03-01 19:41:54 (Stockholm)_
 
 ## 📅 Race Calendar
 - **Last run:** 2026-02-28 19:54:28
@@ -36,9 +36,13 @@ _Last updated: 2026-02-28 21:18:07 (Stockholm)_
 | Taça Brasil de Cross-Country RJ - Elite Men | 2026-03-06 | 0 | ⏭️ no pcsUrl | 2026-02-28 18:06:30 |
 
 ## 🏁 Results
-- **Last run:** 2026-02-28 21:18:07
+- **Last run:** 2026-03-01 19:41:54
 - **Status:** ✅ OK
-- No races needing results
+- 149 results imported across 1 race(s). 0 race(s) need LLM fallback (no pcsUrl).
+
+| Race | Date | Results | Status | Scraped |
+|------|------|---------|--------|---------|
+| Kuurne - Brussel - Kuurne 2026 - Junior Men | 2026-03-01 | 149 | ✅ imported | 2026-03-01 19:41:13 |
 
 ---
 <!-- STATUS_JSON
@@ -194,8 +198,17 @@ _Last updated: 2026-02-28 21:18:07 (Stockholm)_
   "results": {
     "component": "results",
     "status": "ok",
-    "summary": "No races needing results",
-    "updatedAt": "2026-02-28 21:18:07"
+    "summary": "149 results imported across 1 race(s). 0 race(s) need LLM fallback (no pcsUrl).",
+    "raceRows": [
+      {
+        "name": "Kuurne - Brussel - Kuurne 2026 - Junior Men",
+        "date": "2026-03-01",
+        "count": 149,
+        "status": "✅ imported",
+        "scrapedAt": "2026-03-01 19:41:13"
+      }
+    ],
+    "updatedAt": "2026-03-01 19:41:54"
   },
   "calendar": {
     "component": "calendar",

@@ -554,7 +554,8 @@ async function main() {
   races.forEach(r => console.log(`  • ${r.name} (${r.date})${r.pcsUrl ? "" : " — no pcsUrl"}`));
   console.log();
 
-  const browser = await chromium.launch({ headless: true });
+  const chromePath = `${process.env.HOME}/Library/Caches/ms-playwright/chromium-1208/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing`;
+  const browser = await chromium.launch({ headless: true, executablePath: chromePath });
   const raceRows: import("./lib/scrape-status").RaceRow[] = [];
   let totalInserted = 0;
   let totalNoResults = 0;
