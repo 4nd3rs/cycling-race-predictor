@@ -257,7 +257,14 @@ function PreviewCard({ event, race, preds }: any) {
               );
             })}
             <div style={{ height: 1, background: DIMMED, marginTop: 40, marginBottom: 36, flexShrink: 0 }} />
-            <BrandBar />
+            {/* Brand — left-aligned, safe from IG buttons at bottom-right */}
+            <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+              <BibIcon size={48} />
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <span style={{ fontSize: 18, fontWeight: 800, color: RED, letterSpacing: "0.08em", fontFamily: "Barlow Condensed" }}>PRO CYCLING PREDICTOR</span>
+                <span style={{ fontSize: 22, fontWeight: 600, color: WHITE, fontFamily: "Inter" }}>procyclingpredictor.com</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -417,19 +424,12 @@ function ResultsCard({ event, race, results }: any) {
         })}
       </div>
 
-      {/* URL bar */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 72px 48px 96px", flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 16, background: "#1A1614", borderRadius: 40, padding: "14px 32px", border: `1px solid ${DIMMED}` }}>
-          <span style={{ fontSize: 26, fontWeight: 700, color: WHITE, fontFamily: "Inter", letterSpacing: "0.02em" }}>
-            procyclingpredictor.com
-          </span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-            <span style={{ fontSize: 16, fontWeight: 700, color: WHITE, letterSpacing: "0.1em" }}>PRO CYCLING</span>
-            <span style={{ fontSize: 20, fontWeight: 800, color: RED }}>PREDICTOR</span>
-          </div>
-          <BibIcon size={52} />
+      {/* URL + brand bar — all left-aligned, safe from IG overlay buttons at bottom-right */}
+      <div style={{ display: "flex", alignItems: "center", gap: 24, padding: "20px 72px 52px 96px", flexShrink: 0 }}>
+        <BibIcon size={48} />
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <span style={{ fontSize: 18, fontWeight: 800, color: RED, letterSpacing: "0.08em", fontFamily: "Barlow Condensed" }}>PRO CYCLING PREDICTOR</span>
+          <span style={{ fontSize: 22, fontWeight: 600, color: WHITE, fontFamily: "Inter", letterSpacing: "0.02em" }}>procyclingpredictor.com</span>
         </div>
       </div>
     </div>
