@@ -196,6 +196,56 @@ async function raceExists(name: string, dateStr: string): Promise<boolean> {
 
 // ─── Upsert race into DB ─────────────────────────────────────────────────────
 
+
+/**
+ * Parse gender + age category from a race name.
+ * Handles patterns like: "ME - ITT", "WE - Road Race", "MU", "WJ", "MJ"
+ * Also handles suffix patterns: "- Elite Men", "- Elite Women", etc.
+ * Returns one entry per detected category, or both genders elite if none detected.
+ */
+function parseRaceCategories(name: string): Array<{ gender: string; ageCategory: string; cleanName: string }> {
+  const ageMap: Record<string, string> = { E: "elite", U: "u23", J: "junior" };
+  const genderMap: Record<string, string> = { M: "men", W: "women" };
+
+  // Match patterns like "ME", "WE", "MU", "WU", "MJ", "WJ" as standalone tokens
+  // Also "Men Elite", "Women Elite", "Elite Men", "Elite Women", etc.
+  const tokens = name.toUpperCase().split(/[\s\-_|]+/);
+
+  const shortCodes = ["ME", "WE", "MU", "WU", "MJ", "WJ"];
+  const found = tokens.filter(t => shortCodes.includes(t));
+
+  if (found.length > 0) {
+    // Strip the code + surrounding labels from the name
+    let cleanName = name
+      .replace(/\s*[-–]?\s*(ME|WE|MU|WU|MJ|WJ)\b/gi, "")
+      .replace(/\s*[-–]\s*(Elite|U23|Junior)\s*(Men|Women|Man|Woman)\s*$/i, "")
+      .replace(/\s*[-–]\s*(Men|Women)\s*(Elite|U23|Junior)\s*$/i, "")
+      .replace(/\s+/g, " ").trim();
+
+    return [...new Set(found)].map(code => ({
+      gender: genderMap[code[0]] ?? "men",
+      ageCategory: ageMap[code[1]] ?? "elite",
+      cleanName,
+    }));
+  }
+
+  // Check for explicit gender suffixes already in name
+  const hasEliteMen = /elite\s+men|men\s+elite/i.test(name);
+  const hasEliteWomen = /elite\s+women|women\s+elite/i.test(name);
+  if (hasEliteMen && !hasEliteWomen) {
+    return [{ gender: "men", ageCategory: "elite", cleanName: name.replace(/\s*[-–]?\s*(elite\s+men|men\s+elite)/gi, "").trim() }];
+  }
+  if (hasEliteWomen && !hasEliteMen) {
+    return [{ gender: "women", ageCategory: "elite", cleanName: name.replace(/\s*[-–]?\s*(elite\s+women|women\s+elite)/gi, "").trim() }];
+  }
+
+  // No gender info — create both men and women elite
+  return [
+    { gender: "men", ageCategory: "elite", cleanName: name },
+    { gender: "women", ageCategory: "elite", cleanName: name },
+  ];
+}
+
 async function upsertRace(race: ScrapedRace): Promise<"inserted" | "existed" | "error"> {
   try {
     // Check for existing race/event
@@ -276,12 +326,14 @@ async function upsertRace(race: ScrapedRace): Promise<"inserted" | "existed" | "
       return "existed";
     }
 
-    // Create men + women elite races
-    const genders = ["men", "women"];
-    for (const gender of genders) {
-      const categorySlug = generateCategorySlug("elite", gender);
-      const genderLabel = gender.charAt(0).toUpperCase() + gender.slice(1);
-      const raceName = `${race.name} - Elite ${genderLabel}`;
+    // Parse gender + age category from race name if embedded (ME/WE/MU/WU/MJ/WJ/NC patterns)
+    const raceCategories = parseRaceCategories(race.name);
+    for (const cat of raceCategories) {
+      const categorySlug = generateCategorySlug(cat.ageCategory, cat.gender);
+      const genderLabel = cat.gender.charAt(0).toUpperCase() + cat.gender.slice(1);
+      const ageLabelMap: Record<string, string> = { elite: "Elite", u23: "U23", junior: "Junior", masters: "Masters" };
+      const ageLabel = ageLabelMap[cat.ageCategory] ?? "Elite";
+      const raceName = `${cat.cleanName} - ${ageLabel} ${genderLabel}`;
 
       await db
         .insert(schema.races)
@@ -292,8 +344,8 @@ async function upsertRace(race: ScrapedRace): Promise<"inserted" | "existed" | "
           endDate: race.endDate || null,
           discipline: race.discipline,
           raceType: race.subDiscipline || (race.endDate ? "stage_race" : "one_day"),
-          ageCategory: "elite",
-          gender,
+          ageCategory: cat.ageCategory,
+          gender: cat.gender,
           uciCategory: race.uciCategory || null,
           country: normalizeCountry(race.country) ?? null,
           raceEventId: newEvent.id,
