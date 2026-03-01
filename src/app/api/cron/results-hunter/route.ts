@@ -7,7 +7,7 @@ import {
   raceResults,
   teams,
 } from "@/lib/db";
-import { and, ilike, eq, lt, gte, asc, desc } from "drizzle-orm";
+import { and, ilike, eq, lt, lte, gte, asc, desc } from "drizzle-orm";
 import { scrapeRaceResults } from "@/lib/scraper/pcs";
 import {
   notifyRaceEventCombined,
@@ -97,7 +97,7 @@ export async function GET() {
       .from(races)
       .where(
         and(
-          lt(races.date, today),
+          lte(races.date, today),
           gte(races.date, cutoff),
           eq(races.status, "active")
         )
