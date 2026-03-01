@@ -193,12 +193,12 @@ function PreviewCard({ event, race, preds }: any) {
       <div style={{ width: W, height: H, background: BLACK, display: "flex", flexDirection: "column", fontFamily: "Barlow Condensed", position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 8, background: RED }} />
         <div style={{ position: "absolute", left: 0, top: 8, bottom: 0, width: 8, background: RED }} />
-        <div style={{ display: "flex", flex: 1, alignItems: "center", justifyContent: "center", padding: "80px 96px" }}>
+        <div style={{ display: "flex", flex: 1, alignItems: "center", justifyContent: "center", padding: "120px 96px 100px" }}>
           <div style={{ display: "flex", flexDirection: "column", width: "100%" }}>
             <span style={{ fontSize: 20, fontWeight: 700, color: RED, letterSpacing: "0.18em", fontFamily: "Inter", marginBottom: 28, flexShrink: 0 }}>
               {gender === "women" ? "WOMEN  ·  RACE PREVIEW" : "RACE PREVIEW"}
             </span>
-            <span style={{ fontSize: nameFontSize, fontWeight: 800, color: WHITE, textTransform: "uppercase", lineHeight: 0.9, letterSpacing: "-0.01em", marginBottom: 64, flexShrink: 0 }}>
+            <span style={{ fontSize: nameFontSize, fontWeight: 800, color: WHITE, textTransform: "uppercase", lineHeight: 1.0, letterSpacing: "-0.01em", marginBottom: 64, flexShrink: 0 }}>
               {String(event.name).toUpperCase()}
             </span>
             <span style={{ fontSize: 24, fontWeight: 700, color: RED, letterSpacing: "0.1em", fontFamily: "Inter", marginBottom: 10, flexShrink: 0 }}>{metaParts}</span>
@@ -229,45 +229,50 @@ function PreviewCard({ event, race, preds }: any) {
     );
   }
 
-  // ── FEED (1080×1080) — flat structure, flexShrink:0 on everything ──
+  // ── FEED (1080×1080) — header block + predictions block fills remaining space ──
   const nameFontSize = nameFontSizeFeed;
   return (
     <div style={{ width: 1080, height: 1080, background: BLACK, display: "flex", flexDirection: "column", overflow: "hidden", fontFamily: "Barlow Condensed" }}>
-      {/* Top red border — in flow so it takes up real space */}
+      {/* Top red border */}
       <div style={{ height: 8, background: RED, flexShrink: 0 }} />
       {/* Left red bar — absolute */}
       <div style={{ position: "absolute", left: 0, top: 8, bottom: 0, width: 8, background: RED }} />
-      {/* Main content */}
-      <div style={{ display: "flex", flexDirection: "column", padding: "52px 88px 0 96px", flex: 1, minHeight: 0 }}>
-        <span style={{ fontSize: 18, fontWeight: 700, color: RED, letterSpacing: "0.18em", fontFamily: "Inter", marginBottom: 16, flexShrink: 0 }}>
+      {/* Header block — fixed height */}
+      <div style={{ display: "flex", flexDirection: "column", padding: "44px 88px 0 96px", flexShrink: 0 }}>
+        <span style={{ fontSize: 18, fontWeight: 700, color: RED, letterSpacing: "0.18em", fontFamily: "Inter", marginBottom: 14 }}>
           {gender === "women" ? "WOMEN  ·  RACE PREVIEW" : "RACE PREVIEW"}
         </span>
-        <span style={{ fontSize: nameFontSize, fontWeight: 800, color: WHITE, textTransform: "uppercase", lineHeight: 0.9, letterSpacing: "-0.01em", marginBottom: 32, flexShrink: 0 }}>
+        <span style={{ fontSize: nameFontSize, fontWeight: 800, color: WHITE, textTransform: "uppercase", lineHeight: 1.0, letterSpacing: "-0.01em", marginBottom: 18 }}>
           {String(event.name).toUpperCase()}
         </span>
-        <span style={{ fontSize: 20, fontWeight: 700, color: RED, letterSpacing: "0.1em", fontFamily: "Inter", marginBottom: 8, flexShrink: 0 }}>{metaParts}</span>
-        <span style={{ fontSize: 22, fontWeight: 700, color: RED, fontFamily: "Inter", marginBottom: 28, flexShrink: 0 }}>{race?.date ? fmtDate(race.date) : ""}</span>
-        <div style={{ height: 1, background: DIMMED, marginBottom: 24, flexShrink: 0 }} />
-        <span style={{ fontSize: 16, fontWeight: 700, color: WHITE, letterSpacing: "0.14em", fontFamily: "Inter", marginBottom: 18, flexShrink: 0 }}>TOP PREDICTIONS</span>
-        {preds.slice(0, 3).map((p: any, i: number) => {
+        <span style={{ fontSize: 19, fontWeight: 700, color: RED, letterSpacing: "0.1em", fontFamily: "Inter", marginBottom: 6 }}>{metaParts}</span>
+        <span style={{ fontSize: 20, fontWeight: 700, color: RED, fontFamily: "Inter", marginBottom: 0 }}>{race?.date ? fmtDate(race.date) : ""}</span>
+      </div>
+      {/* Predictions block — fills remaining space with even distribution */}
+      <div style={{ display: "flex", flexDirection: "column", padding: "0 88px 0 96px", flex: 1, justifyContent: "space-between" }}>
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          <div style={{ height: 1, background: DIMMED, marginBottom: 14 }} />
+          <span style={{ fontSize: 15, fontWeight: 700, color: WHITE, letterSpacing: "0.14em", fontFamily: "Inter" }}>TOP PREDICTIONS</span>
+        </div>
+        {preds.slice(0, 5).map((p: any, i: number) => {
           const pct = Math.round(Number(p.win_probability) * 100);
           return (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14, flexShrink: 0 }}>
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 14 }}>
               <span style={{ fontSize: 18, fontWeight: 700, color: WHITE, width: 22, flexShrink: 0, fontFamily: "Inter" }}>{i + 1}</span>
-              <RiderAvatar photoDataUri={p._photoDataUri ?? null} name={p.rider_name} size={52} />
+              <RiderAvatar photoDataUri={p._photoDataUri ?? null} name={p.rider_name} size={54} />
               <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
                 <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: 30, fontWeight: 800, color: i === 0 ? WHITE : "#C8C0B8", lineHeight: 1 }}>{p.rider_name}</span>
+                  <span style={{ fontSize: 32, fontWeight: 800, color: i === 0 ? WHITE : "#C8C0B8", lineHeight: 1 }}>{p.rider_name}</span>
                   <span style={{ fontSize: 26, fontWeight: 800, color: i === 0 ? RED : "#8A3020", lineHeight: 1, marginLeft: 12 }}>{pct}%</span>
                 </div>
-                <ProbBar pct={pct} width={520} />
+                <ProbBar pct={pct} width={440} />
               </div>
             </div>
           );
         })}
       </div>
       {/* Brand bar */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 88px 40px 96px", borderTop: `1px solid ${DIMMED}`, flexShrink: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 88px 36px 96px", borderTop: `1px solid ${DIMMED}`, flexShrink: 0 }}>
         <span style={{ fontSize: 18, color: WHITE, fontFamily: "Inter" }}>procyclingpredictor.com</span>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
@@ -290,12 +295,12 @@ function ResultsCard({ event, race, results }: any) {
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 8, background: RED }} />
       <div style={{ position: "absolute", left: 0, top: 8, bottom: 0, width: 8, background: RED }} />
 
-      <div style={{ display: "flex", flexDirection: "column", padding: "80px 96px 0 96px", flex: 1 }}>
+      <div style={{ display: "flex", flexDirection: "column", padding: "120px 96px 0 96px", flex: 1 }}>
         <span style={{ fontSize: 20, fontWeight: 700, color: RED, letterSpacing: "0.18em", fontFamily: "Inter", marginBottom: 28 }}>
           {gender === "women" ? "WOMEN  ·  RESULTS" : "RESULTS"}
         </span>
 
-        <span style={{ fontSize: event.name.length > 35 ? 88 : event.name.length > 24 ? 104 : 126, fontWeight: 800, color: WHITE, textTransform: "uppercase", lineHeight: 0.9, letterSpacing: "-0.01em", marginBottom: 64 }}>
+        <span style={{ fontSize: event.name.length > 35 ? 88 : event.name.length > 24 ? 104 : 126, fontWeight: 800, color: WHITE, textTransform: "uppercase", lineHeight: 1.0, letterSpacing: "-0.01em", marginBottom: 64 }}>
           {event.name.toUpperCase()}
         </span>
 

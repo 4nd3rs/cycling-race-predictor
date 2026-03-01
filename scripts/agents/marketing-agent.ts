@@ -7,7 +7,8 @@ import { db, races, raceResults, raceEvents } from "./lib/db";
 import { eq as eqOp } from "drizzle-orm";
 import { and, gte, lte, eq, sql } from "drizzle-orm";
 
-const TRACKING_FILE = "/tmp/marketing-posted.json";
+import path from "path";
+const TRACKING_FILE = path.join(process.cwd(), "data/marketing-posted.json");
 const INTEL_DIR = "./data/intel";
 
 interface IntelItem {
