@@ -7,39 +7,13 @@
 
 import * as cheerio from "cheerio";
 import { normalizeCountry } from "../../../scripts/agents/lib/normalize";
+import { scrapeDo } from "./scrape-do";
 
 const PCS_BASE_URL = "https://www.procyclingstats.com";
-const RATE_LIMIT_MS = parseInt(process.env.PCS_RATE_LIMIT_MS || "1200", 10); // Default 1.2s between requests
 
-// Simple in-memory rate limiter
-let lastRequestTime = 0;
-
+// Use scrape.do to bypass Cloudflare on PCS
 async function rateLimitedFetch(url: string): Promise<string> {
-  const now = Date.now();
-  const timeSinceLastRequest = now - lastRequestTime;
-
-  if (timeSinceLastRequest < RATE_LIMIT_MS) {
-    await new Promise((resolve) =>
-      setTimeout(resolve, RATE_LIMIT_MS - timeSinceLastRequest)
-    );
-  }
-
-  lastRequestTime = Date.now();
-
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent":
-        "CyclingRacePredictor/1.0 (Educational Project; +https://github.com/cycling-race-predictor)",
-      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "Accept-Language": "en-US,en;q=0.5",
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: Failed to fetch ${url}`);
-  }
-
-  return response.text();
+  return scrapeDo(url, { render: true, timeout: 30000 });
 }
 
 // ============================================================================

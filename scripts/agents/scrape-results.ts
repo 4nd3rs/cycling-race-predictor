@@ -1,7 +1,7 @@
 /**
  * Scrape Results Agent
  *
- * Scrapes race results from ProCyclingStats via Playwright (bypasses Cloudflare).
+ * Scrapes race results from ProCyclingStats via scrape.do (bypasses Cloudflare).
  * Handles one-day races, stage races (per-stage + GC), and women's events.
  * Falls back to marking races for LLM fallback if no pcsUrl is available.
  *
@@ -16,7 +16,8 @@ import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
 import { eq, and, gte, lte, sql, isNotNull } from "drizzle-orm";
 import * as schema from "../../src/lib/db/schema";
-import { chromium, type Browser, type Page } from "playwright";
+import * as cheerio from "cheerio";
+import { scrapeDo } from "../../src/lib/scraper/scrape-do";
 import { writeScrapeStatus, type RaceRow } from "./lib/scrape-status";
 import { processRaceElo } from "../../src/lib/prediction/process-race-elo";
 
@@ -71,159 +72,92 @@ function parseGapStr(raw: string): number | null {
 // ─── PCS results page scraper ─────────────────────────────────────────────────
 
 async function scrapeResultsFromPage(
-  page: Page,
   url: string,
   stageNum?: number
 ): Promise<ParsedResult[]> {
   console.log(`   📄 Fetching: ${url}`);
+  let html: string;
   try {
-    await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
-    await page.waitForTimeout(1500);
+    html = await scrapeDo(url, { render: true, timeout: 30000 });
   } catch (err: any) {
-    console.error(`   ❌ Navigation failed: ${err.message}`);
+    console.error(`   ❌ scrape.do failed: ${err.message}`);
     return [];
   }
 
-  // Check if PCS shows "no results yet" or 404
-  const pageTitle = await page.title().catch(() => "");
-  const notFound = await page.$(".page-not-found, .error-404, h1.red").catch(() => null);
-  if (notFound || pageTitle.toLowerCase().includes("not found")) {
+  const $ = cheerio.load(html);
+
+  // Check if PCS shows "no results yet"
+  if ($(".page-not-found, .error-404, h1.red").length || $("title").text().toLowerCase().includes("not found")) {
     console.log(`   ⏳ No results page found (race may not have finished)`);
     return [];
   }
 
-  // PCS results are in a table with class "results" or in .resultlistbase ul
-  const results = await page.evaluate((stageN) => {
-    const entries: {
-      riderName: string; riderPcsId: string; teamName: string | null;
-      pos: string; timeStr: string; gapStr: string;
-    }[] = [];
+  const results: ParsedResult[] = [];
+  const table = $("table.results, table[class*='result']").first();
 
-    // ── Method 1: Standard PCS results table ──
-    // Columns: rnk | bib | rider | team | ... | time | gap | ...
-    const table = document.querySelector("table.results, table[class*='result']") as HTMLTableElement | null;
-    if (table) {
-      const headers = Array.from(table.querySelectorAll("thead th, thead td"))
-        .map(th => th.textContent?.trim().toLowerCase() ?? "");
-      const rnkIdx = headers.findIndex(h => h === "rnk" || h === "pos" || h === "#");
-      const riderIdx = headers.findIndex(h => h.includes("rider") || h === "name");
-      const teamIdx = headers.findIndex(h => h.includes("team"));
-      const timeIdx = headers.findIndex(h => h === "time" || h === "finish");
-      const gapIdx = headers.findIndex(h => h === "gap" || h === "+");
+  if (table.length) {
+    const headers: string[] = [];
+    table.find("thead th, thead td").each((_, th) => headers.push($(th).text().trim().toLowerCase()));
+    const rnkIdx = headers.findIndex(h => h === "rnk" || h === "pos" || h === "#");
+    const riderIdx = headers.findIndex(h => h.includes("rider") || h === "name");
+    const teamIdx = headers.findIndex(h => h.includes("team"));
+    const timeIdx = headers.findIndex(h => h === "time");
+    const gapIdx = headers.findIndex(h => h === "gap" || h === "+");
 
-      table.querySelectorAll("tbody tr").forEach(tr => {
-        const tds = Array.from(tr.querySelectorAll("td"));
-        if (tds.length < 3) return;
-
-        const riderLink = tr.querySelector("a[href*='rider/']") as HTMLAnchorElement | null;
-        const teamLink = tr.querySelector("a[href*='team/']") as HTMLAnchorElement | null;
-
-        const riderName = riderLink?.textContent?.trim() ?? tds[riderIdx > 0 ? riderIdx : 2]?.textContent?.trim() ?? "";
-        const riderHref = riderLink?.getAttribute("href") ?? "";
-        const riderPcsId = riderHref.replace(/^\//, "").split("rider/")[1]?.split("/")[0]?.split("?")[0] ?? "";
-
-        const teamName = teamLink?.textContent?.trim() ?? null;
-        const posText = tds[rnkIdx > 0 ? rnkIdx : 0]?.textContent?.trim() ?? "";
-        const timeText = timeIdx > 0 ? (tds[timeIdx]?.textContent?.trim() ?? "") : "";
-        const gapText = gapIdx > 0 ? (tds[gapIdx]?.textContent?.trim() ?? "") : "";
-
-        if (riderName && riderPcsId) {
-          entries.push({ riderName, riderPcsId, teamName, pos: posText, timeStr: timeText, gapStr: gapText });
-        }
+    table.find("tbody tr").each((_, row) => {
+      const cells = $(row).find("td");
+      const posText = cells.eq(rnkIdx >= 0 ? rnkIdx : 0).text().trim();
+      const riderLink = $(row).find("a[href*='/rider/']").first();
+      const riderName = riderLink.text().trim();
+      const riderHref = riderLink.attr("href") || "";
+      const riderPcsId = riderHref.split("rider/")[1]?.split("/")[0] || "";
+      if (!riderName || !riderPcsId) return;
+      const teamName = $(row).find("a[href*='/team/']").text().trim() || null;
+      const timeText = timeIdx >= 0 ? cells.eq(timeIdx).text().trim() : "";
+      const gapText = gapIdx >= 0 ? cells.eq(gapIdx).text().trim() : "";
+      results.push({
+        riderName, riderPcsId, teamName,
+        pos: posText,
+        timeStr: timeText,
+        gapStr: gapText,
       });
-    }
-
-    // ── Method 2: PCS resultlistbase ul (older layout) ──
-    if (entries.length === 0) {
-      document.querySelectorAll(".resultlistbase > li, ul.list.moblist.finishlist > li").forEach(li => {
-        const riderLink = li.querySelector("a[href*='rider/']") as HTMLAnchorElement | null;
-        const teamLink = li.querySelector("a[href*='team/']") as HTMLAnchorElement | null;
-        if (!riderLink) return;
-
-        const riderName = riderLink.textContent?.trim() ?? "";
-        const riderHref = riderLink.getAttribute("href") ?? "";
-        const riderPcsId = riderHref.replace(/^\//, "").split("rider/")[1]?.split("/")[0] ?? "";
-        const teamName = teamLink?.textContent?.trim() ?? null;
-
-        const rnkEl = li.querySelector(".rnk, .pos, [class*='rank']");
-        const posText = rnkEl?.textContent?.trim() ?? "";
-        const timeEl = li.querySelector(".time, [class*='time']");
-        const timeText = timeEl?.textContent?.trim() ?? "";
-
-        if (riderName && riderPcsId) {
-          entries.push({ riderName, riderPcsId, teamName, pos: posText, timeStr: timeText, gapStr: "" });
-        }
-      });
-    }
-
-    // ── Method 3: Broad fallback — any rider links in main content ──
-    if (entries.length === 0) {
-      let rnk = 1;
-      document.querySelectorAll(".content a[href*='rider/'], #content a[href*='rider/'], main a[href*='rider/']").forEach(el => {
-        const riderName = el.textContent?.trim() ?? "";
-        const riderHref = el.getAttribute("href") ?? "";
-        const riderPcsId = riderHref.replace(/^\//, "").split("rider/")[1]?.split("/")[0] ?? "";
-        if (!riderName || !riderPcsId || riderName.length < 3) return;
-        const li = el.closest("li, tr");
-        const teamLink = li?.querySelector("a[href*='team/']") as HTMLAnchorElement | null;
-        entries.push({
-          riderName, riderPcsId,
-          teamName: teamLink?.textContent?.trim() ?? null,
-          pos: String(rnk++),
-          timeStr: "", gapStr: "",
-        });
-      });
-    }
-
-    return entries.map(e => ({ ...e, stage: stageN ?? null }));
-  }, stageNum ?? null);
-
-  if (results.length === 0) {
-    console.log(`   ⚠️  No riders found in results page`);
-    return [];
-  }
-
-  console.log(`   📊 Found ${results.length} rider entries`);
-
-  // Parse positions / status
-  const parsed: ParsedResult[] = [];
-  for (const r of results) {
-    const posUp = r.pos.toUpperCase().trim();
-    const dnf = posUp === "DNF" || posUp === "OTL" || posUp === "ABD";
-    const dns = posUp === "DNS" || posUp === "DQ" || posUp === "DSQ";
-    const dsq = posUp === "DSQ" || posUp === "DQ";
-    const position = (!dnf && !dns && !dsq && /^\d+$/.test(posUp)) ? parseInt(posUp, 10) : null;
-
-    parsed.push({
-      riderName: r.riderName,
-      riderPcsId: r.riderPcsId,
-      teamName: r.teamName,
-      position,
-      timeSeconds: parseTimeStr(r.timeStr),
-      timeGapSeconds: parseGapStr(r.gapStr),
-      dnf,
-      dns,
-      dsq,
-      stage: r.stage ?? undefined,
     });
   }
 
+  const parsed: ParsedResult[] = results
+    .map(r => {
+      const isDnf = r.pos.toUpperCase() === "DNF";
+      const isDns = r.pos.toUpperCase() === "DNS";
+      const position = isDnf || isDns ? null : parseInt(r.pos, 10) || null;
+      return {
+        riderName: r.riderName,
+        riderPcsId: r.riderPcsId,
+        teamName: r.teamName,
+        position,
+        dnf: isDnf,
+        dns: isDns,
+        timeSeconds: parseTimeStr(r.timeStr),
+        gapSeconds: parseGapStr(r.gapStr),
+        stageNum: stageNum ?? null,
+      };
+    })
+    .filter(r => r.riderName && r.riderPcsId);
+
+  console.log(`   ✅ Parsed ${parsed.length} results from ${url}`);
   return parsed;
 }
 
-// ─── Detect stage count from PCS race page ────────────────────────────────────
 
-async function detectStageCount(page: Page, pcsUrl: string): Promise<number> {
+async function detectStageCount(pcsUrl: string): Promise<number> {
   try {
-    await page.goto(pcsUrl, { waitUntil: "networkidle", timeout: 20000 });
-    const stageLinks = await page.$$eval("a[href*='/stage-']", links =>
-      links.map(l => {
-        const m = (l.getAttribute("href") ?? "").match(/\/stage-(\d+)/);
-        return m ? parseInt(m[1], 10) : 0;
-      }).filter(n => n > 0)
-    ).catch(() => [] as number[]);
-    const max = stageLinks.length > 0 ? Math.max(...stageLinks) : 0;
-    return max;
+    const html = await scrapeDo(pcsUrl, { render: true, timeout: 20000 });
+    const $ = cheerio.load(html);
+    const nums: number[] = [];
+    $("a[href*='/stage-']").each((_, el) => {
+      const m = ($(el).attr("href") ?? "").match(/\/stage-(\d+)/);
+      if (m) nums.push(parseInt(m[1], 10));
+    });
+    return nums.length > 0 ? Math.max(...nums) : 0;
   } catch {
     return 0;
   }
@@ -373,8 +307,7 @@ interface RaceToProcess {
 }
 
 async function processRace(
-  race: RaceToProcess,
-  browser: Browser
+  race: RaceToProcess
 ): Promise<{ inserted: number; status: string }> {
 
   if (!race.pcsUrl) {
@@ -383,58 +316,34 @@ async function processRace(
   }
 
   const isStageRace = race.raceType === "stage_race" || race.endDate !== null;
-  const page = await browser.newPage();
-  await page.setExtraHTTPHeaders({
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Accept-Language": "en-US,en;q=0.9",
-  });
-
   let allResults: ParsedResult[] = [];
 
-  try {
-    if (isStageRace) {
-      // For stage races: try to get today's/yesterday's stage result + current GC
-      // First detect how many stages exist
-      const stageCount = await detectStageCount(page, race.pcsUrl);
-      console.log(`   Stage race: ${stageCount} stages detected`);
+  if (isStageRace) {
+    const stageCount = await detectStageCount(race.pcsUrl);
+    console.log(`   Stage race: ${stageCount} stages detected`);
 
-      if (stageCount > 0) {
-        // Scrape the latest completed stage
-        const today = new Date().toISOString().split("T")[0];
-        const raceDate = race.date;
-        const raceEnd = race.endDate ?? raceDate;
-        const isFinished = today > raceEnd;
+    if (stageCount > 0) {
+      const today = new Date().toISOString().split("T")[0];
+      const raceEnd = race.endDate ?? race.date;
+      const isFinished = today > raceEnd;
 
-        if (isFinished) {
-          // Race is over — get GC
-          const gcResults = await scrapeResultsFromPage(page, `${race.pcsUrl}/gc`);
-          if (gcResults.length > 0) allResults = gcResults;
-          else {
-            // Try final stage result as fallback
-            allResults = await scrapeResultsFromPage(page, `${race.pcsUrl}/stage-${stageCount}/result`);
-          }
-        } else {
-          // Race in progress — get most recent completed stage
-          for (let s = stageCount; s >= 1; s--) {
-            const stageResults = await scrapeResultsFromPage(page, `${race.pcsUrl}/stage-${s}/result`, s);
-            if (stageResults.length > 0) {
-              allResults = stageResults;
-              break;
-            }
-          }
-        }
+      if (isFinished) {
+        const gcResults = await scrapeResultsFromPage(`${race.pcsUrl}/gc`);
+        if (gcResults.length > 0) allResults = gcResults;
+        else allResults = await scrapeResultsFromPage(`${race.pcsUrl}/stage-${stageCount}/result`);
       } else {
-        // Could not detect stages — try /result and /gc
-        const res = await scrapeResultsFromPage(page, `${race.pcsUrl}/result`);
-        if (res.length > 0) allResults = res;
-        else allResults = await scrapeResultsFromPage(page, `${race.pcsUrl}/gc`);
+        for (let s = stageCount; s >= 1; s--) {
+          const stageResults = await scrapeResultsFromPage(`${race.pcsUrl}/stage-${s}/result`, s);
+          if (stageResults.length > 0) { allResults = stageResults; break; }
+        }
       }
     } else {
-      // One-day race
-      allResults = await scrapeResultsFromPage(page, `${race.pcsUrl}/result`);
+      const res = await scrapeResultsFromPage(`${race.pcsUrl}/result`);
+      if (res.length > 0) allResults = res;
+      else allResults = await scrapeResultsFromPage(`${race.pcsUrl}/gc`);
     }
-  } finally {
-    await page.close().catch(() => {});
+  } else {
+    allResults = await scrapeResultsFromPage(`${race.pcsUrl}/result`);
   }
 
   if (allResults.length === 0) {
@@ -554,8 +463,6 @@ async function main() {
   races.forEach(r => console.log(`  • ${r.name} (${r.date})${r.pcsUrl ? "" : " — no pcsUrl"}`));
   console.log();
 
-  const chromePath = `${process.env.HOME}/Library/Caches/ms-playwright/chromium-1208/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing`;
-  const browser = await chromium.launch({ headless: true, executablePath: chromePath });
   const raceRows: import("./lib/scrape-status").RaceRow[] = [];
   let totalInserted = 0;
   let totalNoResults = 0;
@@ -564,7 +471,7 @@ async function main() {
     for (const race of races) {
       console.log(`\n🔍 ${race.name} (${race.date})`);
       const now = new Date().toLocaleString("sv-SE", { timeZone: "Europe/Stockholm" }).replace("T", " ");
-      const { inserted, status } = await processRace(race, browser);
+      const { inserted, status } = await processRace(race);
       totalInserted += inserted;
       if (status === "no-results-yet" || status === "no-pcsurl") totalNoResults++;
 
@@ -585,7 +492,7 @@ async function main() {
       });
     }
   } finally {
-    await browser.close();
+    // no browser to close
   }
 
   // Write status
