@@ -5,7 +5,6 @@ import {
   races,
   raceEvents,
   raceStartlist,
-  raceResults,
   riders,
   predictions,
   userFollows,
@@ -279,13 +278,8 @@ async function findRaceCandidates(): Promise<RaceCandidate[]> {
       messageType = "preview";
     } else if (hoursUntilRace >= 0 && hoursUntilRace <= 6) {
       messageType = "raceday";
-    } else if (hoursSinceRace >= 0 && hoursSinceRace <= 12) {
-      // Check if results exist
-      const hasResults = await db.query.raceResults.findFirst({
-        where: eq(raceResults.raceId, r.raceId),
-      });
-      if (hasResults) messageType = "result";
     }
+    // Note: "result" type is handled by results-hunter cron (uses real data, not AI predictions)
 
     if (messageType) {
       candidates.push({
