@@ -98,6 +98,19 @@ function dayStr(offset: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+async function enrichRidersForRace(raceId: string): Promise<void> {
+  console.log(`  🎽 Enriching rider photos for race ${raceId}...`);
+  try {
+    execSync(
+      `node_modules/.bin/tsx scripts/agents/scrape-rider-profiles.ts --race ${raceId} --limit 30`,
+      { encoding: "utf-8", stdio: "pipe", cwd: process.cwd(), timeout: 120000 }
+    );
+    console.log(`  ✅ Rider enrichment done`);
+  } catch (err) {
+    console.warn(`  ⚠️ Rider enrichment failed (non-critical):`, (err as any)?.message?.slice(0, 100));
+  }
+}
+
 async function main() {
   const channel = process.env.TELEGRAM_CHANNEL_ID;
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
@@ -162,9 +175,10 @@ async function main() {
       console.error(`❌ Failed to post preview for ${race.name}:`, err);
     }
 
-    // Instagram Stories — elite races only, post men + women
+    // Instagram Stories — enrich rider photos first, then post
     const igPreviewSlug = await getEventSlug(race);
     if (igPreviewSlug && shouldPostToInstagram(race) && !tracking.igPreviews.includes(race.id)) {
+      await enrichRidersForRace(race.id);
       const cat = (race.categorySlug || "").toLowerCase();
       const genders: string[] = cat.includes("women") ? ["women"] : cat.includes("men") ? ["men"] : ["men", "women"];
       for (const gender of genders) {
@@ -231,9 +245,10 @@ async function main() {
       console.error(`❌ Failed to post result for ${race.name}:`, err);
     }
 
-    // Instagram Stories — elite races only, post men + women
+    // Instagram Stories — enrich rider photos first, then post
     const igResultSlug = await getEventSlug(race);
     if (igResultSlug && shouldPostToInstagram(race) && !tracking.igResults.includes(race.id)) {
+      await enrichRidersForRace(race.id);
       const cat = (race.categorySlug || "").toLowerCase();
       const genders: string[] = cat.includes("women") ? ["women"] : cat.includes("men") ? ["men"] : ["men", "women"];
       for (const gender of genders) {
