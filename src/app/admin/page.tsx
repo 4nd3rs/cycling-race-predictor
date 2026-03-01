@@ -1,210 +1,413 @@
 import { redirect } from "next/navigation";
 import { isAdmin } from "@/lib/auth";
-import { db, uciSyncRuns } from "@/lib/db";
-import { desc } from "drizzle-orm";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  db,
+  races,
+  riders,
+  predictions,
+  users,
+  raceResults,
+  raceStartlist,
+  uciSyncRuns,
+  userTelegram,
+  userWhatsapp,
+  riderDisciplineStats,
+} from "@/lib/db";
+import { desc, sql, count, gte, and, lte, isNotNull, eq } from "drizzle-orm";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { SyncButton } from "@/components/admin/sync-button";
+import * as fs from "fs";
+import * as path from "path";
 
-// Don't prerender - this page always needs fresh data
 export const dynamic = "force-dynamic";
 
-function formatDuration(ms: number | null): string {
-  if (!ms) return "-";
-  if (ms < 1000) return `${ms}ms`;
-  const seconds = Math.round(ms / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
-  return `${minutes}m ${remainingSeconds}s`;
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+function formatRelative(date: Date | string | null): string {
+  if (!date) return "never";
+  const d = typeof date === "string" ? new Date(date) : date;
+  const diffMs = Date.now() - d.getTime();
+  const mins = Math.floor(diffMs / 60_000);
+  const hours = Math.floor(mins / 60);
+  const days = Math.floor(hours / 24);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  return `${days}d ago`;
 }
 
-function formatRelativeTime(date: Date): string {
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMinutes = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMinutes / 60);
-  const diffDays = Math.floor(diffHours / 24);
+interface ScrapeStatus {
+  calendar?: { component: string; status: string; summary: string; updatedAt: string };
+  startlists?: { component: string; status: string; summary: string; updatedAt: string };
+  results?: { component: string; status: string; summary: string; updatedAt: string };
+  "mtb-results"?: { component: string; status: string; summary: string; updatedAt: string };
+}
 
-  if (diffMinutes < 1) return "just now";
-  if (diffMinutes < 60) return `${diffMinutes}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  return `${diffDays}d ago`;
+function readScrapeStatus(): ScrapeStatus {
+  try {
+    const filePath = path.join(process.cwd(), "SCRAPE_STATUS.md");
+    const content = fs.readFileSync(filePath, "utf-8");
+    const match = content.match(/<!-- STATUS_JSON\n([\s\S]*?)\nSTATUS_JSON -->/);
+    if (match?.[1]) {
+      return JSON.parse(match[1]);
+    }
+  } catch {
+    // ignore
+  }
+  return {};
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const variant = status === "completed"
-    ? "default"
-    : status === "running"
-    ? "secondary"
-    : "destructive";
-
-  return <Badge variant={variant}>{status}</Badge>;
+  if (status === "ok") {
+    return <Badge className="bg-emerald-500/20 text-emerald-600 border-emerald-500/30 dark:text-emerald-400" variant="outline">OK</Badge>;
+  }
+  if (status === "warn" || status === "stale") {
+    return <Badge className="bg-yellow-500/20 text-yellow-600 border-yellow-500/30 dark:text-yellow-400" variant="outline">Warning</Badge>;
+  }
+  return <Badge variant="destructive">{status}</Badge>;
 }
 
-export default async function AdminPage() {
-  if (!(await isAdmin())) {
-    redirect("/");
+// ─── Data Queries ───────────────────────────────────────────────────────────
+
+async function getOverviewData() {
+  const now = new Date();
+  const today = now.toISOString().split("T")[0];
+  const weekFromNow = new Date(now.getTime() + 7 * 86400_000).toISOString().split("T")[0];
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400_000);
+
+  const [
+    totalRacesResult,
+    racesThisWeekResult,
+    racesWithResultsResult,
+    staleRacesResult,
+    totalRidersResult,
+    ridersWithEloResult,
+    ridersWithBioResult,
+    ridersWithPhotoResult,
+    totalPredictionsResult,
+    racesWithPredictionsThisWeekResult,
+    totalUsersResult,
+    activeUsersResult,
+    telegramSubsResult,
+    whatsappSubsResult,
+    upcomingRacesResult,
+    lastUciSyncResult,
+  ] = await Promise.all([
+    // Races
+    db.select({ c: count() }).from(races),
+    db.select({ c: count() }).from(races).where(and(gte(races.date, today), lte(races.date, weekFromNow))),
+    db.select({ c: count() }).from(races).where(sql`(SELECT count(*) FROM race_results rr WHERE rr.race_id = races.id) > 0`),
+    db.select({ c: count() }).from(races).where(and(sql`${races.date} < ${today}`, sql`(SELECT count(*) FROM race_results rr WHERE rr.race_id = races.id) = 0`)),
+    // Riders
+    db.select({ c: count() }).from(riders),
+    db.select({ c: count() }).from(riderDisciplineStats).where(sql`${riderDisciplineStats.currentElo} IS NOT NULL AND ${riderDisciplineStats.currentElo} != '1500'`),
+    db.select({ c: count() }).from(riders).where(isNotNull(riders.bio)),
+    db.select({ c: count() }).from(riders).where(isNotNull(riders.photoUrl)),
+    // Predictions
+    db.select({ c: count() }).from(predictions),
+    db.select({ c: sql<number>`count(DISTINCT ${predictions.raceId})` }).from(predictions)
+      .innerJoin(races, eq(predictions.raceId, races.id))
+      .where(and(gte(races.date, today), lte(races.date, weekFromNow))),
+    // Users
+    db.select({ c: count() }).from(users),
+    db.select({ c: count() }).from(users).where(gte(users.updatedAt, thirtyDaysAgo)),
+    db.select({ c: count() }).from(userTelegram).where(isNotNull(userTelegram.telegramChatId)),
+    db.select({ c: count() }).from(userWhatsapp).where(isNotNull(userWhatsapp.phoneNumber)),
+    // Upcoming races (next 7 days)
+    db.select({
+      id: races.id,
+      name: races.name,
+      date: races.date,
+      discipline: races.discipline,
+      pcsUrl: races.pcsUrl,
+    }).from(races)
+      .where(and(gte(races.date, today), lte(races.date, weekFromNow)))
+      .orderBy(races.date)
+      .limit(30),
+    // UCI sync
+    db.select().from(uciSyncRuns).orderBy(desc(uciSyncRuns.startedAt)).limit(1),
+  ]);
+
+  // For upcoming races, check startlist and prediction counts
+  const upcomingRaceIds = upcomingRacesResult.map((r) => r.id);
+  let startlistCounts: Record<string, number> = {};
+  let predictionCounts: Record<string, number> = {};
+  let resultCounts: Record<string, number> = {};
+
+  if (upcomingRaceIds.length > 0) {
+    const [slCounts, predCounts, resCounts] = await Promise.all([
+      db.select({ raceId: raceStartlist.raceId, c: count() })
+        .from(raceStartlist)
+        .where(sql`${raceStartlist.raceId} IN ${upcomingRaceIds}`)
+        .groupBy(raceStartlist.raceId),
+      db.select({ raceId: predictions.raceId, c: count() })
+        .from(predictions)
+        .where(sql`${predictions.raceId} IN ${upcomingRaceIds}`)
+        .groupBy(predictions.raceId),
+      db.select({ raceId: raceResults.raceId, c: count() })
+        .from(raceResults)
+        .where(sql`${raceResults.raceId} IN ${upcomingRaceIds}`)
+        .groupBy(raceResults.raceId),
+    ]);
+    startlistCounts = Object.fromEntries(slCounts.map((r) => [r.raceId, r.c]));
+    predictionCounts = Object.fromEntries(predCounts.map((r) => [r.raceId, r.c]));
+    resultCounts = Object.fromEntries(resCounts.map((r) => [r.raceId, r.c]));
   }
 
-  const runs = await db
-    .select()
-    .from(uciSyncRuns)
-    .orderBy(desc(uciSyncRuns.startedAt))
-    .limit(10);
+  return {
+    races: {
+      total: totalRacesResult[0]?.c ?? 0,
+      thisWeek: racesThisWeekResult[0]?.c ?? 0,
+      withResults: racesWithResultsResult[0]?.c ?? 0,
+      stale: staleRacesResult[0]?.c ?? 0,
+    },
+    riders: {
+      total: totalRidersResult[0]?.c ?? 0,
+      withElo: ridersWithEloResult[0]?.c ?? 0,
+      withBio: ridersWithBioResult[0]?.c ?? 0,
+      withPhoto: ridersWithPhotoResult[0]?.c ?? 0,
+    },
+    predictions: {
+      total: totalPredictionsResult[0]?.c ?? 0,
+      racesThisWeek: racesWithPredictionsThisWeekResult[0]?.c ?? 0,
+    },
+    users: {
+      total: totalUsersResult[0]?.c ?? 0,
+      activeLast30: activeUsersResult[0]?.c ?? 0,
+      telegram: telegramSubsResult[0]?.c ?? 0,
+      whatsapp: whatsappSubsResult[0]?.c ?? 0,
+    },
+    upcomingRaces: upcomingRacesResult.map((r) => ({
+      ...r,
+      hasStartlist: (startlistCounts[r.id] ?? 0) > 0,
+      hasPredictions: (predictionCounts[r.id] ?? 0) > 0,
+      hasResults: (resultCounts[r.id] ?? 0) > 0,
+    })),
+    lastUciSync: lastUciSyncResult[0] ?? null,
+  };
+}
 
-  const latestRun = runs[0] || null;
+// ─── Page ───────────────────────────────────────────────────────────────────
+
+export default async function AdminOverviewPage() {
+  if (!(await isAdmin())) redirect("/");
+
+  const data = await getOverviewData();
+  const scrapeStatus = readScrapeStatus();
+
+  const pipelineItems = [
+    {
+      emoji: "📅",
+      label: "Race Calendar",
+      lastRun: scrapeStatus.calendar?.updatedAt ?? null,
+      status: scrapeStatus.calendar?.status ?? "unknown",
+      detail: scrapeStatus.calendar?.summary ?? "—",
+    },
+    {
+      emoji: "📋",
+      label: "Startlists",
+      lastRun: scrapeStatus.startlists?.updatedAt ?? null,
+      status: scrapeStatus.startlists?.status ?? "unknown",
+      detail: scrapeStatus.startlists?.summary ?? "—",
+    },
+    {
+      emoji: "🏁",
+      label: "Road Results",
+      lastRun: scrapeStatus.results?.updatedAt ?? null,
+      status: scrapeStatus.results?.status ?? "unknown",
+      detail: scrapeStatus.results?.summary ?? "—",
+    },
+    {
+      emoji: "🏁",
+      label: "MTB Results",
+      lastRun: scrapeStatus["mtb-results"]?.updatedAt ?? null,
+      status: scrapeStatus["mtb-results"]?.status ?? "unknown",
+      detail: scrapeStatus["mtb-results"]?.summary ?? "—",
+    },
+    {
+      emoji: "🔮",
+      label: "Predictions",
+      lastRun: null,
+      status: data.predictions.total > 0 ? "ok" : "unknown",
+      detail: `${Number(data.predictions.total).toLocaleString()} total predictions`,
+    },
+    {
+      emoji: "🏆",
+      label: "UCI Rankings",
+      lastRun: data.lastUciSync?.startedAt?.toISOString() ?? null,
+      status: data.lastUciSync?.status === "completed" ? "ok" : (data.lastUciSync?.status ?? "unknown"),
+      detail: data.lastUciSync
+        ? `${data.lastUciSync.ridersUpdated ?? 0} riders updated`
+        : "—",
+    },
+  ];
 
   return (
     <div className="space-y-6">
-      {/* Last Sync Card */}
-      <div className="flex items-start justify-between gap-4">
-        <Card className="flex-1">
-          <CardHeader>
-            <CardTitle>UCI Rankings Sync</CardTitle>
-            <CardDescription>
-              Last sync status and controls
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {latestRun ? (
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <StatusBadge status={latestRun.status} />
-                  <span className="text-sm text-muted-foreground">
-                    {formatRelativeTime(latestRun.startedAt)}
-                  </span>
-                  <span className="text-sm text-muted-foreground">
-                    {formatDuration(latestRun.durationMs)}
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                  <Stat label="Total Entries" value={latestRun.totalEntries ?? 0} />
-                  <Stat label="Riders Created" value={latestRun.ridersCreated ?? 0} />
-                  <Stat label="Riders Updated" value={latestRun.ridersUpdated ?? 0} />
-                  <Stat label="Teams Created" value={latestRun.teamsCreated ?? 0} />
-                </div>
-                {latestRun.errors && (latestRun.errors as string[]).length > 0 && (
-                  <div className="mt-2 rounded-md bg-destructive/10 p-3">
-                    <p className="text-sm font-medium text-destructive">Errors:</p>
-                    <ul className="mt-1 list-inside list-disc text-sm text-destructive">
-                      {(latestRun.errors as string[]).map((err, i) => (
-                        <li key={i}>{err}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">No sync runs yet.</p>
-            )}
-          </CardContent>
-        </Card>
-        <div className="pt-6">
-          <SyncButton />
-        </div>
+      {/* ── Stat Cards ── */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard
+          title="Races"
+          value={Number(data.races.total)}
+          items={[
+            { label: "this week", value: Number(data.races.thisWeek) },
+            { label: "with results", value: Number(data.races.withResults) },
+            { label: "stale (no results)", value: Number(data.races.stale), warn: Number(data.races.stale) > 0 },
+          ]}
+        />
+        <StatCard
+          title="Riders"
+          value={Number(data.riders.total)}
+          items={[
+            { label: "with ELO", value: Number(data.riders.withElo) },
+            { label: "with bio", value: Number(data.riders.withBio) },
+            { label: "with photo", value: Number(data.riders.withPhoto) },
+          ]}
+        />
+        <StatCard
+          title="Predictions"
+          value={Number(data.predictions.total)}
+          items={[
+            { label: "races w/ predictions (7d)", value: Number(data.predictions.racesThisWeek) },
+          ]}
+        />
+        <StatCard
+          title="Users"
+          value={Number(data.users.total)}
+          items={[
+            { label: "active (30d)", value: Number(data.users.activeLast30) },
+            { label: "Telegram subs", value: Number(data.users.telegram) },
+            { label: "WhatsApp subs", value: Number(data.users.whatsapp) },
+          ]}
+        />
       </div>
 
-      {/* Category Breakdown */}
-      {latestRun?.categoryDetails && (latestRun.categoryDetails as Array<{
-        category: string;
-        entries: number;
-        ridersCreated: number;
-        ridersUpdated: number;
-      }>).length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Category Breakdown</CardTitle>
-            <CardDescription>Latest sync per-category stats</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="py-2 text-left font-medium">Category</th>
-                    <th className="py-2 text-right font-medium">Entries</th>
-                    <th className="py-2 text-right font-medium">Created</th>
-                    <th className="py-2 text-right font-medium">Updated</th>
+      {/* ── Pipeline Health Strip ── */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle>Pipeline Health</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border/50 bg-muted/30">
+                  <th className="px-4 py-2 text-left font-medium text-muted-foreground">Component</th>
+                  <th className="px-4 py-2 text-left font-medium text-muted-foreground">Last Run</th>
+                  <th className="px-4 py-2 text-left font-medium text-muted-foreground">Status</th>
+                  <th className="px-4 py-2 text-left font-medium text-muted-foreground">Detail</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pipelineItems.map((item, i) => (
+                  <tr key={item.label} className={`border-b border-border/30 ${i % 2 ? "bg-muted/10" : ""}`}>
+                    <td className="px-4 py-2 font-medium">
+                      <span className="mr-1.5">{item.emoji}</span>
+                      {item.label}
+                    </td>
+                    <td className="px-4 py-2 text-muted-foreground">
+                      {item.lastRun ? formatRelative(item.lastRun) : "—"}
+                    </td>
+                    <td className="px-4 py-2">
+                      <StatusBadge status={item.status} />
+                    </td>
+                    <td className="px-4 py-2 text-xs text-muted-foreground max-w-[300px] truncate">
+                      {item.detail}
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {(latestRun.categoryDetails as Array<{
-                    category: string;
-                    entries: number;
-                    ridersCreated: number;
-                    ridersUpdated: number;
-                  }>).map((cat) => (
-                    <tr key={cat.category} className="border-b last:border-0">
-                      <td className="py-2">{cat.category}</td>
-                      <td className="py-2 text-right">{cat.entries}</td>
-                      <td className="py-2 text-right">{cat.ridersCreated}</td>
-                      <td className="py-2 text-right">{cat.ridersUpdated}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
 
-      {/* Sync History */}
-      {runs.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Sync History</CardTitle>
-            <CardDescription>Last 10 sync runs</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="py-2 text-left font-medium">Status</th>
-                    <th className="py-2 text-left font-medium">Started</th>
-                    <th className="py-2 text-right font-medium">Duration</th>
-                    <th className="py-2 text-right font-medium">Entries</th>
-                    <th className="py-2 text-right font-medium">Created</th>
-                    <th className="py-2 text-right font-medium">Updated</th>
-                    <th className="py-2 text-right font-medium">Errors</th>
+      {/* ── Upcoming Races ── */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle>Upcoming Races (next 7 days)</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border/50 bg-muted/30">
+                  <th className="px-4 py-2 text-left font-medium text-muted-foreground">Race</th>
+                  <th className="px-4 py-2 text-left font-medium text-muted-foreground">Date</th>
+                  <th className="px-4 py-2 text-left font-medium text-muted-foreground">Discipline</th>
+                  <th className="px-4 py-2 text-center font-medium text-muted-foreground">Startlist</th>
+                  <th className="px-4 py-2 text-center font-medium text-muted-foreground">Predictions</th>
+                  <th className="px-4 py-2 text-center font-medium text-muted-foreground">Results</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.upcomingRaces.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
+                      No races in the next 7 days
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {runs.map((run) => (
-                    <tr key={run.id} className="border-b last:border-0">
-                      <td className="py-2">
-                        <StatusBadge status={run.status} />
-                      </td>
-                      <td className="py-2">
-                        {formatRelativeTime(run.startedAt)}
-                      </td>
-                      <td className="py-2 text-right">
-                        {formatDuration(run.durationMs)}
-                      </td>
-                      <td className="py-2 text-right">{run.totalEntries ?? 0}</td>
-                      <td className="py-2 text-right">{run.ridersCreated ?? 0}</td>
-                      <td className="py-2 text-right">{run.ridersUpdated ?? 0}</td>
-                      <td className="py-2 text-right">
-                        {(run.errors as string[] | null)?.length || 0}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                )}
+                {data.upcomingRaces.map((race, i) => (
+                  <tr key={race.id} className={`border-b border-border/30 ${i % 2 ? "bg-muted/10" : ""}`}>
+                    <td className="px-4 py-2 font-medium max-w-[250px] truncate">{race.name}</td>
+                    <td className="px-4 py-2 text-muted-foreground whitespace-nowrap">{race.date}</td>
+                    <td className="px-4 py-2">
+                      <Badge variant="outline" className="text-xs">{race.discipline}</Badge>
+                    </td>
+                    <td className="px-4 py-2 text-center">
+                      {race.hasStartlist ? <span className="text-emerald-500">✅</span> : <span className="text-red-400">❌</span>}
+                    </td>
+                    <td className="px-4 py-2 text-center">
+                      {race.hasPredictions ? <span className="text-emerald-500">✅</span> : <span className="text-red-400">❌</span>}
+                    </td>
+                    <td className="px-4 py-2 text-center">
+                      {race.hasResults ? <span className="text-emerald-500">✅</span> : <span className="text-zinc-400">—</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <p className="text-xs text-muted-foreground text-right">
+        Data as of {new Date().toLocaleString("sv-SE", { timeZone: "Europe/Stockholm" })}
+      </p>
     </div>
   );
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
+// ─── Components ─────────────────────────────────────────────────────────────
+
+function StatCard({
+  title,
+  value,
+  items,
+}: {
+  title: string;
+  value: number;
+  items: Array<{ label: string; value: number; warn?: boolean }>;
+}) {
   return (
-    <div>
-      <p className="text-2xl font-bold">{value.toLocaleString()}</p>
-      <p className="text-xs text-muted-foreground">{label}</p>
-    </div>
+    <Card className="bg-card/50 border-border/50">
+      <CardContent className="pt-4 pb-3">
+        <p className="text-2xl font-bold tabular-nums">{value.toLocaleString()}</p>
+        <p className="text-xs font-medium mt-0.5">{title}</p>
+        <div className="mt-2 space-y-0.5">
+          {items.map((item) => (
+            <p key={item.label} className={`text-xs ${item.warn ? "text-yellow-500" : "text-muted-foreground"}`}>
+              {item.value.toLocaleString()} {item.label}
+            </p>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
