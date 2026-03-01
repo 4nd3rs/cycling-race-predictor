@@ -320,6 +320,84 @@ async function importResults(
   return { inserted, skipped, errors };
 }
 
+
+// ─── PCS URL auto-discovery & healing (road only) ────────────────────────────
+
+function slugifyRaceName(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s*[-–|]\s*(elite|u23|under 23|junior|men|women|masculin|feminin).*$/i, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .trim().replace(/^-|-$/g, "");
+}
+
+async function tryPCSUrl(url: string): Promise<number> {
+  try {
+    const html = await scrapeDo(url, { render: true, timeout: 20000 });
+    const $ = cheerio.load(html);
+    const title = $("title").text().toLowerCase();
+    if (title.includes("not found") || title.includes("error")) return 0;
+    const table = $("table.results, table[class*=\'result\']").first();
+    if (!table.length) return 0;
+    return table.find("tbody tr").length;
+  } catch { return 0; }
+}
+
+async function discoverPCSUrl(race: RaceToProcess): Promise<string | null> {
+  if (race.discipline === "mtb") return null;
+  const year = race.date.substring(0, 4);
+  const slug = slugifyRaceName(race.name);
+  if (!slug) return null;
+
+  const candidates = [
+    `https://www.procyclingstats.com/race/${slug}/${year}`,
+    `https://www.procyclingstats.com/race/${slug}`,
+  ];
+
+  for (const url of candidates) {
+    const resultUrl = `${url}/result`;
+    console.log(`   🔍 Trying: ${resultUrl}`);
+    const count = await tryPCSUrl(resultUrl);
+    if (count > 5) {
+      console.log(`   ✅ Discovered: ${url} (${count} results)`);
+      await db.update(schema.races).set({ pcsUrl: url }).where(eq(schema.races.id, race.id));
+      return url;
+    }
+    await sleep(1000);
+  }
+  return null;
+}
+
+async function healPCSUrl(race: RaceToProcess): Promise<string | null> {
+  if (!race.pcsUrl || race.discipline === "mtb") return null;
+  const url = race.pcsUrl;
+  const year = new Date().getFullYear();
+
+  const variants = [
+    url.replace("brussels", "brussel"),
+    url.replace("brussel", "brussels"),
+    url.replace("ghent", "gent"),
+    url.replace("gent-", "ghent-"),
+    url.replace(/\/\d{4}$/, `/${year}`),
+  ].filter(v => v !== url);
+
+  for (const variant of variants) {
+    const resultUrl = `${variant}/result`;
+    console.log(`   🔧 Trying variant: ${resultUrl}`);
+    const count = await tryPCSUrl(resultUrl);
+    if (count > 5) {
+      console.log(`   🔧 Healed pcsUrl: ${url} → ${variant}`);
+      await db.update(schema.races).set({ pcsUrl: variant }).where(eq(schema.races.id, race.id));
+      return variant;
+    }
+    await sleep(1000);
+  }
+  return null;
+}
+
 // ─── Per-race orchestration ────────────────────────────────────────────────────
 
 interface RaceToProcess {
@@ -336,10 +414,21 @@ interface RaceToProcess {
 }
 
 async function processRace(
-  race: RaceToProcess
+  raceInput: RaceToProcess
 ): Promise<{ inserted: number; status: string }> {
+  let race = raceInput;
 
-  if (!race.pcsUrl) {
+  // Auto-discover pcsUrl for road races missing it
+  if (!race.pcsUrl && race.discipline !== "mtb") {
+    console.log(`   🔍 Auto-discovering pcsUrl for ${race.name}…`);
+    const discovered = await discoverPCSUrl(race);
+    if (discovered) {
+      race = { ...race, pcsUrl: discovered };
+    } else {
+      console.log(`   ⏭️  Could not discover pcsUrl — skipping`);
+      return { inserted: 0, status: "no-pcsurl" };
+    }
+  } else if (!race.pcsUrl) {
     console.log(`⏭️  ${race.name}: no pcsUrl — skipping`);
     return { inserted: 0, status: "no-pcsurl" };
   }
@@ -371,11 +460,18 @@ async function processRace(
       allResults = res.length > 0 ? res : await scrapeResultsFromPage(`${race.pcsUrl}/gc`);
     }
   } else {
-    // One-day race — up to 2 attempts
+    // One-day race — up to 2 attempts, then try URL healing
     allResults = await scrapeResultsFromPage(`${race.pcsUrl}/result`);
     if (allResults.length === 0) {
       await sleep(3000);
       allResults = await scrapeResultsFromPage(`${race.pcsUrl}/result`, undefined, 2);
+    }
+    if (allResults.length === 0 && race.pcsUrl) {
+      const healed = await healPCSUrl(race);
+      if (healed) {
+        race = { ...race, pcsUrl: healed };
+        allResults = await scrapeResultsFromPage(`${healed}/result`);
+      }
     }
   }
 
@@ -533,10 +629,31 @@ async function main() {
     raceRows,
   });
 
+  // ── Stale race detection ──────────────────────────────────────────────────
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+  const staleRows = await db.select({
+    id: schema.races.id, name: schema.races.name, date: schema.races.date, pcsUrl: schema.races.pcsUrl,
+  })
+  .from(schema.races)
+  .where(and(
+    or(isNull(schema.races.status), ne(schema.races.status, "completed")),
+    isNotNull(schema.races.pcsUrl),
+    sql`${schema.races.date} < ${yesterday}`,
+    sql`${schema.races.discipline} = 'road'`,
+  ));
+
+  if (staleRows.length > 0) {
+    console.log(`\n⚠️  ${staleRows.length} stale road race(s) — results overdue:`);
+    staleRows.forEach(r => {
+      const days = Math.floor((Date.now() - new Date(r.date).getTime()) / 86400000);
+      console.log(`   • ${r.name} (${r.date}) — ${days}d overdue`);
+    });
+  }
+
   console.log(`\n─────────────────────────────`);
   console.log(`Total: ${totalInserted} results imported`);
   if (noPcs.length > 0) {
-    console.log(`\n⚠️  ${noPcs.length} race(s) have no pcsUrl:`);
+    console.log(`\n⚠️  ${noPcs.length} road race(s) have no pcsUrl:`);
     noPcs.forEach(r => console.log(`   • ${r.name} (${r.date})`));
   }
 }
