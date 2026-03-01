@@ -137,7 +137,7 @@ async function fetchData(sql: ReturnType<typeof neon>) {
       FROM race_results rr
       JOIN riders r ON r.id = rr.rider_id
       WHERE rr.race_id = ${race.id}
-      ORDER BY rr.position ASC LIMIT 5
+      ORDER BY rr.position ASC LIMIT 10
     ` : [];
     return { event, race, preds: [], results };
   }
@@ -324,42 +324,48 @@ function PreviewCard({ event, race, preds }: any) {
 function ResultsCard({ event, race, results }: any) {
   const country = event.country ?? "";
   const discipline = (event.discipline ?? "").toUpperCase();
+  const nameLen = String(event.name).length;
+  const nameFontSize = nameLen > 35 ? 72 : nameLen > 24 ? 88 : 104;
 
   return (
-    <div style={{ width: W, height: H, background: BLACK, display: "flex", flexDirection: "column", fontFamily: "Barlow Condensed", position: "relative", overflow: "hidden" }}>
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 8, background: RED }} />
+    <div style={{ width: W, height: H, background: BLACK, display: "flex", flexDirection: "column", fontFamily: "Barlow Condensed", overflow: "hidden" }}>
+      {/* Top red border */}
+      <div style={{ height: 8, background: RED, flexShrink: 0 }} />
+      {/* Left red bar — absolute */}
       <div style={{ position: "absolute", left: 0, top: 8, bottom: 0, width: 8, background: RED }} />
-
-      <div style={{ display: "flex", flexDirection: "column", padding: "120px 96px 0 96px", flex: 1 }}>
-        <span style={{ fontSize: 20, fontWeight: 700, color: RED, letterSpacing: "0.18em", fontFamily: "Inter", marginBottom: 28 }}>
+      {/* Header */}
+      <div style={{ display: "flex", flexDirection: "column", padding: "44px 88px 0 96px", flexShrink: 0 }}>
+        <span style={{ fontSize: 28, fontWeight: 700, color: RED, letterSpacing: "0.18em", fontFamily: "Inter", marginBottom: 14 }}>
           {gender === "women" ? "WOMEN  ·  RESULTS" : "RESULTS"}
         </span>
-
-        <span style={{ fontSize: event.name.length > 35 ? 88 : event.name.length > 24 ? 104 : 126, fontWeight: 800, color: WHITE, textTransform: "uppercase", lineHeight: 1.0, letterSpacing: "-0.01em", marginBottom: 64 }}>
+        <span style={{ fontSize: nameFontSize, fontWeight: 800, color: WHITE, textTransform: "uppercase", lineHeight: 1.0, letterSpacing: "-0.01em", marginBottom: 18 }}>
           {event.name.toUpperCase()}
         </span>
-
-        <span style={{ fontSize: 24, fontWeight: 700, color: RED, letterSpacing: "0.1em", fontFamily: "Inter", marginBottom: 12 }}>
+        <span style={{ fontSize: 30, fontWeight: 700, color: RED, letterSpacing: "0.1em", fontFamily: "Inter", marginBottom: 6 }}>
           {[country, discipline].filter(Boolean).join("  ·  ")}
         </span>
-        <span style={{ fontSize: 28, fontWeight: 700, color: RED, fontFamily: "Inter", marginBottom: 48 }}>
+        <span style={{ fontSize: 31, fontWeight: 700, color: RED, fontFamily: "Inter", marginBottom: 0 }}>
           {race?.date ? fmtDate(race.date) : ""}
         </span>
-
-        <div style={{ width: "100%", height: 1, background: DIMMED, marginBottom: 48 }} />
-
-        {results.slice(0, 3).map((r: any, i: number) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 24, marginBottom: 36 }}>
-            <span style={{ fontSize: 44, fontWeight: 800, color: WHITE, width: 48, flexShrink: 0 }}>
-              {i + 1}.
+      </div>
+      {/* Results block — fills remaining space evenly */}
+      <div style={{ display: "flex", flexDirection: "column", padding: "0 88px 0 96px", flex: 1, justifyContent: "space-between" }}>
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          <div style={{ height: 1, background: DIMMED, marginBottom: 14 }} />
+          <span style={{ fontSize: 25, fontWeight: 700, color: WHITE, letterSpacing: "0.14em", fontFamily: "Inter" }}>TOP 10</span>
+        </div>
+        {results.slice(0, 10).map((r: any, i: number) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <span style={{ fontSize: i < 3 ? 28 : 22, fontWeight: 800, color: i < 3 ? WHITE : MUTED, width: 32, flexShrink: 0, fontFamily: "Inter" }}>
+              {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`}
             </span>
-            <RiderAvatar photoDataUri={r._photoDataUri ?? null} name={r.rider_name} size={80} />
+            <RiderAvatar photoDataUri={r._photoDataUri ?? null} name={r.rider_name} size={i < 3 ? 68 : 52} />
             <div style={{ display: "flex", flexDirection: "column" }}>
-              <span style={{ fontSize: i === 0 ? 58 : 48, fontWeight: 800, color: i === 0 ? WHITE : "#A09888", lineHeight: 1 }}>
+              <span style={{ fontSize: i === 0 ? 49 : i < 3 ? 42 : 34, fontWeight: 800, color: i === 0 ? WHITE : i < 3 ? "#C8C0B8" : "#A09888", lineHeight: 1 }}>
                 {r.rider_name}
               </span>
-              {r.nationality && (
-                <span style={{ fontSize: 20, color: MUTED, fontFamily: "Inter", marginTop: 4 }}>{r.nationality}</span>
+              {r.nationality && i < 5 && (
+                <span style={{ fontSize: 18, color: MUTED, fontFamily: "Inter", marginTop: 2 }}>{r.nationality}</span>
               )}
             </div>
           </div>
