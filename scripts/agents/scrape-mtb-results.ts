@@ -18,6 +18,7 @@ import { eq, and, gte, lte, or, isNull, ne } from "drizzle-orm";
 import * as schema from "../../src/lib/db/schema";
 import * as cheerio from "cheerio";
 import { scrapeDo } from "../../src/lib/scraper/scrape-do";
+import { execSync } from "child_process";
 import { processRaceElo } from "../../src/lib/prediction/process-race-elo";
 import { writeScrapeStatus, type RaceRow } from "./lib/scrape-status";
 
@@ -416,6 +417,30 @@ async function processRace(race: DBRace): Promise<{ inserted: number; status: st
       console.log(`   🎯 ELO: ${eloUpdates} rider ratings updated`);
     } catch (e: any) {
       console.warn(`   ⚠️  ELO update failed: ${e.message}`);
+    }
+
+    // Refresh predictions for upcoming MTB races after ELO shift
+    if (!dryRun) {
+      try {
+        execSync(
+          `node_modules/.bin/tsx scripts/agents/generate-predictions.ts --discipline mtb --days 30`,
+          { cwd: process.cwd(), stdio: "pipe" }
+        );
+        console.log(`   🔮 Predictions refreshed for upcoming MTB races`);
+      } catch (err: any) {
+        console.warn(`   ⚠️  Prediction refresh failed: ${(err as any).message?.slice(0, 100)}`);
+      }
+
+      // Trigger marketing post for MTB results
+      try {
+        execSync(
+          `node_modules/.bin/tsx scripts/agents/marketing-agent.ts`,
+          { cwd: process.cwd(), stdio: "pipe", timeout: 60000 }
+        );
+        console.log(`   📣 Marketing agent triggered`);
+      } catch (err: any) {
+        console.warn(`   ⚠️  Marketing agent failed: ${(err as any).message?.slice(0, 100)}`);
+      }
     }
   }
 

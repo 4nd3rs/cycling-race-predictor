@@ -255,6 +255,8 @@ const raceIdIdx = args.indexOf("--race-id");
 const SINGLE_RACE_ID = raceIdIdx !== -1 ? args[raceIdIdx + 1] : null;
 const daysIdx = args.indexOf("--days");
 const daysAhead = daysIdx !== -1 ? parseInt(args[daysIdx + 1]) : null;
+const disciplineIdx = args.indexOf("--discipline");
+const FILTER_DISCIPLINE = disciplineIdx !== -1 ? args[disciplineIdx + 1] : null;
 
 const MIN_STARTLIST = 3;
 
@@ -436,7 +438,12 @@ async function main() {
   const maxDate = new Date(Date.now() + days * 86400000).toISOString().split("T")[0];
 
   const races = await db.query.races.findMany({
-    where: and(eq(schema.races.status, "active"), gte(schema.races.date, today), lte(schema.races.date, maxDate)),
+    where: and(
+      eq(schema.races.status, "active"),
+      gte(schema.races.date, today),
+      lte(schema.races.date, maxDate),
+      ...(FILTER_DISCIPLINE ? [eq(schema.races.discipline, FILTER_DISCIPLINE)] : []),
+    ),
     orderBy: (r, { asc }) => [asc(r.date)],
   });
 

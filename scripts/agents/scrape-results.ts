@@ -20,6 +20,7 @@ config({ path: ".env.local" });
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
 import { eq, and, gte, lte, or, isNull, ne, sql } from "drizzle-orm";
+import { execSync } from "child_process";
 import * as schema from "../../src/lib/db/schema";
 import * as cheerio from "cheerio";
 import { scrapeDo } from "../../src/lib/scraper/scrape-do";
@@ -506,6 +507,30 @@ async function processRace(
         console.log(`   🎯 ELO: ${eloUpdates} rider ratings updated`);
       } catch (err: any) {
         console.warn(`   ⚠️  ELO update failed: ${err.message}`);
+      }
+
+      // Refresh predictions for upcoming races of same discipline after ELO shift
+      if (!dryRun) {
+        try {
+          execSync(
+            `node_modules/.bin/tsx scripts/agents/generate-predictions.ts --discipline ${race.discipline} --days 30`,
+            { cwd: process.cwd(), stdio: "pipe" }
+          );
+          console.log(`   🔮 Predictions refreshed for upcoming ${race.discipline} races`);
+        } catch (err: any) {
+          console.warn(`   ⚠️  Prediction refresh failed: ${(err as any).message?.slice(0, 100)}`);
+        }
+
+        // Trigger marketing post for this race's results
+        try {
+          execSync(
+            `node_modules/.bin/tsx scripts/agents/marketing-agent.ts`,
+            { cwd: process.cwd(), stdio: "pipe", timeout: 60000 }
+          );
+          console.log(`   📣 Marketing agent triggered`);
+        } catch (err: any) {
+          console.warn(`   ⚠️  Marketing agent failed: ${(err as any).message?.slice(0, 100)}`);
+        }
       }
     }
   }
