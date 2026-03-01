@@ -356,15 +356,15 @@ function ResultsCard({ event, race, results }: any) {
         </div>
         {results.slice(0, 10).map((r: any, i: number) => (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <span style={{ fontSize: i < 3 ? 28 : 22, fontWeight: 800, color: i < 3 ? WHITE : MUTED, width: 32, flexShrink: 0, fontFamily: "Inter" }}>
+            <span style={{ fontSize: i < 3 ? 28 : 22, fontWeight: 800, color: WHITE, width: 32, flexShrink: 0, fontFamily: "Inter" }}>
               {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`}
             </span>
-            <RiderAvatar photoDataUri={r._photoDataUri ?? null} name={r.rider_name} size={i < 3 ? 68 : 52} />
+            {i < 3 && <RiderAvatar photoDataUri={r._photoDataUri ?? null} name={r.rider_name} size={68} />}
             <div style={{ display: "flex", flexDirection: "column" }}>
-              <span style={{ fontSize: i === 0 ? 49 : i < 3 ? 42 : 34, fontWeight: 800, color: i === 0 ? WHITE : i < 3 ? "#C8C0B8" : "#A09888", lineHeight: 1 }}>
+              <span style={{ fontSize: i === 0 ? 49 : i < 3 ? 42 : 34, fontWeight: 800, color: WHITE, lineHeight: 1 }}>
                 {r.rider_name}
               </span>
-              {r.nationality && i < 5 && (
+              {r.nationality && i < 3 && (
                 <span style={{ fontSize: 18, color: MUTED, fontFamily: "Inter", marginTop: 2 }}>{r.nationality}</span>
               )}
             </div>
