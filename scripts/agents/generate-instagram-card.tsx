@@ -137,7 +137,7 @@ async function fetchData(sql: ReturnType<typeof neon>) {
       FROM race_results rr
       JOIN riders r ON r.id = rr.rider_id
       WHERE rr.race_id = ${race.id}
-      ORDER BY rr.position ASC LIMIT 10
+      ORDER BY rr.position ASC LIMIT 5
     ` : [];
     return { event, race, preds: [], results };
   }
@@ -321,60 +321,115 @@ function PreviewCard({ event, race, preds }: any) {
   );
 }
 
+const ISO3_TO_ISO2: Record<string, string> = {
+  BEL:"be",FRA:"fr",NED:"nl",NL:"nl",GBR:"gb",ITA:"it",ESP:"es",GER:"de",
+  SUI:"ch",AUT:"at",DEN:"dk",NOR:"no",SWE:"se",POL:"pl",CZE:"cz",SVK:"sk",
+  AUS:"au",USA:"us",CAN:"ca",COL:"co",ECU:"ec",SLO:"si",CRO:"hr",HUN:"hu",
+  POR:"pt",RSA:"za",ERI:"er",ETH:"et",KAZ:"kz",JPN:"jp",NZL:"nz",IRL:"ie",
+  LAT:"lv",LTU:"lt",EST:"ee",GRE:"gr",TUR:"tr",UKR:"ua",ROU:"ro",BUL:"bg",
+  SRB:"rs",RSM:"sm",LUX:"lu",AND:"ad",RUS:"ru",BLR:"by",GEO:"ge",ARM:"am",
+  ISR:"il",MAR:"ma",ALG:"dz",TUN:"tn",CHN:"cn",KOR:"kr",IND:"in",BRA:"br",
+  ARG:"ar",MEX:"mx",VEN:"ve",PAN:"pa",CRC:"cr",DOM:"do",PUR:"pr",GBR:"gb",
+  DEN:"dk",SUI:"ch",NED:"nl",AUT:"at",
+};
+
+async function fetchFlagDataUri(iso3: string): Promise<string | null> {
+  const cc = ISO3_TO_ISO2[iso3?.toUpperCase()];
+  if (!cc) return null;
+  return fetchImageAsDataUri(`https://flagcdn.com/40x30/${cc}.png`);
+}
+
+function FlagImg({ dataUri, size = 28 }: { dataUri: string | null; size?: number }) {
+  if (!dataUri) return null;
+  return (
+    <img src={dataUri} style={{ width: Math.round(size * 1.33), height: size, objectFit: "cover", borderRadius: 3, flexShrink: 0 }} alt="" />
+  );
+}
+
 function ResultsCard({ event, race, results }: any) {
   const country = event.country ?? "";
   const discipline = (event.discipline ?? "").toUpperCase();
   const nameLen = String(event.name).length;
-  const nameFontSize = nameLen > 35 ? 72 : nameLen > 24 ? 88 : 104;
+  const nameFontSize = nameLen > 40 ? 56 : nameLen > 28 ? 68 : 80;
+
+  const top5 = results.slice(0, 5);
 
   return (
-    <div style={{ width: W, height: H, background: BLACK, display: "flex", flexDirection: "column", fontFamily: "Barlow Condensed", overflow: "hidden" }}>
-      {/* Top red border */}
+    <div style={{ width: W, height: H, background: "#0E0E0E", display: "flex", flexDirection: "column", fontFamily: "Barlow Condensed", overflow: "hidden" }}>
+      {/* Top accent */}
       <div style={{ height: 8, background: RED, flexShrink: 0 }} />
-      {/* Left red bar — absolute */}
       <div style={{ position: "absolute", left: 0, top: 8, bottom: 0, width: 8, background: RED }} />
+
       {/* Header */}
-      <div style={{ display: "flex", flexDirection: "column", padding: "44px 88px 0 96px", flexShrink: 0 }}>
-        <span style={{ fontSize: 28, fontWeight: 700, color: RED, letterSpacing: "0.18em", fontFamily: "Inter", marginBottom: 14 }}>
-          {gender === "women" ? "WOMEN  ·  RESULTS" : "RESULTS"}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", padding: "48px 72px 0 96px", flexShrink: 0 }}>
+        <span style={{ fontSize: 26, fontWeight: 700, color: RED, letterSpacing: "0.22em", fontFamily: "Inter", marginBottom: 8 }}>
+          {gender === "women" ? "WOMEN  ·  RACE RESULTS" : "RACE RESULTS"}
         </span>
-        <span style={{ fontSize: nameFontSize, fontWeight: 800, color: WHITE, textTransform: "uppercase", lineHeight: 1.0, letterSpacing: "-0.01em", marginBottom: 18 }}>
+        <span style={{ fontSize: nameFontSize, fontWeight: 800, color: WHITE, textTransform: "uppercase", lineHeight: 1.0, letterSpacing: "-0.01em", marginBottom: 16 }}>
           {event.name.toUpperCase()}
         </span>
-        <span style={{ fontSize: 30, fontWeight: 700, color: RED, letterSpacing: "0.1em", fontFamily: "Inter", marginBottom: 6 }}>
-          {[country, discipline].filter(Boolean).join("  ·  ")}
-        </span>
-        <span style={{ fontSize: 31, fontWeight: 700, color: RED, fontFamily: "Inter", marginBottom: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+          <FlagImg dataUri={(event as any)._flagDataUri} size={30} />
+          <span style={{ fontSize: 28, fontWeight: 700, color: "#A09888", fontFamily: "Inter" }}>
+            {[country, discipline].filter(Boolean).join("  ·  ")}
+          </span>
+        </div>
+        <span style={{ fontSize: 26, fontWeight: 700, color: RED, fontFamily: "Inter", marginBottom: 0 }}>
           {race?.date ? fmtDate(race.date) : ""}
         </span>
       </div>
-      {/* Results block — uniform list, podium highlighted by size + photo */}
-      <div style={{ display: "flex", flexDirection: "column", padding: "0 88px 0 96px", flex: 1, justifyContent: "space-between" }}>
-        <div style={{ display: "flex", flexDirection: "column" }}>
-          <div style={{ height: 1, background: DIMMED, marginBottom: 12 }} />
-          <span style={{ fontSize: 22, fontWeight: 700, color: WHITE, letterSpacing: "0.14em", fontFamily: "Inter" }}>TOP 10</span>
+
+      {/* Results table */}
+      <div style={{ display: "flex", flexDirection: "column", padding: "0 72px 0 96px", flex: 1, justifyContent: "center", gap: 16 }}>
+        {/* Column headers */}
+        <div style={{ display: "flex", alignItems: "center", paddingBottom: 12, borderBottom: `1px solid ${DIMMED}` }}>
+          <span style={{ fontSize: 20, fontWeight: 700, color: MUTED, fontFamily: "Inter", width: 56, flexShrink: 0 }}>POS</span>
+          <span style={{ fontSize: 20, fontWeight: 700, color: MUTED, fontFamily: "Inter", flex: 1 }}>RIDER</span>
         </div>
-        {results.slice(0, 10).map((r: any, i: number) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <span style={{ fontSize: i < 3 ? 38 : 30, fontWeight: 800, color: i < 3 ? RED : WHITE, width: 44, flexShrink: 0, fontFamily: "Barlow Condensed", lineHeight: 1 }}>
-              {i + 1}.
-            </span>
-            {i < 3 && <RiderAvatar photoDataUri={r._photoDataUri ?? null} name={r.rider_name} size={52} />}
-            <span style={{ fontSize: i === 0 ? 48 : i < 3 ? 42 : 34, fontWeight: 800, color: WHITE, lineHeight: 1, flex: 1 }}>
-              {r.rider_name}
-            </span>
-          </div>
-        ))}
+        {/* Rows */}
+        {top5.map((r: any, i: number) => {
+          const isPodium = i < 3;
+          return (
+            <div key={i} style={{
+              display: "flex", alignItems: "center",
+              background: isPodium ? "#1A1614" : "#141210",
+              borderRadius: 8,
+              padding: isPodium ? "18px 20px" : "14px 20px",
+              border: isPodium ? `1px solid ${i === 0 ? RED : DIMMED}` : "1px solid #1E1A18",
+            }}>
+              <span style={{
+                fontSize: isPodium ? 52 : 40, fontWeight: 800, color: i === 0 ? RED : WHITE,
+                width: 56, flexShrink: 0, fontFamily: "Barlow Condensed", lineHeight: 1,
+              }}>{i + 1}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1 }}>
+                {isPodium && <RiderAvatar photoDataUri={r._photoDataUri ?? null} name={r.rider_name} size={i === 0 ? 72 : 60} />}
+                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <FlagImg dataUri={r._flagDataUri} size={isPodium ? 24 : 20} />
+                    <span style={{ fontSize: isPodium ? (i === 0 ? 46 : 40) : 34, fontWeight: 800, color: WHITE, lineHeight: 1 }}>
+                      {r.rider_name}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "28px 96px 52px 96px", borderTop: `1px solid ${DIMMED}` }}>
-        <span style={{ fontSize: 20, fontWeight: 400, color: WHITE, letterSpacing: "0.06em", fontFamily: "Inter" }}>procyclingpredictor.com</span>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
-            <span style={{ fontSize: 16, fontWeight: 700, color: WHITE, letterSpacing: "0.1em", textTransform: "uppercase" }}>Pro Cycling</span>
-            <span style={{ fontSize: 22, fontWeight: 800, color: RED, letterSpacing: "0.02em", textTransform: "uppercase" }}>Predictor</span>
+      {/* URL bar */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 72px 48px 96px", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, background: "#1A1614", borderRadius: 40, padding: "14px 32px", border: `1px solid ${DIMMED}` }}>
+          <span style={{ fontSize: 26, fontWeight: 700, color: WHITE, fontFamily: "Inter", letterSpacing: "0.02em" }}>
+            procyclingpredictor.com
+          </span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+            <span style={{ fontSize: 16, fontWeight: 700, color: WHITE, letterSpacing: "0.1em" }}>PRO CYCLING</span>
+            <span style={{ fontSize: 20, fontWeight: 800, color: RED }}>PREDICTOR</span>
           </div>
-          <BibIcon size={60} />
+          <BibIcon size={52} />
         </div>
       </div>
     </div>
@@ -394,13 +449,17 @@ async function main() {
   const sql = neon(process.env.DATABASE_URL!);
   const { event, race, preds, results } = await fetchData(sql);
 
-  // Pre-fetch all rider photos as data URIs in parallel
+  // Pre-fetch all rider photos + flags as data URIs in parallel
   const rows = cardType === "preview" ? preds : results;
   console.log(`Fetching photos for ${rows.length} riders...`);
-  const photoUris = await Promise.all(
-    rows.map((r: any) => resolveRiderPhoto(r.photo_url ?? null, r.rider_name ?? r.name ?? ""))
-  );
-  rows.forEach((r: any, i: number) => { r._photoDataUri = photoUris[i]; });
+  const [photoUris, flagUris] = await Promise.all([
+    Promise.all(rows.map((r: any) => resolveRiderPhoto(r.photo_url ?? null, r.rider_name ?? r.name ?? ""))),
+    Promise.all(rows.map((r: any) => fetchFlagDataUri(r.nationality ?? ""))),
+  ]);
+  rows.forEach((r: any, i: number) => { r._photoDataUri = photoUris[i]; r._flagDataUri = flagUris[i]; });
+  // Also pre-fetch event country flag
+  const eventFlagUri = await fetchFlagDataUri(event.country ?? "");
+  (event as any)._flagDataUri = eventFlagUri;
 
   const card = cardType === "preview"
     ? React.createElement(PreviewCard, { event, race, preds })
