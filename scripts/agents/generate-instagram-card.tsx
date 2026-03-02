@@ -272,9 +272,7 @@ function PreviewCard({ event, race, preds }: any) {
           <div style={{ display: "flex", alignItems: "center", gap: 20, marginTop: 20 }}>
             <FlagImg dataUri={top?._flagDataUri} size={36} />
             <span style={{ fontSize: 110, fontWeight: 800, color: RED, lineHeight: 1, letterSpacing: "-0.03em" }}>{topPct}%</span>
-            <div style={{ display: "flex", alignItems: "center" }}>
-              <ProbBar pct={topPct} width={200} />
-            </div>
+
           </div>
         </div>
 
