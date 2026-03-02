@@ -147,11 +147,11 @@ async function fetchData(sql: ReturnType<typeof neon>) {
 const W = 1080;
 const H = isStories ? 1920 : 1080;
 const RED = "#C8102E";
-const BLACK = "#0D0D0D";
+const BLACK = "#16171B";
 const WHITE = "#F2EDE6";
-const MUTED = "#7A7065";
-const DIMMED = "#3A3530";
-const CARD_BG = "#161412";
+const MUTED = "#888890";
+const DIMMED = "#2A2B30";
+const CARD_BG = "#1E1F24";
 
 function ProbBar({ pct, width = 400 }: { pct: number; width?: number }) {
   const fill = Math.max(4, Math.round((pct / 100) * width));
@@ -166,7 +166,7 @@ function BibIcon({ size = 56 }: { size?: number }) {
   const s = size / 200;
   return (
     <div style={{ width: size, height: size, background: BLACK, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", flexShrink: 0 }}>
-      <div style={{ position: "absolute", left: Math.round(22*s), top: Math.round(14*s), width: Math.round(156*s), height: Math.round(172*s), background: WHITE, borderRadius: Math.round(7*s) }} />
+      <div style={{ position: "absolute", left: Math.round(22*s), top: Math.round(14*s), width: Math.round(156*s), height: Math.round(172*s), background: WHITE, borderRadius: Math.round(7*s), display: "flex" }} />
       {[{l:33,t:25},{l:152,t:25},{l:33,t:161},{l:152,t:161}].map((p,i)=>(
         <div key={i} style={{ position:"absolute", left:Math.round(p.l*s), top:Math.round(p.t*s), width:Math.round(11*s), height:Math.round(11*s), borderRadius:"50%", background:BLACK }} />
       ))}
@@ -177,18 +177,33 @@ function BibIcon({ size = 56 }: { size?: number }) {
   );
 }
 
-function RiderAvatar({ photoDataUri, name, size = 72 }: { photoDataUri: string | null; name: string; size?: number }) {
+function RiderAvatar({ photoDataUri, name, size = 72, glow = false }: { photoDataUri: string | null; name: string; size?: number; glow?: boolean }) {
+  const ring = glow ? `3px solid ${RED}` : `2px solid ${DIMMED}`;
+  const glowShadow = `0 0 ${Math.round(size*0.3)}px ${RED}66`;
   if (photoDataUri) {
     return (
-      <div style={{ width: size, height: size, borderRadius: "50%", overflow: "hidden", flexShrink: 0, border: `2px solid ${DIMMED}`, display: "flex" }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
+      <div style={{ width: size, height: size, borderRadius: "50%", overflow: "hidden", flexShrink: 0, border: ring, display: "flex", boxShadow: glow ? glowShadow : "none" }}>
         <img src={photoDataUri} style={{ width: size, height: size, objectFit: "cover" }} alt={name} />
       </div>
     );
   }
+  // Diagonal stripe pattern avatar
+  const stripeCount = 6;
+  const stripes = Array.from({ length: stripeCount }, (_, i) => i);
   return (
-    <div style={{ width: size, height: size, borderRadius: "50%", background: DIMMED, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", border: `2px solid ${CARD_BG}` }}>
-      <span style={{ fontSize: Math.round(size * 0.3), fontWeight: 700, color: MUTED, fontFamily: "Barlow Condensed" }}>
+    <div style={{ width: size, height: size, borderRadius: "50%", flexShrink: 0, border: ring, display: "flex", alignItems: "center", justifyContent: "center", background: "#22232A", overflow: "hidden", position: "relative", boxShadow: glow ? glowShadow : "none" }}>
+      {stripes.map((i) => (
+        <div key={i} style={{
+          position: "absolute",
+          width: Math.round(size * 0.18),
+          height: size * 2,
+          background: i % 2 === 0 ? `${RED}33` : "transparent",
+          left: Math.round((i / stripeCount) * size * 1.2 - size * 0.1),
+          top: -size * 0.5,
+          transform: "rotate(-30deg)",
+        }} />
+      ))}
+      <span style={{ fontSize: Math.round(size * 0.28), fontWeight: 800, color: WHITE, fontFamily: "Barlow Condensed", position: "relative", letterSpacing: "-0.02em" }}>
         {initials(name)}
       </span>
     </div>
@@ -222,64 +237,80 @@ function PreviewCard({ event, race, preds }: any) {
   const nameFontSizeStory = nameLen > 35 ? 88 : nameLen > 24 ? 104 : 126;
 
   if (isStories) {
-    // ── STORIES (1080×1920) — hero #1 + ranked list below ──
+    // ── STORIES (1080×1920) — NB-inspired design ──
     const nameFontSize = nameFontSizeStory;
     const top = preds[0];
     const rest = preds.slice(1);
     const topPct = top ? Math.round(Number(top.win_probability) * 100) : 0;
     return (
       <div style={{ width: W, height: H, background: BLACK, display: "flex", flexDirection: "column", fontFamily: "Barlow Condensed", overflow: "hidden" }}>
-        <div style={{ height: 8, background: RED, flexShrink: 0 }} />
-        <div style={{ position: "absolute", left: 0, top: 8, bottom: 0, width: 8, background: RED }} />
 
-        {/* Header */}
-        <div style={{ display: "flex", flexDirection: "column", padding: "44px 80px 0 96px", flexShrink: 0 }}>
-          <span style={{ fontSize: 24, fontWeight: 700, color: RED, letterSpacing: "0.18em", fontFamily: "Inter", marginBottom: 10 }}>
+        {/* Top-left red corner block */}
+        <div style={{ position: "absolute", top: 0, left: 0, width: 220, height: 220, background: RED, borderRadius: "0 0 100% 0", display: "flex" }} />
+        {/* Thin red right border accent */}
+        <div style={{ position: "absolute", top: 0, right: 0, width: 6, height: H, background: `${RED}44`, display: "flex" }} />
+
+        {/* Header — over the red corner */}
+        <div style={{ display: "flex", flexDirection: "column", padding: "52px 80px 0 52px", flexShrink: 0 }}>
+          <span style={{ fontSize: 22, fontWeight: 700, color: WHITE, letterSpacing: "0.2em", fontFamily: "Inter", marginBottom: 4, textShadow: "0 1px 4px #00000088" }}>
             {gender === "women" ? "WOMEN  ·  RACE PREVIEW" : "RACE PREVIEW"}
           </span>
-          <span style={{ fontSize: nameFontSize, fontWeight: 800, color: WHITE, textTransform: "uppercase", lineHeight: 1.0, letterSpacing: "-0.01em", marginBottom: 12 }}>
+          <span style={{ fontSize: nameFontSize, fontWeight: 800, color: WHITE, textTransform: "uppercase", lineHeight: 1.0, letterSpacing: "-0.02em", marginBottom: 8, textShadow: "0 2px 8px #00000099" }}>
             {String(event.name).toUpperCase()}
           </span>
-          <span style={{ fontSize: 26, fontWeight: 700, color: RED, letterSpacing: "0.08em", fontFamily: "Inter", marginBottom: 4 }}>{metaParts}</span>
-          <span style={{ fontSize: 26, fontWeight: 700, color: RED, fontFamily: "Inter" }}>{race?.date ? fmtDate(race.date) : ""}</span>
+          <span style={{ fontSize: 24, fontWeight: 600, color: `${WHITE}AA`, letterSpacing: "0.08em", fontFamily: "Inter" }}>{metaParts}</span>
+          <span style={{ fontSize: 24, fontWeight: 600, color: `${WHITE}AA`, fontFamily: "Inter" }}>{race?.date ? fmtDate(race.date) : ""}</span>
         </div>
 
         {/* Hero #1 */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, padding: "0 80px" }}>
-          <span style={{ fontSize: 24, fontWeight: 700, color: RED, letterSpacing: "0.2em", fontFamily: "Inter", marginBottom: 28 }}>FAVOURITE TO WIN</span>
-          <RiderAvatar photoDataUri={top?._photoDataUri ?? null} name={top?.rider_name ?? ""} size={300} />
-          <span style={{ fontSize: 68, fontWeight: 800, color: WHITE, lineHeight: 1.05, marginTop: 28, textAlign: "center" }}>{top?.rider_name ?? ""}</span>
-          <div style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 18 }}>
-            <FlagImg dataUri={top?._flagDataUri} size={32} />
-            <span style={{ fontSize: 56, fontWeight: 800, color: RED, lineHeight: 1 }}>{topPct}%</span>
-            <ProbBar pct={topPct} width={260} />
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1 }}>
+          <span style={{ fontSize: 22, fontWeight: 700, color: RED, letterSpacing: "0.22em", fontFamily: "Inter", marginBottom: 32 }}>FAVOURITE TO WIN</span>
+          <RiderAvatar photoDataUri={top?._photoDataUri ?? null} name={top?.rider_name ?? ""} size={290} glow={true} />
+          <span style={{ fontSize: 72, fontWeight: 800, color: WHITE, lineHeight: 1.0, marginTop: 32, textAlign: "center", letterSpacing: "-0.02em", padding: "0 60px" }}>
+            {top?.rider_name ?? ""}
+          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 20 }}>
+            <FlagImg dataUri={top?._flagDataUri} size={34} />
+            <span style={{ fontSize: 64, fontWeight: 800, color: RED, lineHeight: 1 }}>{topPct}%</span>
+          </div>
+          <div style={{ width: 320, marginTop: 16, display: "flex" }}>
+            <ProbBar pct={topPct} width={320} />
           </div>
         </div>
 
-        {/* Rest of predictions */}
-        <div style={{ display: "flex", flexDirection: "column", padding: "0 80px 0 96px", flexShrink: 0 }}>
-          <div style={{ height: 1, background: DIMMED, marginBottom: 18 }} />
-          <span style={{ fontSize: 20, fontWeight: 700, color: WHITE, letterSpacing: "0.14em", fontFamily: "Inter", marginBottom: 18 }}>ALSO WATCH</span>
+        {/* Divider */}
+        <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "0 60px", marginBottom: 20, flexShrink: 0 }}>
+          <div style={{ flex: 1, height: 1, background: DIMMED }} />
+          <span style={{ fontSize: 18, fontWeight: 700, color: MUTED, letterSpacing: "0.18em", fontFamily: "Inter" }}>ALSO WATCH</span>
+          <div style={{ flex: 1, height: 1, background: DIMMED }} />
+        </div>
+
+        {/* Rest — card rows */}
+        <div style={{ display: "flex", flexDirection: "column", padding: "0 52px", gap: 10, flexShrink: 0 }}>
           {rest.map((p: any, i: number) => {
             const pct = Math.round(Number(p.win_probability) * 100);
             return (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
-                <span style={{ fontSize: 26, fontWeight: 800, color: MUTED, width: 30, flexShrink: 0, fontFamily: "Inter", lineHeight: 1 }}>{i + 2}.</span>
-                <RiderAvatar photoDataUri={p._photoDataUri ?? null} name={p.rider_name} size={52} />
-                <FlagImg dataUri={p._flagDataUri} size={22} />
-                <span style={{ fontSize: 36, fontWeight: 800, color: WHITE, flex: 1, lineHeight: 1 }}>{p.rider_name}</span>
-                <span style={{ fontSize: 30, fontWeight: 800, color: RED, lineHeight: 1 }}>{pct}%</span>
+              <div key={i} style={{
+                display: "flex", alignItems: "center", gap: 14,
+                background: CARD_BG, borderRadius: 12, padding: "14px 18px",
+                border: `1px solid ${DIMMED}`,
+              }}>
+                <span style={{ fontSize: 28, fontWeight: 800, color: MUTED, width: 30, flexShrink: 0, fontFamily: "Inter", lineHeight: 1 }}>{i + 2}</span>
+                <RiderAvatar photoDataUri={p._photoDataUri ?? null} name={p.rider_name} size={50} />
+                <FlagImg dataUri={p._flagDataUri} size={20} />
+                <span style={{ fontSize: 38, fontWeight: 800, color: WHITE, flex: 1, lineHeight: 1 }}>{p.rider_name}</span>
+                <span style={{ fontSize: 32, fontWeight: 800, color: RED, lineHeight: 1 }}>{pct}%</span>
               </div>
             );
           })}
         </div>
 
         {/* Brand footer */}
-        <div style={{ display: "flex", alignItems: "center", gap: 20, padding: "18px 80px 52px 96px", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "18px 52px 52px", flexShrink: 0 }}>
           <BibIcon size={44} />
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
             <span style={{ fontSize: 17, fontWeight: 800, color: RED, letterSpacing: "0.08em" }}>PRO CYCLING PREDICTOR</span>
-            <span style={{ fontSize: 20, fontWeight: 600, color: WHITE, fontFamily: "Inter" }}>procyclingpredictor.com</span>
+            <span style={{ fontSize: 20, fontWeight: 500, color: `${WHITE}99`, fontFamily: "Inter" }}>procyclingpredictor.com</span>
           </div>
         </div>
       </div>
@@ -376,63 +407,72 @@ function ResultsCard({ event, race, results }: any) {
   const rest = results.slice(1, 5);
 
   return (
-    <div style={{ width: W, height: H, background: "#0E0E0E", display: "flex", flexDirection: "column", fontFamily: "Barlow Condensed", overflow: "hidden" }}>
-      <div style={{ height: 8, background: RED, flexShrink: 0 }} />
-      <div style={{ position: "absolute", left: 0, top: 8, bottom: 0, width: 8, background: RED }} />
+    <div style={{ width: W, height: H, background: BLACK, display: "flex", flexDirection: "column", fontFamily: "Barlow Condensed", overflow: "hidden" }}>
+
+      {/* Top-left red corner block */}
+      <div style={{ position: "absolute", top: 0, left: 0, width: 220, height: 220, background: RED, borderRadius: "0 0 100% 0", display: "flex" }} />
+      {/* Thin red right border accent */}
+      <div style={{ position: "absolute", top: 0, right: 0, width: 6, height: H, background: `${RED}44`, display: "flex" }} />
 
       {/* Header */}
-      <div style={{ display: "flex", flexDirection: "column", padding: "44px 80px 0 96px", flexShrink: 0 }}>
-        <span style={{ fontSize: 24, fontWeight: 700, color: RED, letterSpacing: "0.22em", fontFamily: "Inter", marginBottom: 10 }}>
+      <div style={{ display: "flex", flexDirection: "column", padding: "52px 80px 0 52px", flexShrink: 0 }}>
+        <span style={{ fontSize: 22, fontWeight: 700, color: WHITE, letterSpacing: "0.2em", fontFamily: "Inter", marginBottom: 4, textShadow: "0 1px 4px #00000088" }}>
           {gender === "women" ? "WOMEN  ·  RACE RESULTS" : "RACE RESULTS"}
         </span>
-        <span style={{ fontSize: nameFontSize, fontWeight: 800, color: WHITE, textTransform: "uppercase", lineHeight: 1.0, letterSpacing: "-0.01em", marginBottom: 12 }}>
+        <span style={{ fontSize: nameFontSize, fontWeight: 800, color: WHITE, textTransform: "uppercase", lineHeight: 1.0, letterSpacing: "-0.02em", marginBottom: 8, textShadow: "0 2px 8px #00000099" }}>
           {event.name.toUpperCase()}
         </span>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
-          <FlagImg dataUri={(event as any)._flagDataUri} size={26} />
-          <span style={{ fontSize: 26, fontWeight: 700, color: "#A09888", fontFamily: "Inter" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <FlagImg dataUri={(event as any)._flagDataUri} size={24} />
+          <span style={{ fontSize: 24, fontWeight: 600, color: `${WHITE}AA`, fontFamily: "Inter" }}>
             {[country, discipline].filter(Boolean).join("  ·  ")}
           </span>
         </div>
-        <span style={{ fontSize: 26, fontWeight: 700, color: RED, fontFamily: "Inter" }}>
-          {race?.date ? fmtDate(race.date) : ""}
-        </span>
+        <span style={{ fontSize: 24, fontWeight: 600, color: `${WHITE}AA`, fontFamily: "Inter" }}>{race?.date ? fmtDate(race.date) : ""}</span>
       </div>
 
       {/* Hero winner */}
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, padding: "0 80px" }}>
-        <span style={{ fontSize: 24, fontWeight: 700, color: RED, letterSpacing: "0.2em", fontFamily: "Inter", marginBottom: 24 }}>WINNER</span>
-        <RiderAvatar photoDataUri={top?._photoDataUri ?? null} name={top?.rider_name ?? ""} size={300} />
-        <span style={{ fontSize: 68, fontWeight: 800, color: WHITE, lineHeight: 1.05, marginTop: 28, textAlign: "center" }}>{top?.rider_name ?? ""}</span>
-        <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 14 }}>
-          <FlagImg dataUri={top?._flagDataUri} size={32} />
-          {top?.nationality && <span style={{ fontSize: 28, fontWeight: 700, color: MUTED, fontFamily: "Inter" }}>{top.nationality}</span>}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1 }}>
+        <span style={{ fontSize: 22, fontWeight: 700, color: RED, letterSpacing: "0.22em", fontFamily: "Inter", marginBottom: 32 }}>WINNER</span>
+        <RiderAvatar photoDataUri={top?._photoDataUri ?? null} name={top?.rider_name ?? ""} size={290} glow={true} />
+        <span style={{ fontSize: 72, fontWeight: 800, color: WHITE, lineHeight: 1.0, marginTop: 32, textAlign: "center", letterSpacing: "-0.02em", padding: "0 60px" }}>
+          {top?.rider_name ?? ""}
+        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 16 }}>
+          <FlagImg dataUri={top?._flagDataUri} size={34} />
+          {top?.nationality && <span style={{ fontSize: 32, fontWeight: 700, color: MUTED, fontFamily: "Inter" }}>{top.nationality}</span>}
         </div>
       </div>
 
-      {/* Rest — 2-5 compact list */}
-      <div style={{ display: "flex", flexDirection: "column", padding: "0 80px 0 96px", flexShrink: 0 }}>
-        <div style={{ height: 1, background: DIMMED, marginBottom: 16 }} />
+      {/* Divider */}
+      <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "0 60px", marginBottom: 20, flexShrink: 0 }}>
+        <div style={{ flex: 1, height: 1, background: DIMMED }} />
+        <span style={{ fontSize: 18, fontWeight: 700, color: MUTED, letterSpacing: "0.18em", fontFamily: "Inter" }}>TOP 5</span>
+        <div style={{ flex: 1, height: 1, background: DIMMED }} />
+      </div>
+
+      {/* Positions 2-5 */}
+      <div style={{ display: "flex", flexDirection: "column", padding: "0 52px", gap: 10, flexShrink: 0 }}>
         {rest.map((r: any, i: number) => (
           <div key={i} style={{
-            display: "flex", alignItems: "center", gap: 14, marginBottom: 14,
-            background: "#151210", borderRadius: 8, padding: "12px 16px",
-            border: "1px solid #1E1A18",
+            display: "flex", alignItems: "center", gap: 14,
+            background: CARD_BG, borderRadius: 12, padding: "14px 18px",
+            border: `1px solid ${DIMMED}`,
           }}>
-            <span style={{ fontSize: 34, fontWeight: 800, color: WHITE, width: 36, flexShrink: 0, lineHeight: 1 }}>{i + 2}.</span>
-            <RiderAvatar photoDataUri={r._photoDataUri ?? null} name={r.rider_name} size={52} />
-            <FlagImg dataUri={r._flagDataUri} size={22} />
+            <span style={{ fontSize: 28, fontWeight: 800, color: MUTED, width: 30, flexShrink: 0, fontFamily: "Inter", lineHeight: 1 }}>{i + 2}</span>
+            <RiderAvatar photoDataUri={r._photoDataUri ?? null} name={r.rider_name} size={50} />
+            <FlagImg dataUri={r._flagDataUri} size={20} />
             <span style={{ fontSize: 38, fontWeight: 800, color: WHITE, flex: 1, lineHeight: 1 }}>{r.rider_name}</span>
           </div>
         ))}
       </div>
 
       {/* Brand footer */}
-      <div style={{ display: "flex", alignItems: "center", gap: 20, padding: "16px 80px 52px 96px", flexShrink: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "18px 52px 52px", flexShrink: 0 }}>
         <BibIcon size={44} />
-        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
           <span style={{ fontSize: 17, fontWeight: 800, color: RED, letterSpacing: "0.08em" }}>PRO CYCLING PREDICTOR</span>
-          <span style={{ fontSize: 20, fontWeight: 600, color: WHITE, fontFamily: "Inter" }}>procyclingpredictor.com</span>
+          <span style={{ fontSize: 20, fontWeight: 500, color: `${WHITE}99`, fontFamily: "Inter" }}>procyclingpredictor.com</span>
         </div>
       </div>
     </div>
