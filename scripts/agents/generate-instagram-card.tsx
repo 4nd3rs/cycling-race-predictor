@@ -178,11 +178,11 @@ function BibIcon({ size = 56 }: { size?: number }) {
 }
 
 function RiderAvatar({ photoDataUri, name, size = 72, glow = false }: { photoDataUri: string | null; name: string; size?: number; glow?: boolean }) {
-  const ring = glow ? `3px solid ${RED}` : `2px solid ${DIMMED}`;
-  const glowShadow = `0 0 ${Math.round(size*0.3)}px ${RED}66`;
+  // Glow simulated via thick border (boxShadow not supported by resvg)
+  const ring = glow ? `6px solid ${RED}` : `2px solid ${DIMMED}`;
   if (photoDataUri) {
     return (
-      <div style={{ width: size, height: size, borderRadius: "50%", overflow: "hidden", flexShrink: 0, border: ring, display: "flex", boxShadow: glow ? glowShadow : "none" }}>
+      <div style={{ width: size, height: size, borderRadius: "50%", overflow: "hidden", flexShrink: 0, border: ring, display: "flex", boxShadow: "none" }}>
         <img src={photoDataUri} style={{ width: size, height: size, objectFit: "cover" }} alt={name} />
       </div>
     );
@@ -191,7 +191,7 @@ function RiderAvatar({ photoDataUri, name, size = 72, glow = false }: { photoDat
   const stripeCount = 6;
   const stripes = Array.from({ length: stripeCount }, (_, i) => i);
   return (
-    <div style={{ width: size, height: size, borderRadius: "50%", flexShrink: 0, border: ring, display: "flex", alignItems: "center", justifyContent: "center", background: "#22232A", overflow: "hidden", position: "relative", boxShadow: glow ? glowShadow : "none" }}>
+    <div style={{ width: size, height: size, borderRadius: "50%", flexShrink: 0, border: ring, display: "flex", alignItems: "center", justifyContent: "center", background: "#22232A", overflow: "hidden", position: "relative", boxShadow: "none" }}>
       {stripes.map((i) => (
         <div key={i} style={{
           position: "absolute",
@@ -234,7 +234,7 @@ function PreviewCard({ event, race, preds }: any) {
   const metaParts = [country, discipline, uci].filter(Boolean).join("  ·  ");
   const nameLen = String(event.name).length;
   const nameFontSizeFeed = nameLen > 30 ? 64 : nameLen > 20 ? 72 : 88;
-  const nameFontSizeStory = nameLen > 35 ? 88 : nameLen > 24 ? 104 : 126;
+  const nameFontSizeStory = nameLen > 35 ? 96 : nameLen > 24 ? 114 : 136;
 
   if (isStories) {
     // ── STORIES (1080×1920) — NB-inspired design ──
@@ -246,7 +246,7 @@ function PreviewCard({ event, race, preds }: any) {
       <div style={{ width: W, height: H, background: BLACK, display: "flex", flexDirection: "column", fontFamily: "Barlow Condensed", overflow: "hidden" }}>
 
         {/* Top-left red corner block */}
-        <div style={{ position: "absolute", top: 0, left: 0, width: 220, height: 220, background: RED, borderRadius: "0 0 100% 0", display: "flex" }} />
+        <div style={{ position: "absolute", top: 0, left: 0, width: 460, height: 460, background: RED, borderRadius: "0 0 100% 0", display: "flex" }} />
         {/* Thin red right border accent */}
         <div style={{ position: "absolute", top: 0, right: 0, width: 6, height: H, background: `${RED}44`, display: "flex" }} />
 
@@ -264,24 +264,24 @@ function PreviewCard({ event, race, preds }: any) {
 
         {/* Hero #1 */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1 }}>
-          <span style={{ fontSize: 22, fontWeight: 700, color: RED, letterSpacing: "0.22em", fontFamily: "Inter", marginBottom: 32 }}>FAVOURITE TO WIN</span>
-          <RiderAvatar photoDataUri={top?._photoDataUri ?? null} name={top?.rider_name ?? ""} size={290} glow={true} />
-          <span style={{ fontSize: 72, fontWeight: 800, color: WHITE, lineHeight: 1.0, marginTop: 32, textAlign: "center", letterSpacing: "-0.02em", padding: "0 60px" }}>
+          <span style={{ fontSize: 24, fontWeight: 700, color: RED, letterSpacing: "0.25em", fontFamily: "Inter", marginBottom: 28 }}>FAVOURITE TO WIN</span>
+          <RiderAvatar photoDataUri={top?._photoDataUri ?? null} name={top?.rider_name ?? ""} size={420} glow={true} />
+          <span style={{ fontSize: 100, fontWeight: 800, color: WHITE, lineHeight: 0.95, marginTop: 24, textAlign: "center", letterSpacing: "-0.03em", padding: "0 32px", textTransform: "uppercase" }}>
             {top?.rider_name ?? ""}
           </span>
-          <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 20 }}>
-            <FlagImg dataUri={top?._flagDataUri} size={34} />
-            <span style={{ fontSize: 64, fontWeight: 800, color: RED, lineHeight: 1 }}>{topPct}%</span>
-          </div>
-          <div style={{ width: 320, marginTop: 16, display: "flex" }}>
-            <ProbBar pct={topPct} width={320} />
+          <div style={{ display: "flex", alignItems: "center", gap: 20, marginTop: 20 }}>
+            <FlagImg dataUri={top?._flagDataUri} size={36} />
+            <span style={{ fontSize: 110, fontWeight: 800, color: RED, lineHeight: 1, letterSpacing: "-0.03em" }}>{topPct}%</span>
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <ProbBar pct={topPct} width={200} />
+            </div>
           </div>
         </div>
 
         {/* Divider */}
         <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "0 60px", marginBottom: 20, flexShrink: 0 }}>
           <div style={{ flex: 1, height: 1, background: DIMMED }} />
-          <span style={{ fontSize: 18, fontWeight: 700, color: MUTED, letterSpacing: "0.18em", fontFamily: "Inter" }}>ALSO WATCH</span>
+          <span style={{ fontSize: 20, fontWeight: 700, color: MUTED, letterSpacing: "0.2em", fontFamily: "Inter" }}>ALSO WATCH</span>
           <div style={{ flex: 1, height: 1, background: DIMMED }} />
         </div>
 
@@ -292,14 +292,14 @@ function PreviewCard({ event, race, preds }: any) {
             return (
               <div key={i} style={{
                 display: "flex", alignItems: "center", gap: 14,
-                background: CARD_BG, borderRadius: 12, padding: "14px 18px",
+                background: CARD_BG, borderRadius: 12, padding: "18px 20px",
                 border: `1px solid ${DIMMED}`,
               }}>
-                <span style={{ fontSize: 28, fontWeight: 800, color: MUTED, width: 30, flexShrink: 0, fontFamily: "Inter", lineHeight: 1 }}>{i + 2}</span>
+                <span style={{ fontSize: 34, fontWeight: 800, color: MUTED, width: 38, flexShrink: 0, fontFamily: "Inter", lineHeight: 1 }}>{i + 2}</span>
                 <RiderAvatar photoDataUri={p._photoDataUri ?? null} name={p.rider_name} size={50} />
                 <FlagImg dataUri={p._flagDataUri} size={20} />
-                <span style={{ fontSize: 38, fontWeight: 800, color: WHITE, flex: 1, lineHeight: 1 }}>{p.rider_name}</span>
-                <span style={{ fontSize: 32, fontWeight: 800, color: RED, lineHeight: 1 }}>{pct}%</span>
+                <span style={{ fontSize: 44, fontWeight: 800, color: WHITE, flex: 1, lineHeight: 1 }}>{p.rider_name}</span>
+                <span style={{ fontSize: 38, fontWeight: 800, color: RED, lineHeight: 1 }}>{pct}%</span>
               </div>
             );
           })}
@@ -410,7 +410,7 @@ function ResultsCard({ event, race, results }: any) {
     <div style={{ width: W, height: H, background: BLACK, display: "flex", flexDirection: "column", fontFamily: "Barlow Condensed", overflow: "hidden" }}>
 
       {/* Top-left red corner block */}
-      <div style={{ position: "absolute", top: 0, left: 0, width: 220, height: 220, background: RED, borderRadius: "0 0 100% 0", display: "flex" }} />
+      <div style={{ position: "absolute", top: 0, left: 0, width: 460, height: 460, background: RED, borderRadius: "0 0 100% 0", display: "flex" }} />
       {/* Thin red right border accent */}
       <div style={{ position: "absolute", top: 0, right: 0, width: 6, height: H, background: `${RED}44`, display: "flex" }} />
 
@@ -433,14 +433,14 @@ function ResultsCard({ event, race, results }: any) {
 
       {/* Hero winner */}
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1 }}>
-        <span style={{ fontSize: 22, fontWeight: 700, color: RED, letterSpacing: "0.22em", fontFamily: "Inter", marginBottom: 32 }}>WINNER</span>
-        <RiderAvatar photoDataUri={top?._photoDataUri ?? null} name={top?.rider_name ?? ""} size={290} glow={true} />
-        <span style={{ fontSize: 72, fontWeight: 800, color: WHITE, lineHeight: 1.0, marginTop: 32, textAlign: "center", letterSpacing: "-0.02em", padding: "0 60px" }}>
+        <span style={{ fontSize: 24, fontWeight: 700, color: RED, letterSpacing: "0.25em", fontFamily: "Inter", marginBottom: 28 }}>WINNER</span>
+        <RiderAvatar photoDataUri={top?._photoDataUri ?? null} name={top?.rider_name ?? ""} size={420} glow={true} />
+        <span style={{ fontSize: 100, fontWeight: 800, color: WHITE, lineHeight: 0.95, marginTop: 24, textAlign: "center", letterSpacing: "-0.03em", padding: "0 32px", textTransform: "uppercase" }}>
           {top?.rider_name ?? ""}
         </span>
         <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 16 }}>
           <FlagImg dataUri={top?._flagDataUri} size={34} />
-          {top?.nationality && <span style={{ fontSize: 32, fontWeight: 700, color: MUTED, fontFamily: "Inter" }}>{top.nationality}</span>}
+          {top?.nationality && <span style={{ fontSize: 36, fontWeight: 700, color: MUTED, fontFamily: "Inter" }}>{top.nationality}</span>}
         </div>
       </div>
 
@@ -456,13 +456,13 @@ function ResultsCard({ event, race, results }: any) {
         {rest.map((r: any, i: number) => (
           <div key={i} style={{
             display: "flex", alignItems: "center", gap: 14,
-            background: CARD_BG, borderRadius: 12, padding: "14px 18px",
+            background: CARD_BG, borderRadius: 12, padding: "18px 20px",
             border: `1px solid ${DIMMED}`,
           }}>
-            <span style={{ fontSize: 28, fontWeight: 800, color: MUTED, width: 30, flexShrink: 0, fontFamily: "Inter", lineHeight: 1 }}>{i + 2}</span>
+            <span style={{ fontSize: 34, fontWeight: 800, color: MUTED, width: 38, flexShrink: 0, fontFamily: "Inter", lineHeight: 1 }}>{i + 2}</span>
             <RiderAvatar photoDataUri={r._photoDataUri ?? null} name={r.rider_name} size={50} />
             <FlagImg dataUri={r._flagDataUri} size={20} />
-            <span style={{ fontSize: 38, fontWeight: 800, color: WHITE, flex: 1, lineHeight: 1 }}>{r.rider_name}</span>
+            <span style={{ fontSize: 44, fontWeight: 800, color: WHITE, flex: 1, lineHeight: 1 }}>{r.rider_name}</span>
           </div>
         ))}
       </div>
