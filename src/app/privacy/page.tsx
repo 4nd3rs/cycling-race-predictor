@@ -28,14 +28,12 @@ export default function PrivacyPage() {
 
         <section>
           <h2 className="font-display text-xl font-bold tracking-tight text-foreground mb-3">Who we are</h2>
-          <p>Pro Cycling Predictor (<strong className="text-foreground">procyclingpredictor.com</strong>) is a service that delivers personalised race briefings via WhatsApp and Telegram, powered by data-driven predictions for professional cycling. We are in beta.</p>
         </section>
 
         <section>
           <h2 className="font-display text-xl font-bold tracking-tight text-foreground mb-3">What data we collect</h2>
           <ul className="list-disc pl-6 space-y-2">
             <li><strong className="text-foreground">Account data</strong> — name and email address, collected via Clerk when you sign up.</li>
-            <li><strong className="text-foreground">Messaging identifiers</strong> — your WhatsApp or Telegram user ID, collected when you connect a channel to receive notifications.</li>
             <li><strong className="text-foreground">Preferences</strong> — the races and riders you choose to follow.</li>
             <li><strong className="text-foreground">Usage data</strong> — standard server logs (pages visited, timestamps). We do not use third-party analytics trackers.</li>
           </ul>
@@ -44,7 +42,6 @@ export default function PrivacyPage() {
         <section>
           <h2 className="font-display text-xl font-bold tracking-tight text-foreground mb-3">How we use your data</h2>
           <ul className="list-disc pl-6 space-y-2">
-            <li>To send you race briefings on WhatsApp or Telegram for races you follow.</li>
             <li>To personalise your experience based on your followed races and riders.</li>
             <li>To maintain and improve the service.</li>
           </ul>
@@ -55,7 +52,6 @@ export default function PrivacyPage() {
           <h2 className="font-display text-xl font-bold tracking-tight text-foreground mb-3">Third-party services</h2>
           <ul className="list-disc pl-6 space-y-2">
             <li><strong className="text-foreground">Clerk</strong> — authentication and account management. <a href="https://clerk.com/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">clerk.com/privacy</a></li>
-            <li><strong className="text-foreground">WhatsApp / Meta</strong> — message delivery when you connect WhatsApp. Subject to Meta&apos;s privacy policy.</li>
             <li><strong className="text-foreground">Telegram</strong> — message delivery when you connect Telegram. Subject to Telegram&apos;s privacy policy.</li>
             <li><strong className="text-foreground">Vercel</strong> — hosting and infrastructure.</li>
             <li><strong className="text-foreground">Neon</strong> — database hosting. Data is stored in the EU.</li>

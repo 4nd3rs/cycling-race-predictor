@@ -9,7 +9,6 @@ import {
   predictions,
   userFollows,
   userTelegram,
-  userWhatsapp,
   notificationLog,
 } from "@/lib/db";
 import { eq, and, gte, lte, inArray, asc, desc } from "drizzle-orm";
@@ -68,31 +67,6 @@ async function sendTelegram(chatId: string, text: string): Promise<boolean> {
       disable_web_page_preview: true,
     }),
   });
-  return res.ok;
-}
-
-async function sendWhatsApp(to: string, text: string): Promise<boolean> {
-  const sid = process.env.TWILIO_ACCOUNT_SID;
-  const token = process.env.TWILIO_AUTH_TOKEN;
-  const from = process.env.TWILIO_WHATSAPP_NUMBER || "+16812710565";
-  if (!sid || !token) return false;
-  const normalized = to.startsWith("+") ? to : `+${to}`;
-  const body = new URLSearchParams({
-    From: `whatsapp:${from}`,
-    To: `whatsapp:${normalized}`,
-    Body: text,
-  });
-  const res = await fetch(
-    `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: "Basic " + Buffer.from(`${sid}:${token}`).toString("base64"),
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: body.toString(),
-    }
-  );
   return res.ok;
 }
 
@@ -367,17 +341,11 @@ async function processRace(race: RaceCandidate): Promise<{ sent: number; skipped
 
   // Get contacts for all users in this race
   const userIds = Array.from(userMap.keys());
-  const [tgRows, waRows] = await Promise.all([
-    db.select({ userId: userTelegram.userId, chatId: userTelegram.telegramChatId })
-      .from(userTelegram)
-      .where(inArray(userTelegram.userId, userIds)),
-    db.select({ userId: userWhatsapp.userId, phone: userWhatsapp.phoneNumber })
-      .from(userWhatsapp)
-      .where(inArray(userWhatsapp.userId, userIds)),
-  ]);
+  const tgRows = await db.select({ userId: userTelegram.userId, chatId: userTelegram.telegramChatId })
+    .from(userTelegram)
+    .where(inArray(userTelegram.userId, userIds));
 
   const tgByUser = new Map(tgRows.filter(r => r.chatId).map(r => [r.userId, r.chatId!]));
-  const waByUser = new Map(waRows.filter(r => r.phone).map(r => [r.userId, r.phone!]));
 
   // Build send tasks (max 20 concurrent)
   type SendTask = () => Promise<void>;
@@ -385,8 +353,7 @@ async function processRace(race: RaceCandidate): Promise<{ sent: number; skipped
 
   for (const [userId, data] of userMap) {
     const hasTg = tgByUser.has(userId);
-    const hasWa = waByUser.has(userId);
-    if (!hasTg && !hasWa) { skipped++; continue; }
+    if (!hasTg) { skipped++; continue; }
 
     // Get followed rider predictions for this user
     let followedRiders: Array<{ name: string; predictedPosition: number | null }> = [];
@@ -423,18 +390,7 @@ async function processRace(race: RaceCandidate): Promise<{ sent: number; skipped
       });
     }
 
-    // WhatsApp send task
-    if (hasWa) {
-      tasks.push(async () => {
-        const phone = waByUser.get(userId)!;
-        if (await alreadySent(userId, race.raceId, race.messageType, "whatsapp")) { dupes++; return; }
-        const msg = await generateMessage(prompt);
-        if (!msg) { skipped++; return; }
-        const ok = await sendWhatsApp(phone, msg.plain);
-        if (ok) { await logSent(userId, race.raceId, race.messageType, "whatsapp"); sent++; }
-        else { skipped++; }
-      });
-    }
+
   }
 
   // Execute in batches of 20
@@ -455,10 +411,6 @@ export async function GET(request: Request) {
 
   // Test mode: ?test=true — sends a real WA message to all connected users
   const url = new URL(request.url);
-  if (url.searchParams.get("test") === "true") {
-    return handleTestMode();
-  }
-
   // Quiet hours: skip if UTC hour < 7 or > 22
   const utcHour = new Date().getUTCHours();
   if (utcHour < 7 || utcHour > 22) {
@@ -501,61 +453,4 @@ export async function POST(request: Request) {
   return GET(request);
 }
 
-// ── Test handler ──────────────────────────────────────────────────────────────
-
-async function handleTestMode(): Promise<NextResponse> {
-  // Find all WhatsApp-connected users
-  const waUsers = await db
-    .select({ userId: userWhatsapp.userId, phone: userWhatsapp.phoneNumber })
-    .from(userWhatsapp)
-    .limit(20);
-
-  if (waUsers.length === 0) {
-    return NextResponse.json({ success: false, message: "No WhatsApp-connected users found" });
-  }
-
-  const testMessage = `🚴 <b>Pro Cycling Predictor — Test Notification</b>
-
-This is a test of your personalised race alerts.
-
-When races are upcoming, you'll receive:
-• Preview (2 days before) with our top predictions
-• Race day reminder
-• Results summary after the finish
-
-Next up: <b>Strade Bianche 2026</b> — Saturday 7 March.
-
-procyclingpredictor.com`;
-
-  const testMessagePlain = `Pro Cycling Predictor — Test Notification
-
-This is a test of your personalised race alerts.
-
-When races are upcoming, you'll receive:
-• Preview (2 days before) with our top predictions
-• Race day reminder  
-• Results summary after the finish
-
-Next up: Strade Bianche 2026 — Saturday 7 March.
-
-procyclingpredictor.com`;
-
-  const results: Array<{ phone: string; ok: boolean }> = [];
-
-  await Promise.allSettled(
-    waUsers.map(async (u) => {
-      if (!u.phone) return;
-      const ok = await sendWhatsApp(u.phone, testMessagePlain);
-      results.push({ phone: u.phone.replace(/\d(?=\d{4})/g, "*"), ok });
-    })
-  );
-
-  const sent = results.filter(r => r.ok).length;
-  return NextResponse.json({
-    success: true,
-    mode: "test",
-    usersFound: waUsers.length,
-    sent,
-    results,
-  });
-}
+// Test mode disabled

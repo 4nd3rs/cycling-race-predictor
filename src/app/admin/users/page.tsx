@@ -5,7 +5,6 @@ import {
   users,
   userTips,
   userTelegram,
-  userWhatsapp,
   notificationLog,
   aiChatSessions,
   discussionThreads,
@@ -61,7 +60,6 @@ async function getUsersData() {
     totalChatSessionsResult,
     chatSessionsLast7dResult,
     telegramSubsResult,
-    whatsappSubsResult,
     recentNotificationsResult,
     topTipUsersResult,
     totalThreadsResult,
@@ -75,7 +73,6 @@ async function getUsersData() {
     db.select({ c: count() }).from(aiChatSessions),
     db.select({ c: count() }).from(aiChatSessions).where(gte(aiChatSessions.createdAt, sevenDaysAgo)),
     db.select({ c: count() }).from(userTelegram).where(isNotNull(userTelegram.telegramChatId)),
-    db.select({ c: count() }).from(userWhatsapp).where(isNotNull(userWhatsapp.phoneNumber)),
     db.select({
       id: notificationLog.id,
       userId: notificationLog.userId,
@@ -127,7 +124,6 @@ async function getUsersData() {
     },
     notifications: {
       telegram: Number(telegramSubsResult[0]?.c ?? 0),
-      whatsapp: Number(whatsappSubsResult[0]?.c ?? 0),
       recentLog: recentNotificationsResult,
     },
     topTipUsers: topTipUsersResult.map((r) => ({
@@ -197,7 +193,6 @@ export default async function UsersPage() {
         <CardHeader className="pb-3">
           <CardTitle>Notification Subscribers</CardTitle>
           <CardDescription>
-            Telegram: {data.notifications.telegram} | WhatsApp: {data.notifications.whatsapp}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">

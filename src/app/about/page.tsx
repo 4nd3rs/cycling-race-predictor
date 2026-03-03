@@ -4,7 +4,6 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "About — Pro Cycling Predictor",
   description:
-    "Pro Cycling Predictor sends personalised race briefings to your WhatsApp or Telegram — before every race you follow. Backed by TrueSkill predictions and live intel.",
 };
 
 export default function AboutPage() {
@@ -26,7 +25,6 @@ export default function AboutPage() {
           </h1>
           <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
             Follow your favourite races and riders. Get a personalised briefing on{" "}
-            <strong className="text-foreground">WhatsApp</strong> or{" "}
             <strong className="text-foreground">Telegram</strong> before every start —
             no app to open, no feed to check.
           </p>
@@ -43,12 +41,10 @@ export default function AboutPage() {
             Pro Cycling Predictor is built around one idea: you shouldn't have to go
             looking for race information. Follow a race and we'll send you everything
             you need — who's on the startlist, who to watch, key intel, and a weather
-            check — right before it kicks off. Delivered via WhatsApp or Telegram, so
             it lands where you already are.
           </p>
           <div className="mt-8 grid gap-6 sm:grid-cols-3">
             <div className="rounded-xl border border-border/50 bg-card p-6">
-              <h3 className="font-semibold text-sm uppercase tracking-wide text-primary mb-2">WhatsApp &amp; Telegram</h3>
               <p className="text-sm text-muted-foreground">
                 No app to install. Connect once, follow the races you care about, and
                 briefings arrive automatically before each start.

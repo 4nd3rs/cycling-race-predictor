@@ -4,13 +4,12 @@ import { auth } from "@clerk/nextjs/server";
 import { Header } from "@/components/header";
 import { Badge } from "@/components/ui/badge";
 import { getAuthUser } from "@/lib/auth";
-import { db, users, userFollows, userTelegram, userWhatsapp, riders, raceEvents, races, raceStartlist, teams } from "@/lib/db";
+import { db, users, userFollows, userTelegram, riders, raceEvents, races, raceStartlist, teams } from "@/lib/db";
 import { eq, and, gte, lt, lte, inArray, desc } from "drizzle-orm";
 import { format, formatDistanceToNow, isPast, isToday } from "date-fns";
 import { getFlag } from "@/lib/country-flags";
 import { buildEventUrl } from "@/lib/url-utils";
 import { ConnectTelegramButton } from "@/components/connect-telegram-button";
-import { ConnectWhatsAppButton } from "@/components/connect-whatsapp-button";
 import { NotificationFrequencySelector } from "@/components/notification-frequency-selector";
 
 // ── Data fetching ─────────────────────────────────────────────────────────────
@@ -23,10 +22,9 @@ async function getPageData(userId: string) {
   const [user] = await db.select().from(users).where(eq(users.clerkId, userId)).limit(1);
   if (!user) return null;
 
-  const [follows, telegramRows, whatsappRows] = await Promise.all([
+  const [follows, telegramRows] = await Promise.all([
     db.select().from(userFollows).where(eq(userFollows.userId, user.id)),
     db.select().from(userTelegram).where(eq(userTelegram.userId, user.id)).limit(1),
-    db.select().from(userWhatsapp).where(eq(userWhatsapp.userId, user.id)).limit(1),
   ]);
 
   const raceEventIds = follows.filter(f => f.followType === "race_event").map(f => f.entityId);
@@ -105,7 +103,6 @@ async function getPageData(userId: string) {
   return {
     user,
     telegram: telegramRows[0] || null,
-    whatsapp: whatsappRows[0] || null,
     // schedule
     upcomingEvents: upcomingEvents.map(r => r.event),
     pastEvents: pastEvents.map(r => r.event),
@@ -235,9 +232,9 @@ export default async function MyRaceHubPage({ searchParams }: { searchParams: Pr
                 <span className={"w-1.5 h-1.5 rounded-full " + (data.telegram?.connectedAt ? "bg-blue-400" : "bg-muted-foreground/40")}></span>
                 {data.telegram?.connectedAt ? "Telegram" : "Connect Telegram"}
               </Link>
-              <Link href="?tab=notifications" className={"inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full border transition-colors " + (data.whatsapp?.connectedAt ? "bg-green-500/15 border-green-500/30 text-green-400 hover:bg-green-500/25" : "bg-muted/30 border-border/40 text-muted-foreground hover:bg-muted/50")}>
-                <span className={"w-1.5 h-1.5 rounded-full " + (data.whatsapp?.connectedAt ? "bg-green-400" : "bg-muted-foreground/40")}></span>
-                {data.whatsapp?.connectedAt ? "WhatsApp" : "Connect WhatsApp"}
+              <Link href="?tab=notifications" className={"inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full border transition-colors " + ("bg-muted/30 border-border/40 text-muted-foreground hover:bg-muted/50")>
+                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40"></span>
+                Connect Telegram
               </Link>
             </div>
           </div>
@@ -386,7 +383,7 @@ export default async function MyRaceHubPage({ searchParams }: { searchParams: Pr
           <div className="space-y-4 max-w-2xl">
             {feedItems.length === 0 ? (
               <div className="rounded-xl border border-border/50 bg-card/20 p-8 text-center">
-                <p className="text-muted-foreground text-sm">No messages yet. Connect Telegram or WhatsApp and follow some riders to get started.</p>
+                <p className="text-muted-foreground text-sm">No messages yet. Connect Telegram and follow some riders to get started.</p>
               </div>
             ) : (
               feedItems.map((item: any, i: number) => {
@@ -452,12 +449,7 @@ export default async function MyRaceHubPage({ searchParams }: { searchParams: Pr
                 <div className="rounded-lg border border-border/50 bg-card/20 p-4">
                   <div className="flex items-center justify-between mb-2">
                     <div>
-                      <p className="font-medium text-sm">WhatsApp</p>
-                      <p className="text-xs text-muted-foreground">Personalized alerts on WhatsApp</p>
-                    </div>
-                    {data.whatsapp?.connectedAt && <span className="text-xs font-medium text-green-400 bg-green-500/10 border border-green-500/20 px-2 py-0.5 rounded">Connected</span>}
-                  </div>
-                  <ConnectWhatsAppButton connected={!!data.whatsapp?.connectedAt} phoneNumber={data.whatsapp?.phoneNumber} />
+
                 </div>
               </div>
             </section>

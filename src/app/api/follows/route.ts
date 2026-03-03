@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
-import { db, userFollows, riders, raceEvents, races, teams, userTelegram, userWhatsapp } from "@/lib/db";
+import { db, userFollows, riders, raceEvents, races, teams, userTelegram } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import { sendTelegramMessage } from "@/lib/telegram";
-import { sendWhatsAppMessage } from "@/lib/whatsapp";
 
 export async function GET() {
   const user = await requireAuth();
@@ -115,14 +114,10 @@ async function sendFollowNotification(
   entityId: string
 ): Promise<void> {
   // Check if user has Telegram connected
-  const [[tg], [wa]] = await Promise.all([
-    db.select({ telegramChatId: userTelegram.telegramChatId })
-      .from(userTelegram).where(eq(userTelegram.userId, userId)).limit(1),
-    db.select({ phoneNumber: userWhatsapp.phoneNumber })
-      .from(userWhatsapp).where(eq(userWhatsapp.userId, userId)).limit(1),
-  ]);
+  const [tg] = await db.select({ telegramChatId: userTelegram.telegramChatId })
+    .from(userTelegram).where(eq(userTelegram.userId, userId)).limit(1);
 
-  if (!tg?.telegramChatId && !wa?.phoneNumber) return;
+  if (!tg?.telegramChatId) return;
 
   // Look up entity name + link
   let entityName: string | null = null;
@@ -202,17 +197,5 @@ async function sendFollowNotification(
   if (tg?.telegramChatId) await sendTelegramMessage(tg.telegramChatId, message);
 
 
-  // Also send via WhatsApp if connected
-  if (wa?.phoneNumber) {
-    const waText = [
-      `${emoji} *You're now following ${entityName}!*`,
-      ``,
-      `You'll get WhatsApp updates for this ${typeLabel} — predictions, results, and breaking news.`,
-      ``,
-      `👉 ${entityUrl}`,
-      ``,
-      `Manage your follows at procyclingpredictor.com`,
-    ].join("\n");
-    await sendWhatsAppMessage(wa.phoneNumber, waText);
-  }
+
 }

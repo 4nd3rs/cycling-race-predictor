@@ -17,14 +17,14 @@ const barlowCondensed = Barlow_Condensed({
 });
 
 export const metadata: Metadata = {
-  title: "Pro Cycling Predictor — Race Briefings on WhatsApp & Telegram",
+  title: "Pro Cycling Predictor — Race Briefings on Telegram",
   description:
-    "Follow your favourite races and riders. Get a personalised race briefing on WhatsApp or Telegram before every start — startlists, predictions, rider intel, and weather.",
+    "Follow your favourite races and riders. Get a personalised race briefing on Telegram before every start — startlists, predictions, rider intel, and weather.",
   metadataBase: new URL("https://procyclingpredictor.com"),
   openGraph: {
-    title: "Pro Cycling Predictor — Race Briefings on WhatsApp & Telegram",
+    title: "Pro Cycling Predictor — Race Briefings on Telegram",
     description:
-      "Follow your favourite races and riders. Get a personalised race briefing on WhatsApp or Telegram before every start.",
+      "Follow your favourite races and riders. Get a personalised race briefing on Telegram before every start.",
     type: "website",
     url: "https://procyclingpredictor.com",
     images: [
@@ -32,15 +32,15 @@ export const metadata: Metadata = {
         url: "/opengraph-image.png",
         width: 1200,
         height: 630,
-        alt: "Pro Cycling Predictor — Race briefings on WhatsApp & Telegram",
+        alt: "Pro Cycling Predictor — Race briefings on Telegram",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Pro Cycling Predictor — Race Briefings on WhatsApp & Telegram",
+    title: "Pro Cycling Predictor — Race Briefings on Telegram",
     description:
-      "Personalised race briefings on WhatsApp or Telegram. Startlists, predictions, rider intel — before every race.",
+      "Personalised race briefings on Telegram. Startlists, predictions, rider intel — before every race.",
     images: ["/opengraph-image.png"],
   },
 };

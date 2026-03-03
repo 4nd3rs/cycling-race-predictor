@@ -38,7 +38,14 @@ function stripAccents(str: string): string {
   return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 }
 
-async function fetchXCO(url: string, attempt = 1): Promise<string> {
+interface RankingEntry {
+  rank: number;
+  riderName: string;
+  team: string;
+  uciPoints: number;
+}
+
+async function fetchPage(url: string, attempt = 1): Promise<string> {
   try {
     const res = await fetch(url, {
       headers: {
@@ -53,59 +60,67 @@ async function fetchXCO(url: string, attempt = 1): Promise<string> {
   } catch (e: any) {
     if (attempt < 3) {
       await new Promise(r => setTimeout(r, attempt * 3000));
-      return fetchXCO(url, attempt + 1);
+      return fetchPage(url, attempt + 1);
     }
     throw e;
   }
 }
 
-interface RankingEntry {
-  rank: number;
-  riderName: string;
-  team: string;
-  uciPoints: number;
-}
-
-function parseRankingPage(html: string, maxEntries: number): RankingEntry[] {
+function parseRows(html: string): RankingEntry[] {
   const $ = cheerio.load(html);
   const entries: RankingEntry[] = [];
-
   $("table tbody tr").each((_, row) => {
-    if (entries.length >= maxEntries) return false;
     const cells = $(row).find("td").map((__, td) => $(td).text().trim()).get();
     if (cells.length < 3) return;
-
-    // XCOdata format: [rank, name+team (combined cell), team, points]
-    // Rank may have change indicator: "4                 1" → take first number
     const rankRaw = cells[0].replace(/\s+\d+$/, "").trim();
     const rank = parseInt(rankRaw);
     if (!rank || isNaN(rank)) return;
-
-    // Name cell contains "Firstname LASTNAME\n                 TEAM NAME"
-    // Split on multiple whitespace/newlines
     const nameCell = cells[1];
-    const nameParts = nameCell.split(/\n/).map(s => s.trim()).filter(Boolean);
-    if (nameParts.length === 0) return;
-
-    // First line is rider name — XCOdata format: "Firstname LASTNAME"
-    const rawName = nameParts[0].trim();
-    // Strip any team suffix that leaked in (team names are ALL CAPS in XCOdata)
-    // XCOdata name format is "Firstname LASTNAME" (Title case first, ALL CAPS last)
-    // But some entries are "LASTNAME Firstname" — detect by ALL CAPS first token
-    const riderName = normalizeXCOName(rawName);
+    const nameParts = nameCell.split(/\n/).map((s: string) => s.trim()).filter(Boolean);
+    if (!nameParts.length) return;
+    const riderName = normalizeXCOName(nameParts[0].trim());
     if (!riderName || riderName.length < 3) return;
-
     const team = nameParts[1] ?? cells[2] ?? "";
-
-    // Points column — last non-empty column, may have change marker "+ 90" or "- 7"
     const pointsRaw = cells[cells.length - 1].replace(/[^0-9]/g, "");
     const uciPoints = parseInt(pointsRaw) || 0;
     if (uciPoints === 0) return;
-
     entries.push({ rank, riderName, team, uciPoints });
   });
-
   return entries;
+}
+
+function getNextPageUrl(html: string, baseUrl: string): string | null {
+  const $ = cheerio.load(html);
+  // Find "Next" pagination link
+  let nextHref: string | null = null;
+  $("a").each((_, el) => {
+    const text = $(el).text().trim();
+    if (text === "Next") {
+      nextHref = $(el).attr("href") ?? null;
+      return false;
+    }
+  });
+  if (!nextHref) return null;
+  return "https://www.xcodata.com" + nextHref;
+}
+
+async function scrapeCategory(baseUrl: string, maxEntries: number): Promise<RankingEntry[]> {
+  const all: RankingEntry[] = [];
+  let url: string | null = baseUrl;
+  let page = 1;
+
+  while (url && all.length < maxEntries) {
+    console.log(`    Page ${page}: ${url}`);
+    const html = await fetchPage(url);
+    const rows = parseRows(html);
+    all.push(...rows);
+    if (rows.length < 25) break; // last page
+    url = getNextPageUrl(html, url);
+    page++;
+    await new Promise(r => setTimeout(r, 800)); // polite delay
+  }
+
+  return all.slice(0, maxEntries);
 }
 
 // XCOdata uses "Firstname LASTNAME" — convert to consistent "Firstname Lastname"
@@ -215,15 +230,13 @@ async function main() {
   for (const cat of CATEGORIES) {
     console.log(`── ${cat.label} ──`);
 
-    let html: string;
+    let entries: RankingEntry[];
     try {
-      html = await fetchXCO(cat.url);
+      entries = await scrapeCategory(cat.url, LIMIT);
     } catch (e: any) {
       console.warn(`  ❌ Fetch failed: ${e.message}`);
       continue;
     }
-
-    const entries = parseRankingPage(html, LIMIT);
     console.log(`  Parsed ${entries.length} riders`);
 
     let updated = 0, created = 0, notFound = 0;
@@ -257,7 +270,6 @@ async function main() {
     totalCreated += created;
     totalNotFound += notFound;
 
-    await new Promise(r => setTimeout(r, 1000)); // polite delay
   }
 
   console.log(`\n──────────────────────────────────────────`);
