@@ -12,6 +12,7 @@ import {
 import { Check, Loader2, Bell, BellOff, ChevronDown } from "lucide-react";
 import { formatCategoryDisplay } from "@/lib/category-utils";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface RaceCategory {
   id: string; // race ID (specific category)
@@ -27,7 +28,7 @@ interface RaceFollowButtonProps {
   className?: string;
   size?: "sm" | "default";
   compact?: boolean;
-  initialFollowing?: boolean; // server-provided initial state, skips API check
+  initialFollowing?: boolean; // server-provided optimistic initial state
 }
 
 type FollowState = "idle" | "loading" | "toggling";
@@ -60,14 +61,14 @@ export function RaceFollowButton({
   const { isSignedIn, isLoaded } = useUser();
   const router = useRouter();
 
-  const [state, setState] = useState<FollowState>(initialFollowing !== undefined ? "idle" : "loading");
-  const [open, setOpen] = useState(false);
-
-  // followingMap: key = "race_event:{id}" or "race:{id}", value = boolean
+  // Use initialFollowing as an optimistic pre-render value to avoid flash,
+  // but always verify from API on mount.
   const initMap = initialFollowing !== undefined
     ? { [`race_event:${eventId}`]: initialFollowing }
     : {};
   const [followingMap, setFollowingMap] = useState<Record<string, boolean>>(initMap);
+  const [state, setState] = useState<FollowState>(initialFollowing !== undefined ? "idle" : "loading");
+  const [open, setOpen] = useState(false);
 
   const isFollowingAll = !!followingMap[`race_event:${eventId}`];
   const isFollowingAny =
@@ -81,20 +82,16 @@ export function RaceFollowButton({
       return;
     }
 
-    // If initialFollowing provided, only check per-category follows (skip event-level check)
-    const keys = initialFollowing !== undefined
-      ? categories.map((c) => ({ type: "race", id: c.id }))
-      : [
-          { type: "race_event", id: eventId },
-          ...categories.map((c) => ({ type: "race", id: c.id })),
-        ];
-
-    if (keys.length === 0) { setState("idle"); return; }
+    // Always verify follow state from API — never trust initialFollowing alone.
+    // initialFollowing is only used as the optimistic initial render value.
+    const keys = [
+      { type: "race_event", id: eventId },
+      ...categories.map((c) => ({ type: "race", id: c.id })),
+    ];
 
     Promise.all(keys.map((k) => checkFollow(k.type, k.id).then((v) => ({ key: `${k.type}:${k.id}`, v }))))
       .then((results) => {
         const map: Record<string, boolean> = {};
-        if (initialFollowing !== undefined) map[`race_event:${eventId}`] = initialFollowing;
         results.forEach(({ key, v }) => { map[key] = v; });
         setFollowingMap(map);
         setState("idle");
@@ -114,16 +111,35 @@ export function RaceFollowButton({
     setFollowingMap((m) => ({ ...m, [`race_event:${eventId}`]: newState }));
     setState("idle");
     setOpen(false);
+
+    if (newState) {
+      toast.success(`Following ${eventName}`, {
+        description: "You'll get predictions, results and breaking news.",
+        duration: 4000,
+      });
+    } else {
+      toast(`Unfollowed ${eventName}`);
+    }
   }
 
-  async function toggleCategory(raceId: string) {
+  async function toggleCategory(cat: RaceCategory) {
     if (!isSignedIn) { handleNotSignedIn(); return; }
     setState("toggling");
-    const key = `race:${raceId}`;
+    const key = `race:${cat.id}`;
     const newState = !followingMap[key];
-    await setFollow("race", raceId, newState);
+    await setFollow("race", cat.id, newState);
     setFollowingMap((m) => ({ ...m, [key]: newState }));
     setState("idle");
+
+    const categoryLabel = formatCategoryDisplay(cat.ageCategory, cat.gender);
+    if (newState) {
+      toast.success(`Following ${categoryLabel} — ${eventName}`, {
+        description: "You'll get updates for this category.",
+        duration: 4000,
+      });
+    } else {
+      toast(`Unfollowed ${categoryLabel} — ${eventName}`);
+    }
   }
 
   // Compact: icon-only bell — opens category picker popover (or toggles directly if no categories)
@@ -176,7 +192,7 @@ export function RaceFollowButton({
               return (
                 <button
                   key={cat.id}
-                  onClick={() => toggleCategory(cat.id)}
+                  onClick={() => toggleCategory(cat)}
                   disabled={state === "toggling" || isFollowingAll}
                   className={cn("flex items-center justify-between w-full rounded px-2 py-1.5 text-sm hover:bg-muted transition-colors", isFollowing && "text-primary font-medium", isFollowingAll && "opacity-50 cursor-not-allowed")}
                 >
@@ -275,7 +291,7 @@ export function RaceFollowButton({
             return (
               <button
                 key={cat.id}
-                onClick={() => toggleCategory(cat.id)}
+                onClick={() => toggleCategory(cat)}
                 disabled={state === "toggling" || isFollowingAll}
                 className={cn(
                   "flex items-center justify-between w-full rounded px-2 py-1.5 text-sm hover:bg-muted transition-colors",
