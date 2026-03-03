@@ -119,7 +119,7 @@ function EventRow({ event, extra }: {
       {event.country && (
         <span className="text-base shrink-0 leading-none">{getFlag(event.country)}</span>
       )}
-      <Link href={url} className="flex-1 min-w-0 text-sm font-medium truncate hover:text-primary transition-colors">
+      <Link href={url} prefetch={false} className="flex-1 min-w-0 text-sm font-medium truncate hover:text-primary transition-colors">
         {event.name}
       </Link>
       {extra && <div className="shrink-0 flex items-center gap-1">{extra}</div>}
@@ -159,9 +159,9 @@ export async function MyFeedWidget() {
           <h2 className="text-base font-semibold mb-2">My Feed</h2>
           <p className="text-sm text-muted-foreground">
             Follow riders and races to see personalized updates here.{" "}
-            <Link href="/riders" className="text-primary hover:underline">Browse riders</Link>{" "}
+            <Link href="/riders" prefetch={false} className="text-primary hover:underline">Browse riders</Link>{" "}
             or{" "}
-            <Link href="/races" className="text-primary hover:underline">races</Link>.
+            <Link href="/races" prefetch={false} className="text-primary hover:underline">races</Link>.
           </p>
         </div>
       </section>
@@ -184,7 +184,7 @@ export async function MyFeedWidget() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-6">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold tracking-tight text-muted-foreground uppercase">My Schedule</h2>
-          <Link href="/my-schedule" className="text-xs text-primary hover:text-primary/80 transition-colors">
+          <Link href="/my-schedule" prefetch={false} className="text-xs text-primary hover:text-primary/80 transition-colors">
             Full schedule &amp; results →
           </Link>
         </div>

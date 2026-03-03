@@ -331,7 +331,7 @@ export default async function Home({ searchParams }: HomePageProps) {
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-10">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-xl font-bold tracking-tight">On the Calendar</h2>
-              <Link href="/races" className="text-sm text-primary hover:text-primary/80 transition-colors">
+              <Link href="/races" prefetch={false} className="text-sm text-primary hover:text-primary/80 transition-colors">
                 View all races &rarr;
               </Link>
             </div>
@@ -351,7 +351,7 @@ export default async function Home({ searchParams }: HomePageProps) {
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-10">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold tracking-tight">Latest Results</h2>
-              <Link href="/results" className="text-sm text-primary hover:text-primary/80 transition-colors">
+              <Link href="/results" prefetch={false} className="text-sm text-primary hover:text-primary/80 transition-colors">
                 View all &rarr;
               </Link>
             </div>
@@ -361,6 +361,7 @@ export default async function Home({ searchParams }: HomePageProps) {
                   <Link
                     key={race.id}
                     href={event.slug ? buildEventUrl(event.discipline, event.slug) : getRaceUrl(race, event)}
+                    prefetch={false}
                     className="flex items-center gap-3 py-3 px-3 border-b border-border/30 last:border-0 hover:bg-white/[0.03] transition-colors group"
                   >
                     <span className="text-xs text-muted-foreground w-12 shrink-0">{format(toRaceDate(race.date), "MMM d")}</span>
@@ -442,7 +443,7 @@ export default async function Home({ searchParams }: HomePageProps) {
       {/* Footer */}
       <footer className="border-t border-border/50 py-6">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
-          <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+          <Link href="/" prefetch={false} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             <img src="/logo@2x.png" alt="Pro Cycling Predictor" width="24" height="24" className="rounded-sm" />
             <span className="font-semibold text-foreground text-xs uppercase tracking-wide">Pro Cycling Predictor</span>
           </Link>
@@ -490,7 +491,7 @@ function NextRaceHero({ event: ev }: { event: HomepageEvent }) {
           </div>
 
           <h1 className="text-3xl font-black tracking-tight sm:text-4xl md:text-5xl">
-            <Link href={url} className="hover:text-primary transition-colors">
+            <Link href={url} prefetch={false} className="hover:text-primary transition-colors">
               {ev.name}
             </Link>
           </h1>
@@ -527,7 +528,7 @@ function NextRaceHero({ event: ev }: { event: HomepageEvent }) {
             categories={ev.categories}
             size="default"
           />
-          <Link href={url} className="text-xs text-center text-muted-foreground hover:text-foreground transition-colors">
+          <Link href={url} prefetch={false} className="text-xs text-center text-muted-foreground hover:text-foreground transition-colors">
             View predictions &rarr;
           </Link>
         </div>
