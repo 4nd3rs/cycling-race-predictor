@@ -442,6 +442,7 @@ export default async function MyRaceHubPage({ searchParams }: { searchParams: Pr
                   </div>
                   <ConnectTelegramButton connected={!!data.telegram?.connectedAt} />
                 </div>
+              </div>
             </section>
 
             {/* Frequency */}
