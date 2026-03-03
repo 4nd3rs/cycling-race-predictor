@@ -15,7 +15,7 @@ export default async function OnboardingPage() {
   if (!user) redirect("/sign-in?redirect_url=/onboarding");
 
   const [telegramRows] = await Promise.all([
-    db.select().from(userTelegram).where(eq(userTelegram.userId, user.id)).limit(1),
+    db.select().from(userTelegram).where(eq(userTelegram.userId, user.id)).limit(1)
   ]);
 
   const telegram = telegramRows[0] || null;
@@ -78,6 +78,10 @@ export default async function OnboardingPage() {
                 <ConnectTelegramButton />
               </div>
 
+
+            </div>
+          </div>
+        )}
 
         {/* Connected state — show which are connected */}
         {anyConnected && (

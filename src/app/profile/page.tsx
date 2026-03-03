@@ -234,8 +234,7 @@ export default async function ProfilePage() {
               )}
             </div>
           </section>
-            </div>
-          </section>
+
 
         </div>
       </main>

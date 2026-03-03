@@ -232,10 +232,6 @@ export default async function MyRaceHubPage({ searchParams }: { searchParams: Pr
                 <span className={"w-1.5 h-1.5 rounded-full " + (data.telegram?.connectedAt ? "bg-blue-400" : "bg-muted-foreground/40")}></span>
                 {data.telegram?.connectedAt ? "Telegram" : "Connect Telegram"}
               </Link>
-              <Link href="?tab=notifications" className={"inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full border transition-colors " + ("bg-muted/30 border-border/40 text-muted-foreground hover:bg-muted/50")>
-                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40"></span>
-                Connect Telegram
-              </Link>
             </div>
           </div>
         </div>
@@ -449,9 +445,7 @@ export default async function MyRaceHubPage({ searchParams }: { searchParams: Pr
                 <div className="rounded-lg border border-border/50 bg-card/20 p-4">
                   <div className="flex items-center justify-between mb-2">
                     <div>
-
-                </div>
-              </div>
+                      
             </section>
 
             {/* Frequency */}
