@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
+
+export const maxDuration = 60;
 import { db, races, eloHistory } from "@/lib/db";
 import { eq, and, notExists } from "drizzle-orm";
 import { processRaceElo } from "@/lib/prediction/process-race-elo";

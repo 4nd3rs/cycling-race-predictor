@@ -9,7 +9,7 @@ import {
   riderDisciplineStats,
   raceEvents,
 } from "@/lib/db";
-import { eq, gte, lte, and, ilike, asc } from "drizzle-orm";
+import { eq, gte, lte, and, ilike, asc, notExists } from "drizzle-orm";
 import { scrapeDo } from "@/lib/scraper/scrape-do";
 import * as cheerio from "cheerio";
 import { notifyRiderFollowers } from "@/lib/notify-followers";
@@ -306,18 +306,24 @@ export async function GET() {
     const today = new Date().toISOString().slice(0, 10);
     const maxDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-    const upcomingRaces = await db.query.races.findMany({
-      where: and(
-        eq(races.status, "active"),
-        gte(races.date, today),
-        lte(races.date, maxDate),
-      ),
-      orderBy: [asc(races.date)],
-      limit: MAX_RACES,
-    });
-
-    // Only process races that have a pcsUrl
-    const racesToSync = upcomingRaces.filter(r => r.pcsUrl);
+    // Find upcoming races that have a pcsUrl but no startlist entries yet
+    const racesToSync = await db
+      .select()
+      .from(races)
+      .where(
+        and(
+          eq(races.status, "active"),
+          gte(races.date, today),
+          lte(races.date, maxDate),
+          notExists(
+            db.select({ id: raceStartlist.id })
+              .from(raceStartlist)
+              .where(eq(raceStartlist.raceId, races.id))
+          )
+        )
+      )
+      .orderBy(asc(races.date))
+      .limit(MAX_RACES);
 
     let totalInserted = 0;
     let totalUpdated = 0;

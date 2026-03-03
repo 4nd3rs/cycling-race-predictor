@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
+
+export const maxDuration = 60;
 import { db, userTips, riders, users, riderRumours } from "@/lib/db";
 import {
   parseTip,
