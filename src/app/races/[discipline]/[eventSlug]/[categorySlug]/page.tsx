@@ -115,7 +115,7 @@ async function getRaceByCategorySlug(eventId: string, categorySlug: string) {
   if (!parsed) return null;
 
   try {
-    // Try to find by category_slug first
+    // Try to find by category_slug first, preferring active races
     let [race] = await db
       .select()
       .from(races)
@@ -125,6 +125,7 @@ async function getRaceByCategorySlug(eventId: string, categorySlug: string) {
           eq(races.categorySlug, categorySlug)
         )
       )
+      .orderBy(desc(races.date))
       .limit(1);
 
     // Fallback: find by ageCategory + gender
@@ -139,6 +140,7 @@ async function getRaceByCategorySlug(eventId: string, categorySlug: string) {
             eq(races.gender, parsed.gender)
           )
         )
+        .orderBy(desc(races.date))
         .limit(1);
     }
 
