@@ -138,7 +138,7 @@ export function EventCard({
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
-            <Link href={eventUrl} className="hover:underline">
+            <Link href={eventUrl} prefetch={false} className="hover:underline">
               <CardTitle className="text-lg">{name}</CardTitle>
             </Link>
             <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
@@ -180,7 +180,7 @@ export function EventCard({
               : `/races/${cat.id}`;
 
             return (
-              <Link key={cat.id} href={categoryUrl}>
+              <Link key={cat.id} href={categoryUrl} prefetch={false}>
                 <Badge
                   variant="outline"
                   className="cursor-pointer hover:bg-muted transition-colors"
@@ -345,7 +345,7 @@ null
       {/* Name + Country flag */}
       <div className="flex-1 min-w-0 overflow-hidden flex items-center gap-2">
         {country && <span className="text-base shrink-0 leading-none">{getFlag(country)}</span>}
-        <Link href={eventUrl} className="font-medium text-sm hover:text-primary transition-colors truncate">
+        <Link href={eventUrl} prefetch={false} className="font-medium text-sm hover:text-primary transition-colors truncate">
           {name}
         </Link>
       </div>

@@ -33,11 +33,18 @@ interface RaceFollowButtonProps {
 
 type FollowState = "idle" | "loading" | "toggling";
 
-async function checkFollow(followType: string, entityId: string): Promise<boolean> {
-  const res = await fetch(`/api/follows/check?followType=${followType}&entityId=${entityId}`);
-  if (!res.ok) return false;
+async function checkFollowBatch(
+  items: Array<{ followType: string; entityId: string }>
+): Promise<Record<string, boolean>> {
+  if (items.length === 0) return {};
+  const res = await fetch("/api/follows/check-batch", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ items }),
+  });
+  if (!res.ok) return {};
   const data = await res.json();
-  return data.following as boolean;
+  return data.results as Record<string, boolean>;
 }
 
 async function setFollow(followType: string, entityId: string, follow: boolean): Promise<boolean> {
@@ -82,17 +89,21 @@ export function RaceFollowButton({
       return;
     }
 
-    // Always verify follow state from API — never trust initialFollowing alone.
+    // Always verify follow state from API in a single batch request.
     // initialFollowing is only used as the optimistic initial render value.
-    const keys = [
-      { type: "race_event", id: eventId },
-      ...categories.map((c) => ({ type: "race", id: c.id })),
+    const items = [
+      { followType: "race_event", entityId: eventId },
+      ...categories.map((c) => ({ followType: "race", entityId: c.id })),
     ];
 
-    Promise.all(keys.map((k) => checkFollow(k.type, k.id).then((v) => ({ key: `${k.type}:${k.id}`, v }))))
+    checkFollowBatch(items)
       .then((results) => {
         const map: Record<string, boolean> = {};
-        results.forEach(({ key, v }) => { map[key] = v; });
+        for (const [key, v] of Object.entries(results)) {
+          // key format from API: "followType:entityId" → convert to our internal key
+          const [ft, ...rest] = key.split(":");
+          map[`${ft}:${rest.join(":")}`] = v;
+        }
         setFollowingMap(map);
         setState("idle");
       })
