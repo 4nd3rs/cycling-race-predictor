@@ -41,36 +41,8 @@ interface GroupedEvent {
   }>;
 }
 
-// ─── Country name helper ──────────────────────────────────────────────────────
-function getCountryName(code: string): string {
-  const map: Record<string, string> = {
-    // Western Europe
-    AND: "Andorra", AUT: "Austria", BEL: "Belgium", CHE: "Switzerland",
-    CYP: "Cyprus", DEU: "Germany", GER: "Germany", DNK: "Denmark", DEN: "Denmark",
-    ESP: "Spain", EST: "Estonia", FIN: "Finland", FRA: "France",
-    GBR: "Great Britain", GRC: "Greece", GRE: "Greece", HUN: "Hungary",
-    IRL: "Ireland", ISL: "Iceland", ITA: "Italy", LTU: "Lithuania",
-    LUX: "Luxembourg", LVA: "Latvia", LAT: "Latvia", MLT: "Malta",
-    NLD: "Netherlands", NED: "Netherlands", NOR: "Norway", POL: "Poland",
-    PRT: "Portugal", POR: "Portugal", ROU: "Romania", SWE: "Sweden",
-    SVK: "Slovakia", SVN: "Slovenia", SLO: "Slovenia", SUI: "Switzerland",
-    TUR: "Turkey", UKR: "Ukraine",
-    // Balkans / Eastern Europe
-    BIH: "Bosnia", BUL: "Bulgaria", BGR: "Bulgaria", CRO: "Croatia", HRV: "Croatia",
-    KAZ: "Kazakhstan", RUS: "Russia", SRB: "Serbia",
-    // Americas
-    ARG: "Argentina", BRA: "Brazil", CAN: "Canada", CHI: "Chile", CHL: "Chile",
-    COL: "Colombia", ECU: "Ecuador", MEX: "Mexico", PER: "Peru",
-    URU: "Uruguay", USA: "United States",
-    // Africa
-    ERI: "Eritrea", ETH: "Ethiopia", MAR: "Morocco", NAM: "Namibia",
-    RSA: "South Africa", RWA: "Rwanda",
-    // Asia / Pacific
-    AUS: "Australia", CHN: "China", IND: "India", ISR: "Israel",
-    JPN: "Japan", KOR: "South Korea", NZL: "New Zealand", THA: "Thailand",
-  };
-  return map[code] ?? code;
-}
+// ─── Country name helper (shared utility) ────────────────────────────────────
+import { getCountryName } from "@/lib/country-names";
 
 // ─── Data fetching ────────────────────────────────────────────────────────────
 

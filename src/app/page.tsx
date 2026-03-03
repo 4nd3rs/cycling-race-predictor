@@ -198,18 +198,8 @@ function getRaceUrl(race: typeof races.$inferSelect, event: typeof raceEvents.$i
 }
 
 
-// ─── Country name helper (shared with races page) ─────────────────────────
-function getCountryName(code: string): string {
-  const map: Record<string, string> = {
-    BEL:"Belgium",ITA:"Italy",FRA:"France",ESP:"Spain",GER:"Germany",NED:"Netherlands",
-    GBR:"Great Britain",SUI:"Switzerland",CHE:"Switzerland",AUT:"Austria",DEN:"Denmark",
-    NOR:"Norway",SWE:"Sweden",FIN:"Finland",POL:"Poland",CZE:"Czech Republic",
-    POR:"Portugal",USA:"United States",CAN:"Canada",BRA:"Brazil",ARG:"Argentina",
-    COL:"Colombia",AUS:"Australia",JPN:"Japan",KOR:"South Korea",RSA:"South Africa",
-    AND:"Andorra",LUX:"Luxembourg",IRL:"Ireland",CHI:"Chile",ECU:"Ecuador",
-  };
-  return map[code] || code;
-}
+// ─── Country name helper (shared utility) ─────────────────────────────────
+import { getCountryName } from "@/lib/country-names";
 
 async function getFilteredCalendarEvents(
   discipline: string | null,

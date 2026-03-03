@@ -16,7 +16,7 @@ import { notifyRiderFollowers } from "@/lib/notify-followers";
 
 export const maxDuration = 60;
 
-const MAX_RACES = 5;
+const MAX_RACES = 2;
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
