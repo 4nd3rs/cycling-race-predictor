@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Header } from "@/components/header";
+import { getRaceImage } from "@/lib/race-images";
 import { Badge } from "@/components/ui/badge";
 import { RaceLinksSection } from "@/components/race-links";
 import { getRaceProfile } from "@/lib/race-profiles";
@@ -304,8 +305,26 @@ export default async function EventPage({ params }: PageProps) {
       <main className="flex-1">
 
         {/* ── HERO ──────────────────────────────────────────────────────── */}
-        <section className="border-b border-border/50">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-8">
+        {(() => {
+          const raceImg = getRaceImage(event.slug);
+          return (
+        <section className="border-b border-border/50 relative overflow-hidden">
+          {raceImg && (
+            <>
+              <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${raceImg.src})` }} />
+              <div className="absolute inset-0 bg-gradient-to-r from-background via-background/88 to-background/50" />
+              <div className="absolute inset-0 bg-gradient-to-t from-background/50 via-transparent to-transparent" />
+              <a
+                href={raceImg.commonsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="absolute bottom-2 right-3 z-20 text-[10px] text-white/35 hover:text-white/65 transition-colors"
+              >
+                Photo: {raceImg.credit} / {raceImg.license}
+              </a>
+            </>
+          )}
+          <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-8">
 
             {/* Breadcrumb */}
             <nav className="flex items-center gap-1.5 mb-5 text-xs text-muted-foreground flex-wrap">
@@ -429,6 +448,8 @@ export default async function EventPage({ params }: PageProps) {
             </div>
           </div>
         </section>
+          );
+        })()}
 
 
         {/* ── RACE PROFILE ──────────────────────────────────────────────── */}
