@@ -269,6 +269,20 @@ export default async function RacesPage({ searchParams }: PageProps) {
 
   const countries = await getCountries(tab === "upcoming");
 
+  // Page title changes based on active filter
+  const pageTitle =
+    discipline === "road" && gender === "men"   ? "Men's Road" :
+    discipline === "road" && gender === "women" ? "Women's Road" :
+    discipline === "mtb"                        ? "MTB" :
+    discipline !== "all"                        ? getDisciplineLabel(discipline as Discipline) :
+    "Races";
+
+  const pageSubtitle =
+    discipline === "road" && gender === "men"   ? "Men's UCI road cycling — WorldTour, ProSeries and beyond" :
+    discipline === "road" && gender === "women" ? "Women's UCI road cycling — WWT, ProSeries and beyond" :
+    discipline === "mtb"                        ? "UCI Mountain Bike — World Cup, XCO, XCC and more" :
+    "UCI cycling events — Road, MTB, Gravel, CX";
+
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
@@ -276,10 +290,8 @@ export default async function RacesPage({ searchParams }: PageProps) {
 
         {/* ── Page header ── */}
         <div className="mb-6">
-          <h1 className="text-3xl font-bold">Races</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            UCI cycling events — Road, MTB, Gravel, CX
-          </p>
+          <h1 className="text-3xl font-bold">{pageTitle}</h1>
+          <p className="text-muted-foreground mt-1 text-sm">{pageSubtitle}</p>
         </div>
 
         {/* ── Filters ── */}

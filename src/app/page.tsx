@@ -71,11 +71,12 @@ function getBuzzScore(hypeScore: number, newsCount: number, daysUntil: number): 
   return hypeScore + (newsCount * 2) + proximityBonus;
 }
 
-async function getHighHypeRaces(discipline?: string | null): Promise<{ hero: HomepageEvent | null; calendar: HomepageEvent[] }> {
+async function getHighHypeRaces(discipline?: string | null, gender?: string | null): Promise<{ hero: HomepageEvent | null; calendar: HomepageEvent[] }> {
   const today = new Date().toISOString().split("T")[0];
   try {
     const conditions: Parameters<typeof and>[0][] = [gte(raceEvents.date, today), eq(races.status, "active")];
     if (discipline && discipline !== "all") conditions.push(eq(raceEvents.discipline, discipline as any));
+    if (gender && gender !== "all") conditions.push(eq(races.gender, gender));
     const result = await db
       .select({
         race: races,
@@ -311,7 +312,7 @@ export default async function Home({ searchParams }: HomePageProps) {
   const hasFilters = !!(filterDiscipline || filterGender || filterCountry || filterCat);
 
   const [{ hero: nextRace, calendar: highHypeRaces }, latestIntel, recentResults, filteredRaces, calendarCountries] = await Promise.all([
-    getHighHypeRaces(filterDiscipline),
+    getHighHypeRaces(filterDiscipline, filterGender),
     getLatestIntel(),
     getRecentResults(),
     hasFilters ? getFilteredCalendarEvents(filterDiscipline, filterGender, filterCountry, filterCat) : Promise.resolve([]),
@@ -366,7 +367,7 @@ export default async function Home({ searchParams }: HomePageProps) {
               )}
               <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-10 md:py-16">
                 {nextRace ? (
-                  <NextRaceHero event={nextRace} />
+                  <NextRaceHero event={nextRace} genderFilter={filterGender} />
                 ) : (
                   <div className="text-center py-12">
                     <p className="text-xl text-muted-foreground">No upcoming races — check back soon</p>
@@ -384,7 +385,12 @@ export default async function Home({ searchParams }: HomePageProps) {
         <section className="border-b border-border/50">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-10">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-xl font-bold tracking-tight">On the Calendar</h2>
+              <h2 className="text-xl font-bold tracking-tight">
+                {filterDiscipline === "road" && filterGender === "men"   ? "Men's Road Calendar" :
+                 filterDiscipline === "road" && filterGender === "women" ? "Women's Road Calendar" :
+                 filterDiscipline === "mtb"                              ? "MTB Calendar" :
+                 "On the Calendar"}
+              </h2>
               <Link href="/races" prefetch={false} className="text-sm text-primary hover:text-primary/80 transition-colors">
                 View all races &rarr;
               </Link>
@@ -522,7 +528,7 @@ export default async function Home({ searchParams }: HomePageProps) {
 // SUB-COMPONENTS
 // ---------------------------------------------------------------------------
 
-function NextRaceHero({ event: ev }: { event: HomepageEvent }) {
+function NextRaceHero({ event: ev, genderFilter }: { event: HomepageEvent; genderFilter?: string | null }) {
   const raceDate = toRaceDate(ev.date);
   const daysUntil = differenceInDays(raceDate, new Date());
   const url = ev.slug ? buildEventUrl(ev.discipline, ev.slug) : `/races/${ev.id}`;
@@ -534,7 +540,7 @@ function NextRaceHero({ event: ev }: { event: HomepageEvent }) {
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-bold uppercase tracking-widest text-primary">
-              Next Race
+              {genderFilter === "men" ? "Next Men's Race" : genderFilter === "women" ? "Next Women's Race" : "Next Race"}
             </span>
             {daysUntil >= 0 && daysUntil <= 7 && (
               <Badge className="bg-accent text-accent-foreground text-xs font-bold">

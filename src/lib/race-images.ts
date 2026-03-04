@@ -25,13 +25,13 @@ const RACE_IMAGES: Record<string, RaceImageMeta> = {
     src: "/races/strade-bianche.jpg",
     credit: "Adrian Betteridge",
     license: "CC BY 2.0",
-    commonsUrl: "https://commons.wikimedia.org/wiki/File:Strade_Bianche_(51964933290).jpg",
+    commonsUrl: "https://commons.wikimedia.org/wiki/File:Strade_Bianche-5_(51964657489).jpg",
   },
   "paris-nice": {
     src: "/races/paris-nice.jpg",
-    credit: "Martino Photos",
-    license: "CC BY-SA 2.0",
-    commonsUrl: "https://commons.wikimedia.org/wiki/File:Mads_Pedersen,_2023_Paris-Nice_(52917273166).jpg",
+    credit: "I love the cyclisme",
+    license: "CC0",
+    commonsUrl: "https://commons.wikimedia.org/wiki/File:Tim_Merlier_vainqueur_%C3%A9tape_1_Paris-Nice_2025.jpg",
   },
   "kuurne-brussel-kuurne": {
     src: "/races/kuurne-brussel-kuurne.jpg",
