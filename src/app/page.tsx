@@ -50,6 +50,8 @@ interface HomepageEvent {
   series: string | null;
   uciCategory: string | null;
   hypeScore: number;
+  newsCount: number;
+  heroImage: string | null;
   externalLinks: {
     website?: string; twitter?: string; instagram?: string; youtube?: string;
     liveStream?: Array<{ name: string; url: string; free?: boolean }>;
@@ -63,6 +65,12 @@ interface HomepageEvent {
 // DATA FETCHING
 // ---------------------------------------------------------------------------
 
+/** Composite score for hero selection: prestige + news buzz + proximity */
+function getBuzzScore(hypeScore: number, newsCount: number, daysUntil: number): number {
+  const proximityBonus = Math.max(0, 10 - Math.max(0, daysUntil)); // 10 pts today, 3 pts for 7 days out
+  return hypeScore + (newsCount * 2) + proximityBonus;
+}
+
 async function getHighHypeRaces(discipline?: string | null): Promise<{ hero: HomepageEvent | null; calendar: HomepageEvent[] }> {
   const today = new Date().toISOString().split("T")[0];
   try {
@@ -73,6 +81,8 @@ async function getHighHypeRaces(discipline?: string | null): Promise<{ hero: Hom
         race: races,
         event: raceEvents,
         startlistCount: sql<number>`(SELECT COUNT(*) FROM race_startlist WHERE race_startlist.race_id = ${races.id})`,
+        newsCount: sql<number>`(SELECT COUNT(*) FROM race_news WHERE race_news.race_event_id = ${raceEvents.id})`,
+        heroImage: sql<string | null>`(SELECT image_url FROM race_news WHERE race_news.race_event_id = ${raceEvents.id} AND image_url IS NOT NULL AND image_url != '' ORDER BY published_at DESC LIMIT 1)`,
       })
       .from(races)
       .innerJoin(raceEvents, eq(races.raceEventId, raceEvents.id))
@@ -82,8 +92,8 @@ async function getHighHypeRaces(discipline?: string | null): Promise<{ hero: Hom
 
     // Group by event id — deduplicate categories into one row per event
     const eventsMap = new Map<string, HomepageEvent>();
-    for (const { race, event, startlistCount } of result) {
-      const riders = Number(startlistCount) || 0;
+    for (const { race, event, startlistCount, newsCount, heroImage } of result) {
+      const riderCount = Number(startlistCount) || 0;
       if (!eventsMap.has(event.id)) {
         eventsMap.set(event.id, {
           id: event.id,
@@ -97,6 +107,8 @@ async function getHighHypeRaces(discipline?: string | null): Promise<{ hero: Hom
           series: event.series,
           uciCategory: race.uciCategory ?? null,
           hypeScore: getHypeScore(race.uciCategory),
+          newsCount: Number(newsCount) || 0,
+          heroImage: heroImage ?? null,
           externalLinks: (event.externalLinks as HomepageEvent["externalLinks"]) ?? null,
           categories: [],
           totalRiders: 0,
@@ -107,15 +119,17 @@ async function getHighHypeRaces(discipline?: string | null): Promise<{ hero: Hom
           ev.uciCategory = race.uciCategory ?? null;
           ev.hypeScore = getHypeScore(race.uciCategory);
         }
+        // Keep the most recent hero image across categories
+        if (!ev.heroImage && heroImage) ev.heroImage = heroImage;
       }
       const ev = eventsMap.get(event.id)!;
-      ev.totalRiders += riders;
+      ev.totalRiders += riderCount;
       ev.categories.push({
         id: race.id,
         ageCategory: race.ageCategory || "elite",
         gender: race.gender || "men",
         categorySlug: race.categorySlug,
-        riderCount: riders,
+        riderCount,
       });
     }
 
@@ -126,7 +140,23 @@ async function getHighHypeRaces(discipline?: string | null): Promise<{ hero: Hom
     const highHype = allGrouped.filter(e => e.hypeScore >= HOMEPAGE_HYPE_MIN);
     const pool = highHype.length > 0 ? highHype : allGrouped;
 
-    return { hero: pool[0] ?? null, calendar: pool.slice(1, 20) };
+    // Pick hero by buzz score (hype + news + proximity), not just chronological order
+    const now = new Date();
+    const heroPool = pool.filter(e => {
+      const d = differenceInDays(toRaceDate(e.date), now);
+      return d >= 0 && d <= 7; // Only consider races in the next 7 days as potential hero
+    });
+    const fallbackPool = pool; // if nothing in 7 days, use soonest high-hype
+
+    const scoredPool = (heroPool.length > 0 ? heroPool : fallbackPool).map(e => ({
+      event: e,
+      buzzScore: getBuzzScore(e.hypeScore, e.newsCount, differenceInDays(toRaceDate(e.date), now)),
+    })).sort((a, b) => b.buzzScore - a.buzzScore);
+
+    const hero = scoredPool[0]?.event ?? null;
+    const calendar = pool.filter(e => e.id !== hero?.id).slice(0, 20);
+
+    return { hero, calendar };
   } catch {
     return { hero: null, calendar: [] };
   }
@@ -240,6 +270,7 @@ async function getFilteredCalendarEvents(
           endDate: event.endDate, country: event.country, discipline: event.discipline,
           subDiscipline: event.subDiscipline, series: event.series,
           uciCategory: race.uciCategory ?? null, hypeScore: getHypeScore(race.uciCategory),
+          newsCount: 0, heroImage: null,
           externalLinks: (event.externalLinks as HomepageEvent["externalLinks"]) ?? null,
           categories: [], totalRiders: 0,
         });
@@ -311,8 +342,18 @@ export default async function Home({ searchParams }: HomePageProps) {
         </div>
 
         {/* ---- NEXT RACE SPOTLIGHT ---- */}
-        <section className="border-b border-border/50">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-10 md:py-16">
+        <section className="border-b border-border/50 relative overflow-hidden">
+          {nextRace?.heroImage && (
+            <>
+              <div
+                className="absolute inset-0 bg-cover bg-center"
+                style={{ backgroundImage: `url(${nextRace.heroImage})` }}
+              />
+              <div className="absolute inset-0 bg-gradient-to-r from-background via-background/85 to-background/40" />
+              <div className="absolute inset-0 bg-gradient-to-t from-background/60 via-transparent to-transparent" />
+            </>
+          )}
+          <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-10 md:py-16">
             {nextRace ? (
               <NextRaceHero event={nextRace} />
             ) : (
