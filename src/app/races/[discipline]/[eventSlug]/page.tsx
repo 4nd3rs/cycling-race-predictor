@@ -451,113 +451,6 @@ export default async function EventPage({ params }: PageProps) {
           );
         })()}
 
-
-        {/* ── RACE PROFILE ──────────────────────────────────────────────── */}
-        {raceProfile && (
-          <section className="border-b border-border/50">
-            <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-6">
-              <h2 className="text-base font-semibold uppercase tracking-wide text-muted-foreground mb-4">Race Profile</h2>
-              <div className="grid gap-6 lg:grid-cols-3">
-                {/* Stats */}
-                <div className="flex flex-wrap gap-4 lg:col-span-1 content-start">
-                  {raceProfile.distanceKm && (
-                    <div className="min-w-[80px]">
-                      <p className="text-xs text-muted-foreground">Distance</p>
-                      <p className="text-xl font-bold tabular-nums">{raceProfile.distanceKm}<span className="text-sm font-normal text-muted-foreground ml-1">km</span></p>
-                    </div>
-                  )}
-                  {raceProfile.elevationGainM && (
-                    <div className="min-w-[80px]">
-                      <p className="text-xs text-muted-foreground">Elevation</p>
-                      <p className="text-xl font-bold tabular-nums">{raceProfile.elevationGainM.toLocaleString()}<span className="text-sm font-normal text-muted-foreground ml-1">m</span></p>
-                    </div>
-                  )}
-                  {raceProfile.cobbleSectors && (
-                    <div className="min-w-[80px]">
-                      <p className="text-xs text-muted-foreground">Cobble sectors</p>
-                      <p className="text-xl font-bold tabular-nums">{raceProfile.cobbleSectors}</p>
-                    </div>
-                  )}
-                  {raceProfile.firstEdition && (
-                    <div className="min-w-[80px]">
-                      <p className="text-xs text-muted-foreground">First edition</p>
-                      <p className="text-xl font-bold tabular-nums">{raceProfile.firstEdition}</p>
-                    </div>
-                  )}
-                  {raceProfile.surface && (
-                    <div className="w-full">
-                      <p className="text-xs text-muted-foreground mb-0.5">Surface</p>
-                      <p className="text-sm">{raceProfile.surface}</p>
-                    </div>
-                  )}
-                </div>
-                {/* Character + features */}
-                <div className="lg:col-span-2 space-y-3">
-                  <p className="text-sm text-muted-foreground leading-relaxed">{raceProfile.raceCharacter}</p>
-                  {raceProfile.keyFeatures.length > 0 && (
-                    <ul className="space-y-1">
-                      {raceProfile.keyFeatures.map((f: string, i: number) => (
-                        <li key={i} className="flex gap-2 text-sm">
-                          <span className="text-primary shrink-0 mt-0.5">—</span>
-                          <span>{f}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </div>
-              {/* Past winners */}
-              {raceProfile.pastWinners && raceProfile.pastWinners.length > 0 && (
-                <div className="mt-5 pt-5 border-t border-border/30">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Recent winners</p>
-                  <div className="flex flex-wrap gap-x-6 gap-y-1">
-                    {raceProfile.pastWinners.map((w) => (
-                      <div key={w.year} className="flex items-baseline gap-2 text-sm">
-                        <span className="text-muted-foreground font-mono w-10 shrink-0">{w.year}</span>
-                        <span className="font-medium">{w.name}</span>
-                        {w.team && <span className="text-xs text-muted-foreground">{w.team}</span>}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </section>
-        )}
-
-        {/* ── RACE PULSE: Latest News ──────────────────────────────────── */}
-        {latestNews.length > 0 && (
-          <section className="border-b border-border/50">
-            <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-6">
-              <h2 className="text-lg font-bold mb-4">Race Pulse</h2>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {latestNews.map((article) => (
-                  <a key={article.id} href={article.url || "#"} target="_blank" rel="noopener noreferrer"
-                    className="group flex flex-col rounded-xl border border-border/50 bg-card/30 hover:bg-card/80 hover:border-border transition-all overflow-hidden">
-                    {article.imageUrl && (
-                      <div className="h-36 overflow-hidden bg-muted/30 shrink-0">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={article.imageUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                      </div>
-                    )}
-                    <div className="p-3 flex flex-col gap-1.5 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] uppercase tracking-wider font-semibold text-primary/70">{article.source}</span>
-                        {article.publishedAt && (
-                          <span className="text-[10px] text-muted-foreground/60">· {formatDistanceToNow(article.publishedAt, { addSuffix: true })}</span>
-                        )}
-                      </div>
-                      <p className="text-sm font-semibold leading-snug line-clamp-3 group-hover:text-primary transition-colors">{article.title}</p>
-                    </div>
-                  </a>
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
-
-
-
         {/* ── FEATURED RACES: Elite Men + Women ───────────────────────── */}
         {eliteRaces.length > 0 && (
           <section className="border-b border-border/50">
@@ -567,7 +460,7 @@ export default async function EventPage({ params }: PageProps) {
                 const allCompleted = eliteRaces.every(c => c.race.status === "completed" || c.resultCount > 0);
                 return (
                   <h2 className="text-lg font-bold mb-4">
-                    {allCompleted ? "Results" : anyCompleted ? "Results & Preview" : "Race Preview"}
+                    {allCompleted ? "Results" : anyCompleted ? "Results & Preview" : "Predictions"}
                   </h2>
                 );
               })()}
@@ -783,12 +676,116 @@ export default async function EventPage({ params }: PageProps) {
                       {/* CTA */}
                       <Link href={href}
                         className="flex items-center justify-between px-4 py-3 border-t border-border/30 bg-muted/10 hover:bg-muted/30 transition-colors text-sm font-medium text-primary group">
-                        <span>{hasResults ? "Full results & analysis" : "Full analysis, startlist & predictions"}</span>
+                        <span>{hasResults ? "Full results & analysis" : "Full predictions & startlist"}</span>
                         <span className="group-hover:translate-x-0.5 transition-transform">→</span>
                       </Link>
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* ── RACE PROFILE ──────────────────────────────────────────────── */}
+        {raceProfile && (
+          <section className="border-b border-border/50">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-6">
+              <h2 className="text-base font-semibold uppercase tracking-wide text-muted-foreground mb-4">Race Profile</h2>
+              <div className="grid gap-6 lg:grid-cols-3">
+                {/* Stats */}
+                <div className="flex flex-wrap gap-4 lg:col-span-1 content-start">
+                  {raceProfile.distanceKm && (
+                    <div className="min-w-[80px]">
+                      <p className="text-xs text-muted-foreground">Distance</p>
+                      <p className="text-xl font-bold tabular-nums">{raceProfile.distanceKm}<span className="text-sm font-normal text-muted-foreground ml-1">km</span></p>
+                    </div>
+                  )}
+                  {raceProfile.elevationGainM && (
+                    <div className="min-w-[80px]">
+                      <p className="text-xs text-muted-foreground">Elevation</p>
+                      <p className="text-xl font-bold tabular-nums">{raceProfile.elevationGainM.toLocaleString()}<span className="text-sm font-normal text-muted-foreground ml-1">m</span></p>
+                    </div>
+                  )}
+                  {raceProfile.cobbleSectors && (
+                    <div className="min-w-[80px]">
+                      <p className="text-xs text-muted-foreground">Cobble sectors</p>
+                      <p className="text-xl font-bold tabular-nums">{raceProfile.cobbleSectors}</p>
+                    </div>
+                  )}
+                  {raceProfile.firstEdition && (
+                    <div className="min-w-[80px]">
+                      <p className="text-xs text-muted-foreground">First edition</p>
+                      <p className="text-xl font-bold tabular-nums">{raceProfile.firstEdition}</p>
+                    </div>
+                  )}
+                  {raceProfile.surface && (
+                    <div className="w-full">
+                      <p className="text-xs text-muted-foreground mb-0.5">Surface</p>
+                      <p className="text-sm">{raceProfile.surface}</p>
+                    </div>
+                  )}
+                </div>
+                {/* Character + features */}
+                <div className="lg:col-span-2 space-y-3">
+                  <p className="text-sm text-muted-foreground leading-relaxed">{raceProfile.raceCharacter}</p>
+                  {raceProfile.keyFeatures.length > 0 && (
+                    <ul className="space-y-1">
+                      {raceProfile.keyFeatures.map((f: string, i: number) => (
+                        <li key={i} className="flex gap-2 text-sm">
+                          <span className="text-primary shrink-0 mt-0.5">—</span>
+                          <span>{f}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+              {/* Past winners */}
+              {raceProfile.pastWinners && raceProfile.pastWinners.length > 0 && (
+                <div className="mt-5 pt-5 border-t border-border/30">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Recent winners</p>
+                  <div className="flex flex-wrap gap-x-6 gap-y-1">
+                    {raceProfile.pastWinners.map((w) => (
+                      <div key={w.year} className="flex items-baseline gap-2 text-sm">
+                        <span className="text-muted-foreground font-mono w-10 shrink-0">{w.year}</span>
+                        <span className="font-medium">{w.name}</span>
+                        {w.team && <span className="text-xs text-muted-foreground">{w.team}</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* ── RACE PULSE: Latest News ──────────────────────────────────── */}
+        {latestNews.length > 0 && (
+          <section className="border-b border-border/50">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-6">
+              <h2 className="text-lg font-bold mb-4">Race Pulse</h2>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {latestNews.map((article) => (
+                  <a key={article.id} href={article.url || "#"} target="_blank" rel="noopener noreferrer"
+                    className="group flex flex-col rounded-xl border border-border/50 bg-card/30 hover:bg-card/80 hover:border-border transition-all overflow-hidden">
+                    {article.imageUrl && (
+                      <div className="h-36 overflow-hidden bg-muted/30 shrink-0">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={article.imageUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                      </div>
+                    )}
+                    <div className="p-3 flex flex-col gap-1.5 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] uppercase tracking-wider font-semibold text-primary/70">{article.source}</span>
+                        {article.publishedAt && (
+                          <span className="text-[10px] text-muted-foreground/60">· {formatDistanceToNow(article.publishedAt, { addSuffix: true })}</span>
+                        )}
+                      </div>
+                      <p className="text-sm font-semibold leading-snug line-clamp-3 group-hover:text-primary transition-colors">{article.title}</p>
+                    </div>
+                  </a>
+                ))}
               </div>
             </div>
           </section>

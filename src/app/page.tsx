@@ -4,13 +4,12 @@ import { IntelCard } from "@/components/intel-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { db, races, raceEvents, riderRumours, riders, raceResults } from "@/lib/db";
-import { desc, eq, gte, lt, and, sql, isNotNull } from "drizzle-orm";
+import { db, races, raceEvents, riderRumours, riders, raceResults, predictions } from "@/lib/db";
+import { desc, eq, gte, lt, and, sql, isNotNull, asc } from "drizzle-orm";
 import { format, formatDistanceToNow, differenceInDays } from "date-fns";
 import { toRaceDate, toDateStr } from "@/lib/utils";
 import { getFlag } from "@/lib/country-flags";
 import { buildEventUrl, buildRaceUrl, getDisciplineShortLabel, normalizeUciCategory, getDisciplineColor } from "@/lib/url-utils";
-import { RaceLinksSection } from "@/components/race-links";
 import { EventListView } from "@/components/event-card";
 import { MyFeedWidget } from "@/components/my-feed-widget";
 import { DisciplineFilter, CalendarFilters } from "@/components/race-filters";
@@ -208,6 +207,40 @@ async function getRecentResults() {
   }
 }
 
+/** Fetch top 5 predictions per elite race category for the hero event */
+async function getHeroPredictions(event: HomepageEvent): Promise<Map<string, Array<{ name: string; winPct: number; photoUrl: string | null }>>> {
+  const eliteCategories = event.categories.filter(c => c.ageCategory === "elite");
+  if (eliteCategories.length === 0) return new Map();
+  try {
+    const results = await Promise.all(
+      eliteCategories.map(async (cat) => {
+        const rows = await db
+          .select({ prediction: predictions, rider: riders })
+          .from(predictions)
+          .innerJoin(riders, eq(predictions.riderId, riders.id))
+          .where(eq(predictions.raceId, cat.id))
+          .orderBy(asc(predictions.predictedPosition))
+          .limit(5);
+        const seen = new Set<string>();
+        return {
+          gender: cat.gender,
+          picks: rows.filter(r => { if (seen.has(r.rider.id)) return false; seen.add(r.rider.id); return true; })
+            .map(r => ({
+              name: r.rider.name,
+              winPct: r.prediction.winProbability ? Number(r.prediction.winProbability) * 100 : 0,
+              photoUrl: r.rider.photoUrl ?? null,
+            })),
+        };
+      })
+    );
+    const map = new Map<string, Array<{ name: string; winPct: number; photoUrl: string | null }>>();
+    for (const { gender, picks } of results) {
+      if (picks.length > 0) map.set(gender, picks);
+    }
+    return map;
+  } catch { return new Map(); }
+}
+
 // ---------------------------------------------------------------------------
 // HELPERS
 // ---------------------------------------------------------------------------
@@ -319,6 +352,7 @@ export default async function Home({ searchParams }: HomePageProps) {
     getUpcomingCountries(),
   ]);
   const upcomingRaces = hasFilters ? filteredRaces : highHypeRaces;
+  const heroPredictions = nextRace ? await getHeroPredictions(nextRace) : new Map();
 
   return (
     <div className="min-h-screen flex flex-col overflow-x-hidden">
@@ -367,7 +401,7 @@ export default async function Home({ searchParams }: HomePageProps) {
               )}
               <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-10 md:py-16">
                 {nextRace ? (
-                  <NextRaceHero event={nextRace} genderFilter={filterGender} />
+                  <NextRaceHero event={nextRace} genderFilter={filterGender} heroPredictions={heroPredictions} />
                 ) : (
                   <div className="text-center py-12">
                     <p className="text-xl text-muted-foreground">No upcoming races — check back soon</p>
@@ -528,72 +562,120 @@ export default async function Home({ searchParams }: HomePageProps) {
 // SUB-COMPONENTS
 // ---------------------------------------------------------------------------
 
-function NextRaceHero({ event: ev, genderFilter }: { event: HomepageEvent; genderFilter?: string | null }) {
+type HeroPick = { name: string; winPct: number; photoUrl: string | null };
+
+function NextRaceHero({
+  event: ev,
+  genderFilter,
+  heroPredictions,
+}: {
+  event: HomepageEvent;
+  genderFilter?: string | null;
+  heroPredictions: Map<string, HeroPick[]>;
+}) {
   const raceDate = toRaceDate(ev.date);
   const daysUntil = differenceInDays(raceDate, new Date());
   const url = ev.slug ? buildEventUrl(ev.discipline, ev.slug) : `/races/${ev.id}`;
   const subLabel = ev.subDiscipline ? getDisciplineShortLabel(ev.subDiscipline) : null;
 
+  const menPicks = heroPredictions.get("men") ?? [];
+  const womenPicks = heroPredictions.get("women") ?? [];
+  const hasPredictions = menPicks.length > 0 || womenPicks.length > 0;
+
+  // Decide layout: single column if only one gender, two columns if both
+  const bothGenders = menPicks.length > 0 && womenPicks.length > 0;
+
   return (
     <div className="relative">
-      <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-widest text-primary">
-              {genderFilter === "men" ? "Next Men's Race" : genderFilter === "women" ? "Next Women's Race" : "Next Race"}
-            </span>
-            {daysUntil >= 0 && daysUntil <= 7 && (
-              <Badge className="bg-accent text-accent-foreground text-xs font-bold">
-                {daysUntil === 0 ? "TODAY" : daysUntil === 1 ? "TOMORROW" : `IN ${daysUntil} DAYS`}
-              </Badge>
-            )}
-          </div>
+      <div className="absolute -left-4 top-0 bottom-0 w-1 bg-primary rounded-full hidden md:block" />
 
-          <h1 className="text-3xl font-black tracking-tight sm:text-4xl md:text-5xl">
-            <Link href={url} prefetch={false} className="hover:text-primary transition-colors">
-              {ev.name}
-            </Link>
-          </h1>
-
-          <div className="flex flex-wrap items-center gap-3 text-muted-foreground">
-            <span className="flex items-center gap-1.5">
-              {getFlag(ev.country)} {format(raceDate, "EEEE, MMMM d")}
-            </span>
-            <Badge variant="outline" className={getDisciplineColor(ev.discipline)}>
-              {getDisciplineLabel(ev.discipline)}{subLabel ? ` ${subLabel}` : ""}
+      {/* Race identity */}
+      <div className="space-y-3 mb-6">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-bold uppercase tracking-widest text-primary">
+            {genderFilter === "men" ? "Next Men's Race" : genderFilter === "women" ? "Next Women's Race" : "Next Race"}
+          </span>
+          {daysUntil >= 0 && daysUntil <= 7 && (
+            <Badge className="bg-accent text-accent-foreground text-xs font-bold">
+              {daysUntil === 0 ? "TODAY" : daysUntil === 1 ? "TOMORROW" : `IN ${daysUntil} DAYS`}
             </Badge>
-            {ev.uciCategory && (
-              <Badge variant="outline" className="border-primary/50 text-primary font-mono font-semibold text-xs">{normalizeUciCategory(ev.uciCategory)}</Badge>
-            )}
-          </div>
-
-          {ev.totalRiders > 0 && (
-            <p className="text-sm text-muted-foreground">
-              {ev.totalRiders} riders confirmed across {ev.categories.length} categories
-            </p>
-          )}
-
-          {ev.externalLinks && Object.keys(ev.externalLinks).length > 0 && (
-            <div className="pt-1">
-              <RaceLinksSection links={ev.externalLinks} />
-            </div>
           )}
         </div>
 
-        <div className="flex flex-col gap-3 self-start md:self-end shrink-0">
-          <RaceFollowButton
-            eventId={ev.id}
-            eventName={ev.name}
-            categories={ev.categories}
-            size="default"
-          />
-          <Link href={url} prefetch={false} className="text-xs text-center text-muted-foreground hover:text-foreground transition-colors">
-            View predictions &rarr;
+        <h1 className="text-3xl font-black tracking-tight sm:text-4xl md:text-5xl">
+          <Link href={url} prefetch={false} className="hover:text-primary transition-colors">
+            {ev.name}
           </Link>
+        </h1>
+
+        <div className="flex flex-wrap items-center gap-3 text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            {getFlag(ev.country)} {format(raceDate, "EEEE, MMMM d")}
+          </span>
+          <Badge variant="outline" className={getDisciplineColor(ev.discipline)}>
+            {getDisciplineLabel(ev.discipline)}{subLabel ? ` ${subLabel}` : ""}
+          </Badge>
+          {ev.uciCategory && (
+            <Badge variant="outline" className="border-primary/50 text-primary font-mono font-semibold text-xs">{normalizeUciCategory(ev.uciCategory)}</Badge>
+          )}
         </div>
       </div>
 
-      <div className="absolute -left-4 top-0 bottom-0 w-1 bg-primary rounded-full hidden md:block" />
+      {/* Predictions panel */}
+      {hasPredictions && (
+        <div className={`grid gap-4 mb-6 ${bothGenders ? "sm:grid-cols-2" : "max-w-xs"}`}>
+          {[
+            { gender: "men", picks: menPicks, label: "Men's Favourites" },
+            { gender: "women", picks: womenPicks, label: "Women's Favourites" },
+          ]
+            .filter(({ picks }) => picks.length > 0)
+            .map(({ gender, picks, label }) => {
+              const catSlug = ev.categories.find(c => c.gender === gender && c.ageCategory === "elite")?.categorySlug;
+              const catUrl = catSlug ? `${url}/${catSlug}` : url;
+              return (
+                <div key={gender} className="rounded-lg border border-border/40 bg-black/20 backdrop-blur-sm overflow-hidden">
+                  <div className="px-3 py-2 border-b border-border/30 flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">{label}</span>
+                    <Link href={catUrl} className="text-[10px] text-primary hover:underline">Full predictions →</Link>
+                  </div>
+                  <ol className="divide-y divide-border/20">
+                    {picks.map((pick, i) => (
+                      <li key={pick.name} className="flex items-center gap-3 px-3 py-2">
+                        <span className="text-xs font-bold tabular-nums text-muted-foreground w-4 shrink-0">{i + 1}</span>
+                        {pick.photoUrl ? (
+                          <img src={pick.photoUrl} alt={pick.name} className="w-6 h-6 rounded-full object-cover shrink-0 opacity-90" />
+                        ) : (
+                          <div className="w-6 h-6 rounded-full bg-muted/40 shrink-0" />
+                        )}
+                        <span className="text-sm font-semibold flex-1 leading-tight truncate">{pick.name}</span>
+                        {pick.winPct > 0 && (
+                          <span className="text-xs font-bold tabular-nums text-primary shrink-0">{pick.winPct.toFixed(1)}%</span>
+                        )}
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              );
+            })}
+        </div>
+      )}
+
+      {/* CTA row */}
+      <div className="flex items-center gap-4">
+        <Link
+          href={url}
+          prefetch={false}
+          className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:bg-primary/90 transition-colors"
+        >
+          View all predictions →
+        </Link>
+        <RaceFollowButton
+          eventId={ev.id}
+          eventName={ev.name}
+          categories={ev.categories}
+          size="default"
+        />
+      </div>
     </div>
   );
 }
