@@ -154,7 +154,7 @@ async function syncStartlistForRace(race: {
     const slugPart = race.pcsUrl.replace("https://www.procyclingstats.com/race/", "").split("/")[0];
     const isWomensUrl = WOMENS_SLUG_INDICATORS.some(ind => slugPart.includes(ind));
     if (!isWomensUrl) {
-      console.warn(\`[sync-startlists] Skipping \${race.name} — pcs_url looks like a men's page (\${slugPart}). Fix pcs_url to use women's PCS slug.\`);
+      console.warn("[sync-startlists] Skipping " + race.name + " — pcs_url looks like a men's page (" + slugPart + "). Fix pcs_url to use women's PCS slug.");
       return { inserted: 0, updated: 0, errors: 0 };
     }
   }
