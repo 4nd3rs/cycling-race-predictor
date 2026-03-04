@@ -82,7 +82,6 @@ async function getHighHypeRaces(discipline?: string | null): Promise<{ hero: Hom
         event: raceEvents,
         startlistCount: sql<number>`(SELECT COUNT(*) FROM race_startlist WHERE race_startlist.race_id = ${races.id})`,
         newsCount: sql<number>`(SELECT COUNT(*) FROM race_news WHERE race_news.race_event_id = ${raceEvents.id})`,
-        heroImage: sql<string | null>`(SELECT image_url FROM race_news WHERE race_news.race_event_id = ${raceEvents.id} AND image_url IS NOT NULL AND image_url != '' ORDER BY published_at DESC LIMIT 1)`,
       })
       .from(races)
       .innerJoin(raceEvents, eq(races.raceEventId, raceEvents.id))
@@ -92,7 +91,7 @@ async function getHighHypeRaces(discipline?: string | null): Promise<{ hero: Hom
 
     // Group by event id — deduplicate categories into one row per event
     const eventsMap = new Map<string, HomepageEvent>();
-    for (const { race, event, startlistCount, newsCount, heroImage } of result) {
+    for (const { race, event, startlistCount, newsCount } of result) {
       const riderCount = Number(startlistCount) || 0;
       if (!eventsMap.has(event.id)) {
         eventsMap.set(event.id, {
@@ -108,7 +107,7 @@ async function getHighHypeRaces(discipline?: string | null): Promise<{ hero: Hom
           uciCategory: race.uciCategory ?? null,
           hypeScore: getHypeScore(race.uciCategory),
           newsCount: Number(newsCount) || 0,
-          heroImage: heroImage ?? null,
+          heroImage: null,
           externalLinks: (event.externalLinks as HomepageEvent["externalLinks"]) ?? null,
           categories: [],
           totalRiders: 0,
@@ -119,8 +118,7 @@ async function getHighHypeRaces(discipline?: string | null): Promise<{ hero: Hom
           ev.uciCategory = race.uciCategory ?? null;
           ev.hypeScore = getHypeScore(race.uciCategory);
         }
-        // Keep the most recent hero image across categories
-        if (!ev.heroImage && heroImage) ev.heroImage = heroImage;
+
       }
       const ev = eventsMap.get(event.id)!;
       ev.totalRiders += riderCount;
@@ -230,6 +228,7 @@ function getRaceUrl(race: typeof races.$inferSelect, event: typeof raceEvents.$i
 
 // ─── Country name helper (shared utility) ─────────────────────────────────
 import { getCountryName } from "@/lib/country-names";
+import { getRaceImage } from "@/lib/race-images";
 
 async function getFilteredCalendarEvents(
   discipline: string | null,
@@ -342,27 +341,41 @@ export default async function Home({ searchParams }: HomePageProps) {
         </div>
 
         {/* ---- NEXT RACE SPOTLIGHT ---- */}
-        <section className="border-b border-border/50 relative overflow-hidden">
-          {nextRace?.heroImage && (
-            <>
-              <div
-                className="absolute inset-0 bg-cover bg-center"
-                style={{ backgroundImage: `url(${nextRace.heroImage})` }}
-              />
-              <div className="absolute inset-0 bg-gradient-to-r from-background via-background/85 to-background/40" />
-              <div className="absolute inset-0 bg-gradient-to-t from-background/60 via-transparent to-transparent" />
-            </>
-          )}
-          <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-10 md:py-16">
-            {nextRace ? (
-              <NextRaceHero event={nextRace} />
-            ) : (
-              <div className="text-center py-12">
-                <p className="text-xl text-muted-foreground">No upcoming races — check back soon</p>
+        {(() => {
+          const raceImg = nextRace ? getRaceImage(nextRace.slug) : null;
+          return (
+            <section className="border-b border-border/50 relative overflow-hidden">
+              {raceImg && (
+                <>
+                  <div
+                    className="absolute inset-0 bg-cover bg-center"
+                    style={{ backgroundImage: `url(${raceImg.src})` }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-r from-background via-background/85 to-background/40" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-background/60 via-transparent to-transparent" />
+                  {/* Photo credit */}
+                  <a
+                    href={raceImg.commonsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="absolute bottom-2 right-3 z-20 text-[10px] text-white/40 hover:text-white/70 transition-colors"
+                  >
+                    Photo: {raceImg.credit} / {raceImg.license}
+                  </a>
+                </>
+              )}
+              <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-10 md:py-16">
+                {nextRace ? (
+                  <NextRaceHero event={nextRace} />
+                ) : (
+                  <div className="text-center py-12">
+                    <p className="text-xl text-muted-foreground">No upcoming races — check back soon</p>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        </section>
+            </section>
+          );
+        })()}
 
         {/* ---- MY FEED (logged in users) ---- */}
         <MyFeedWidget />
