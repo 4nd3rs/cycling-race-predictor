@@ -16,6 +16,11 @@ async function rateLimitedFetch(url: string): Promise<string> {
   return scrapeDo(url, { render: true, timeout: 30000 });
 }
 
+// Lightweight fetch for results pages — no JS rendering needed, faster and cheaper
+async function lightFetch(url: string): Promise<string> {
+  return scrapeDo(url, { render: false, timeout: 20000 });
+}
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -182,8 +187,12 @@ export async function scrapeRaceResults(
   raceUrl: string
 ): Promise<PCSRaceResult[]> {
   try {
-    const url = raceUrl.startsWith("http") ? raceUrl : `${PCS_BASE_URL}${raceUrl}`;
-    const html = await rateLimitedFetch(url);
+    let url = raceUrl.startsWith("http") ? raceUrl : `${PCS_BASE_URL}${raceUrl}`;
+    // Ensure we hit the /result subpage — the overview page only has a mini table.basic preview
+    if (!url.match(/\/result\/?$/)) {
+      url = url.replace(/\/?$/, "/result");
+    }
+    const html = await lightFetch(url);
     const $ = cheerio.load(html);
 
     const results: PCSRaceResult[] = [];

@@ -294,7 +294,8 @@ async function generateForRace(raceId: string): Promise<void> {
       where: and(
         eq(schema.riderDisciplineStats.riderId, rider.id),
         eq(schema.riderDisciplineStats.discipline, discipline),
-        eq(schema.riderDisciplineStats.ageCategory, ageCategory)
+        eq(schema.riderDisciplineStats.ageCategory, ageCategory),
+        eq(schema.riderDisciplineStats.gender, gender)
       ),
     });
 
@@ -309,7 +310,8 @@ async function generateForRace(raceId: string): Promise<void> {
         where: and(
           eq(schema.riderDisciplineStats.riderId, rider.id),
           eq(schema.riderDisciplineStats.discipline, discipline),
-          eq(schema.riderDisciplineStats.ageCategory, ageCategory)
+          eq(schema.riderDisciplineStats.ageCategory, ageCategory),
+          eq(schema.riderDisciplineStats.gender, gender)
         ),
       });
     }
