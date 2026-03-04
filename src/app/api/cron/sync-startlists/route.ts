@@ -146,10 +146,22 @@ async function syncStartlistForRace(race: {
 }): Promise<{ inserted: number; updated: number; errors: number }> {
   if (!race.pcsUrl) return { inserted: 0, updated: 0, errors: 0 };
 
+  // Women's races must have a women's PCS URL — never scrape a men's page for women.
+  // Women's PCS URLs always contain one of these indicators in the slug.
+  const WOMENS_SLUG_INDICATORS = ["-we", "-donne", "-femmes", "-women", "-ladies", "-fem", "-vrouwen", "-femenina", "-feminine"];
+  const raceGender = race.gender || "men";
+  if (raceGender === "women") {
+    const slugPart = race.pcsUrl.replace("https://www.procyclingstats.com/race/", "").split("/")[0];
+    const isWomensUrl = WOMENS_SLUG_INDICATORS.some(ind => slugPart.includes(ind));
+    if (!isWomensUrl) {
+      console.warn(\`[sync-startlists] Skipping \${race.name} — pcs_url looks like a men's page (\${slugPart}). Fix pcs_url to use women's PCS slug.\`);
+      return { inserted: 0, updated: 0, errors: 0 };
+    }
+  }
+
   const startlistUrl = race.pcsUrl.replace(/\/$/, "") + "/startlist";
   const raceDiscipline = race.discipline || "road";
   const raceAgeCategory = race.ageCategory || "elite";
-  const raceGender = race.gender || "men";
 
   type RawEntry = { riderName: string; riderPcsId: string; teamName: string | null; bibNumber: number | null };
   let rawEntries: RawEntry[] = [];
