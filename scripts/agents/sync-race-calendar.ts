@@ -239,10 +239,11 @@ function parseRaceCategories(name: string): Array<{ gender: string; ageCategory:
     return [{ gender: "women", ageCategory: "elite", cleanName: name.replace(/\s*[-–]?\s*(elite\s+women|women\s+elite)/gi, "").trim() }];
   }
 
-  // No gender info — create both men and women elite
+  // No explicit gender marker in the race name → men-only.
+  // Women's races on PCS always have an explicit indicator (WE, Women, Donne, Femmes, Ladies, etc.).
+  // We no longer auto-create a phantom women's race; those must come with explicit PCS proof.
   return [
     { gender: "men", ageCategory: "elite", cleanName: name },
-    { gender: "women", ageCategory: "elite", cleanName: name },
   ];
 }
 
