@@ -14,6 +14,7 @@ const isPublicRoute = createRouteMatcher([
   "/sign-up(.*)",
   "/api/cron(.*)", // Cron jobs are protected by Vercel's signature
   "/api/telegram(.*)", // Telegram webhook is verified by token in payload
+  "/api/og(.*)", // OG image generation — public
 ]);
 
 // Define admin-only routes
