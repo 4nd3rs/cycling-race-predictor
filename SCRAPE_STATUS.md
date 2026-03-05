@@ -1,6 +1,6 @@
 # SCRAPE_STATUS.md — Pipeline Status
 
-_Last updated: 2026-03-05 12:05:28 (Stockholm)_
+_Last updated: 2026-03-05 18:02:45 (Stockholm)_
 
 ## 📅 Race Calendar
 - **Last run:** 2026-03-01 23:21:41
@@ -17,13 +17,13 @@ _Last updated: 2026-03-05 12:05:28 (Stockholm)_
 | Salverda Bouw Ster van Zwolle - Elite Men | 2026-03-07 | 172 | ✅ up to date | 2026-03-05 08:04:54 |
 
 ## 🏁 Results
-- **Last run:** 2026-03-05 12:05:28
+- **Last run:** 2026-03-05 18:02:45
 - **Status:** ✅ OK
-- 158 results imported across 1 race(s). 0 race(s) missing pcsUrl.
+- 135 results imported across 1 race(s). 0 race(s) missing pcsUrl.
 
 | Race | Date | Results | Status | Scraped |
 |------|------|---------|--------|---------|
-| Trofeo Laigueglia - Elite Men | 2026-03-04 | 158 | ✅ imported | 2026-03-05 12:04:55 |
+| Omloop Het Nieuwsblad 2026 - Elite Women | 2026-02-28 | 135 | ✅ imported | 2026-03-05 18:02:20 |
 
 ---
 <!-- STATUS_JSON
@@ -46,17 +46,17 @@ _Last updated: 2026-03-05 12:05:28 (Stockholm)_
   "results": {
     "component": "results",
     "status": "ok",
-    "summary": "158 results imported across 1 race(s). 0 race(s) missing pcsUrl.",
+    "summary": "135 results imported across 1 race(s). 0 race(s) missing pcsUrl.",
     "raceRows": [
       {
-        "name": "Trofeo Laigueglia - Elite Men",
-        "date": "2026-03-04",
-        "count": 158,
+        "name": "Omloop Het Nieuwsblad 2026 - Elite Women",
+        "date": "2026-02-28",
+        "count": 135,
         "status": "✅ imported",
-        "scrapedAt": "2026-03-05 12:04:55"
+        "scrapedAt": "2026-03-05 18:02:20"
       }
     ],
-    "updatedAt": "2026-03-05 12:05:28"
+    "updatedAt": "2026-03-05 18:02:45"
   },
   "calendar": {
     "component": "calendar",

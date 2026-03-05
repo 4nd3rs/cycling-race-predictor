@@ -2,53 +2,32 @@
 <!-- Max 50 lines. Trim old entries when approaching limit. -->
 
 ## Last run
-2026-03-05 ~12:01 Stockholm
+2026-03-05 ~18:01 Stockholm
+
+## RESOLVED — DO NOT RE-RAISE
+- Paris-Nice W + Tirreno-Adriatico W: DELETED (phantom races, Anders confirmed)
+- 188 phantom women's races purged (2026-03-05)
+- OHN M (bbd718a5): scrape-results --force → 173 results ✅ (2026-03-05 16:01)
+- OHN W (f6f9ae0b): scrape-results --force → 135 results inserted ✅ (2026-03-05 18:01)
 
 ## Active issues
 
-### [CRITICAL — AWAITING ANDERS] Paris-Nice W + Tirreno-Adriatico W = PHANTOM RACES
-- f2fdb0e3 (Paris-Nice W) — 0 startlist, pcs_url=paris-nice-femmes/2026
-- c259eb66 (Tirreno-Adriatico W) — 0 startlist, pcs_url=tirreno-adriatico-donne/2026
-→ Asked Anders multiple times. Waiting: delete or disable these records.
-
-### [AWAITING ANDERS] Faun Drome Classic W — wrong pcs_url
-- 870aacb5 — pcs_url = men's URL (la-drome-classic/2026), -dames/-femmes tried → HTTP 000
-→ Waiting for Anders: correct PCS URL?
-
-### [MINOR — AWAITING ANDERS] Salverda Bouw Ster van Zwolle W — likely phantom
-- 55cb9868 — gender=women, pcs_url same as men's race
-→ Ask Anders if should be removed.
-
-### [WATCH #1] Le Samyn M (race c498bdc7, Mar 3) — 171 startlist, only 5 results
-→ Added this run. Check next run; if still <10, run scrape-results --race-id c498bdc7.
-
-### [WATCH #1] Omloop Het Nieuwsblad M (race 2890d292, Feb 28) — 175 startlist, only 2 results
-→ Added this run. Check next run; if still <10, run scrape-results --race-id 2890d292.
+### [WATCH] Stale 2025 road races (19 races, 270-410d overdue)
+→ Not urgent. Likely results never scraped for older PCS entries.
+→ Do not batch-fix. Flag for Anders if he wants to backfill.
 
 ## scrape.do status
-- 2026-03-05 12:01: Site HTTP 200 ✅
+- 2026-03-05 18:01: Site HTTP 200 ✅
 
-## Healthy upcoming races
-- Strade Bianche M (Mar 7): 71 startlist + 71 predictions ✅ 22 news ✅
-- Strade Bianche W (Mar 7): 45 startlist + 45 predictions ✅ 22 news ✅
-- Ster van Zwolle M (Mar 7): 172 startlist + 172 predictions ✅ 1 news ✅
-- Paris-Nice M (Mar 8): 84 startlist + 84 predictions ✅ 10 news ✅
-- Tirreno-Adriatico M (Mar 9): 70 startlist + 70 predictions ✅ 6 news ✅
-
-## Missing results (expected — null pcs_url or MTB)
-- VTT Chabrières M/W (Feb 28): MTB, null pcs_url
-- Gran Premio Zaragoza XCO M/W (Feb 28): MTB, null pcs_url
-- BIWASE Tour of Vietnam M (Mar 4): null pcs_url
-- National Championships Bolivia M (Feb 28): null pcs_url
+## Healthy upcoming races (checked 18:01)
+- Strade Bianche W (Mar 7): 45 startlist + predictions, 26 news ✅
+- Strade Bianche M (Mar 7): 71 startlist + predictions, 26 news ✅
+- Ster van Zwolle M (Mar 7): 172 startlist + predictions, 1 news ✅
+- Paris-Nice M (Mar 8): 84 startlist + predictions, 10 news ✅
+- Tirreno-Adriatico M (Mar 9): 70 startlist + predictions, 6 news ✅
 
 ## Recent fixes
-- 2026-03-05 12:01: scrape-results Trofeo Laigueglia M (c2514259) → 158 results inserted ✅
-- 2026-03-05 10:01: scrape-race-news Ster van Zwolle M → 3 articles (hub 404, limited)
-- 2026-03-05 08:01: generate-predictions Ster van Zwolle M (a738096d) → 172 predictions ✅
-- 2026-03-04 20:01: scrape-results Hageland M (9481e288) → 160 results ✅
-
-## Notes
-- Pattern: some races marked "completed" with only 2-5 results (parse timing issue?)
-- Kuurne (174✅), Hageland (160✅) scraped fine; Le Samyn + OHN only 2-5
-- Women's PCS URLs: -donne, -femmes, -we, -ladies depending on race
-- MTB races with null pcs_url — expected, no action
+- 2026-03-05 18:01: OHN W → 135 results inserted (was stuck at 1) ✅
+- 2026-03-05 16:01: OHN M → 173 results ✅ (was stuck at 2)
+- 2026-03-05 14:01: Le Samyn M → 166 results ✅
+- 2026-03-05 12:01: Trofeo Laigueglia M → 158 results ✅

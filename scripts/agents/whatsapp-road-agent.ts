@@ -6,7 +6,7 @@
 import { config } from "dotenv";
 config({ path: ".env.local" });
 
-import { db, races, raceResults, raceEvents, riders, raceStartlist, teams } from "./lib/db";
+import { db, races, raceResults, raceEvents, riders, raceStartlist, teams, predictions } from "./lib/db";
 import { eq, and, gte, lte, lt, desc, inArray, isNotNull, sql } from "drizzle-orm";
 import { readFileSync, existsSync } from "fs";
 import { GoogleGenerativeAI } from "@google/generative-ai";
@@ -48,7 +48,12 @@ async function sendToWA(text: string) {
 
 async function generate(prompt: string): Promise<string> {
   const result = await model.generateContent(prompt);
-  return result.response.text().trim();
+  const text = result.response.text().trim();
+  // Safeguard: reject output containing unfilled template placeholders
+  if (/\[Top Pick \d+ Name\]|\[.*Name.*\]|\[.*placeholder.*\]/i.test(text)) {
+    throw new Error(`Gemini returned unfilled template placeholders: ${text.slice(0, 100)}`);
+  }
+  return text;
 }
 
 function loadTodayIntel() {
@@ -62,6 +67,7 @@ function loadTodayIntel() {
 async function getUpcomingRaces(dayMin: number, dayMax: number) {
   return db.select({
     id: races.id, name: races.name, date: races.date, discipline: races.discipline,
+    gender: races.gender,
     raceEventId: races.raceEventId, pcsUrl: races.pcsUrl,
     eventName: raceEvents.name, eventSlug: raceEvents.slug, country: raceEvents.country,
   })
@@ -77,16 +83,26 @@ async function getUpcomingRaces(dayMin: number, dayMax: number) {
 }
 
 async function getTopPredictions(raceId: string, limit = 5) {
-  const startlist = await db.select({
-    name: riders.name, team: teams.name, score: raceStartlist.predictedScore, position: raceStartlist.predictedPosition,
+  // Use win_probability (TrueSkill) — NOT predictedPosition which is often null
+  const preds = await db.select({
+    name: riders.name, team: teams.name, winProbability: predictions.winProbability,
   })
-    .from(raceStartlist)
-    .leftJoin(riders, eq(raceStartlist.riderId, riders.id))
+    .from(predictions)
+    .leftJoin(riders, eq(predictions.riderId, riders.id))
+    .leftJoin(raceStartlist, and(eq(raceStartlist.raceId, raceId), eq(raceStartlist.riderId, predictions.riderId)))
     .leftJoin(teams, eq(raceStartlist.teamId, teams.id))
-    .where(and(eq(raceStartlist.raceId, raceId), isNotNull(raceStartlist.predictedPosition)))
-    .orderBy(raceStartlist.predictedPosition)
-    .limit(limit);
-  return startlist;
+    .where(and(eq(predictions.raceId, raceId), isNotNull(predictions.winProbability)))
+    .orderBy(desc(predictions.winProbability))
+    .limit(limit * 3); // fetch extra to deduplicate by name
+  // Deduplicate by normalized first two name tokens (handles suffix variants)
+  const seen = new Set<string>();
+  const deduped = preds.filter(p => {
+    const key = (p.name ?? "").toLowerCase().trim().split(/\s+/).slice(0, 2).join(" ");
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  return deduped.slice(0, limit);
 }
 
 async function getRecentResults(raceId: string) {
@@ -142,15 +158,36 @@ async function postPreview() {
   const races48h = await getUpcomingRaces(1, 2);
   if (races48h.length === 0) { console.log("No races in 48h window"); return; }
 
-  for (const race of races48h.slice(0, 2)) {
+  // Dedup by event slug — one preview per event (avoids men's+women's double-post).
+  // For each event slug, pick the gender with the most predictions (prefer men's on tie).
+  const bySlug = new Map<string, typeof races48h[0]>();
+  for (const race of races48h) {
+    const key = race.eventSlug ?? race.id;
+    const existing = bySlug.get(key);
+    if (!existing) { bySlug.set(key, race); continue; }
+    // Replace with men's edition if current slot is women's (men's has more/better predictions usually)
+    if ((race as any).gender === "men" && (existing as any).gender !== "men") bySlug.set(key, race);
+  }
+  // From all unique events, pick up to 2 that actually have predictions
+  const racesWithPreds: Array<{ race: typeof races48h[0]; preds: Awaited<ReturnType<typeof getTopPredictions>> }> = [];
+  for (const race of Array.from(bySlug.values())) {
     const preds = await getTopPredictions(race.id);
+    if (preds.length === 0) {
+      console.log(`⚠️  Skipping ${race.eventName ?? race.name} — no predictions in DB`);
+      continue;
+    }
+    racesWithPreds.push({ race, preds });
+    if (racesWithPreds.length >= 2) break;
+  }
+  if (racesWithPreds.length === 0) { console.log("No races with predictions in 48h window"); return; }
+
+  for (const { race, preds } of racesWithPreds) {
+
     const intel = loadTodayIntel().filter(i =>
       i.type === "race" && i.subject.toLowerCase().includes((race.eventName ?? race.name).toLowerCase().split(" ")[0])
     );
 
-    const predText = preds.length > 0
-      ? preds.map((p, i) => `${i + 1}. ${p.name} (${p.team ?? "?"})` ).join("\n")
-      : "Predictions generating...";
+    const predText = preds.map((p, i) => `${i + 1}. ${p.name} (${p.team ?? "?"})` ).join("\n");
 
     const url = race.eventSlug
       ? `${APP_URL}/races/road/${race.eventSlug}`
@@ -192,10 +229,15 @@ async function postRaceDay() {
   const todayRaces = await getUpcomingRaces(0, 0);
   if (todayRaces.length === 0) { console.log("No races today"); return; }
 
-  for (const race of todayRaces.slice(0, 2)) {
+  // Dedup by event slug
+  const seenRD = new Set<string>();
+  const uniqueToday = todayRaces.filter(r => { const k = r.eventSlug ?? r.id; if (seenRD.has(k)) return false; seenRD.add(k); return true; });
+
+  for (const race of uniqueToday.slice(0, 2)) {
     const preds = await getTopPredictions(race.id, 3);
     const url = race.eventSlug ? `${APP_URL}/races/road/${race.eventSlug}` : APP_URL;
 
+    if (preds.length === 0) { console.log(`⚠️  Skipping raceday ${race.eventName ?? race.name} — no predictions`); continue; }
     const topPick = preds[0]?.name ?? "unknown";
 
     const prompt = `Short race-day WhatsApp hype message for ${race.eventName ?? race.name}.
