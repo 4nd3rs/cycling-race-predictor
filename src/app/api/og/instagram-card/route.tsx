@@ -68,7 +68,11 @@ async function fetchFlag(iso3: string): Promise<string | null> {
     const res = await fetch(`https://flagcdn.com/w40/${code}.png`);
     if (!res.ok) return null;
     const buf = await res.arrayBuffer();
-    return `data:image/png;base64,${Buffer.from(buf).toString("base64")}`;
+    // Edge runtime: use btoa with Uint8Array instead of Buffer
+    const bytes = new Uint8Array(buf);
+    let binary = "";
+    for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+    return `data:image/png;base64,${btoa(binary)}`;
   } catch { return null; }
 }
 
@@ -218,6 +222,7 @@ export async function GET(req: NextRequest) {
   const eventSlug = searchParams.get("event") ?? "strade-bianche";
   const cardType = searchParams.get("type") ?? "preview";
   const gender = searchParams.get("gender") ?? "men";
+  try {
 
   const [barlowBold, barlowSemibold, interRegular] = await Promise.all([
     loadGoogleFont("Barlow Condensed", 800),
@@ -237,12 +242,18 @@ export async function GET(req: NextRequest) {
   const card = PreviewCard({ event, race, preds: rows });
 
   return new ImageResponse(card, {
-    width: W,
-    height: H,
-    fonts: [
-      { name: "Barlow Condensed", data: barlowBold,     weight: 800, style: "normal" },
-      { name: "Barlow Condensed", data: barlowSemibold, weight: 700, style: "normal" },
-      { name: "Inter",            data: interRegular,   weight: 400, style: "normal" },
-    ],
-  });
+      width: W,
+      height: H,
+      fonts: [
+        { name: "Barlow Condensed", data: barlowBold,     weight: 800, style: "normal" },
+        { name: "Barlow Condensed", data: barlowSemibold, weight: 700, style: "normal" },
+        { name: "Inter",            data: interRegular,   weight: 400, style: "normal" },
+      ],
+    });
+  } catch (err: any) {
+    return new Response(JSON.stringify({ error: err.message, stack: err.stack?.slice(0, 500) }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 }
