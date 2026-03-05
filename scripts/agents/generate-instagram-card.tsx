@@ -20,7 +20,8 @@ const eventSlug = args[args.indexOf("--event") + 1] ?? null;
 const cardType: "preview" | "results" = (args[args.indexOf("--type") + 1] as any) ?? "preview";
 const gender: "men" | "women" = (args[args.indexOf("--gender") + 1] as any) ?? "men";
 const isStories = args.includes("--stories"); // keep flag for non-IG surfaces (Telegram, web); IG always uses stories via post-to-instagram.ts
-const outPath = args[args.indexOf("--out") + 1] ?? `/tmp/pcp-instagram-${cardType}-${gender}-${isStories ? "story" : "feed"}-${Date.now()}.png`;
+const outIdx = args.indexOf("--out");
+const outPath = outIdx !== -1 ? args[outIdx + 1] : `/tmp/pcp-instagram-${cardType}-${gender}-${isStories ? "story" : "feed"}-${Date.now()}.png`;
 
 if (!eventSlug) {
   console.error("Usage: tsx generate-instagram-card.tsx --event <slug> --type preview|results [--gender men|women]");
@@ -123,11 +124,13 @@ async function fetchData(sql: ReturnType<typeof neon>) {
       WHERE p.race_id = ${race.id} AND p.win_probability IS NOT NULL
       ORDER BY p.win_probability DESC LIMIT 20
     ` : [];
-    // Deduplicate by rider name, keeping highest probability entry
+    // Deduplicate by normalized rider name (handles "Surname Name" vs "Surname Name Suffix")
     const seen = new Set<string>();
+    const normName = (n: string) => n.toLowerCase().trim().split(/\s+/).slice(0, 2).join(" ");
     const dedupedPreds = preds.filter((p: any) => {
-      if (seen.has(p.rider_name)) return false;
-      seen.add(p.rider_name);
+      const key = normName(p.rider_name ?? "");
+      if (seen.has(key)) return false;
+      seen.add(key);
       return true;
     }).slice(0, 5);
     return { event, race, preds: dedupedPreds, results: [] };
@@ -303,13 +306,11 @@ function PreviewCard({ event, race, preds }: any) {
           })}
         </div>
 
-        {/* Brand footer */}
-        <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "18px 52px 52px", flexShrink: 0 }}>
-          <BibIcon size={44} />
-          <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-            <span style={{ fontSize: 17, fontWeight: 800, color: RED, letterSpacing: "0.08em" }}>PRO CYCLING PREDICTOR</span>
-            <span style={{ fontSize: 20, fontWeight: 500, color: `${WHITE}99`, fontFamily: "Inter" }}>procyclingpredictor.com</span>
-          </div>
+        {/* Brand footer — centered, bigger */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, padding: "24px 52px 64px", flexShrink: 0 }}>
+          <BibIcon size={80} />
+          <span style={{ fontSize: 26, fontWeight: 800, color: RED, letterSpacing: "0.12em", fontFamily: "Inter" }}>PRO CYCLING PREDICTOR</span>
+          <span style={{ fontSize: 22, fontWeight: 400, color: `${WHITE}88`, fontFamily: "Inter" }}>procyclingpredictor.com</span>
         </div>
       </div>
     );
