@@ -128,6 +128,10 @@ export const raceEvents = pgTable(
       raceStart?: string;
       raceFinish?: string;
     }>(),
+    // Timing system integration
+    timingSystem: varchar("timing_system", { length: 50 }), // 'sportstiming' | 'eqtiming' | 'xcodata' | 'raceresult' | 'mylaps' | 'uci'
+    timingEventId: varchar("timing_event_id", { length: 100 }), // External ID in the timing system (e.g. "16260" for sportstiming)
+    timingEventUrl: varchar("timing_event_url", { length: 500 }), // Direct URL to results/startlist page
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
@@ -777,3 +781,14 @@ export const waGroupMembers = pgTable("wa_group_members", {
 });
 export type WaGroupMember = typeof waGroupMembers.$inferSelect;
 export type NewWaGroupMember = typeof waGroupMembers.$inferInsert;
+
+// ── Marketing Posts (dedup tracking for Telegram/Instagram) ──────────────────
+export const marketingPosts = pgTable("marketing_posts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  raceId: text("race_id").notNull(),
+  postType: varchar("post_type", { length: 20 }).notNull(), // "preview" | "result" | "ig-preview" | "ig-result"
+  channel: varchar("channel", { length: 20 }).notNull(),    // "telegram" | "instagram"
+  postedAt: timestamp("posted_at", { withTimezone: true }).defaultNow().notNull(),
+});
+export type MarketingPost = typeof marketingPosts.$inferSelect;
+export type NewMarketingPost = typeof marketingPosts.$inferInsert;

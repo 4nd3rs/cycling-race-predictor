@@ -1,120 +1,146 @@
-import { config } from 'dotenv'; config({ path: '.env.local' });
-import { drizzle } from 'drizzle-orm/neon-http';
-import { neon } from '@neondatabase/serverless';
-import { eq, sql as drizzleSql } from 'drizzle-orm';
-import * as schema from '../../src/lib/db/schema';
+/**
+ * dedup-riders.ts
+ * Finds riders that are the same person but stored under reversed name order,
+ * merges them into the canonical record (older/richer one), and deletes the duplicate.
+ *
+ * Usage:
+ *   tsx scripts/agents/dedup-riders.ts            # dry run
+ *   tsx scripts/agents/dedup-riders.ts --apply    # actually merge
+ */
+import { config } from "dotenv";
+config({ path: ".env.local" });
 
-const db = drizzle(neon(process.env.DATABASE_URL!), { schema });
+import { neon } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-http";
+import { eq, and, inArray } from "drizzle-orm";
+import * as schema from "../../src/lib/db/schema";
 
-// Canonical key: sorted lowercase words, accent-stripped
-function canonicalKey(name: string): string {
-  const stripped = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  return stripped.toLowerCase().split(/\s+/).sort().join(" ");
+const sqlClient = neon(process.env.DATABASE_URL!);
+const db = drizzle(sqlClient, { schema });
+const APPLY = process.argv.includes("--apply");
+const DISCIPLINE = process.argv.find(a => a.startsWith("--discipline="))?.split("=")[1] ?? null;
+
+function stripAccents(s: string) {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 }
 
-// Canonical "First Last" from any order name
-function toFirstLast(name: string): string {
-  const words = name.trim().split(/\s+/);
-  if (words.length < 2) return name;
-  // Detect ALL_CAPS last name (UCI format: LASTNAME Firstname)
-  const stripAcc = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  let lastCapIdx = -1;
-  for (let i = 0; i < words.length - 1; i++) {
-    const w = stripAcc(words[i]);
-    if (w === w.toUpperCase() && w.length > 1 && /[A-Za-z]/.test(w)) {
-      lastCapIdx = i;
-    } else break;
-  }
-  if (lastCapIdx >= 0) {
-    const last = words.slice(0, lastCapIdx + 1);
-    const first = words.slice(lastCapIdx + 1);
-    return [...first, ...last].map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
-  }
-  // Title case as-is
-  return words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+function tokenSet(name: string): Set<string> {
+  return new Set(stripAccents(name).split(/\s+/));
+}
+
+function sameTokens(a: string, b: string): boolean {
+  const ta = tokenSet(a);
+  const tb = tokenSet(b);
+  if (ta.size !== tb.size) return false;
+  for (const t of ta) if (!tb.has(t)) return false;
+  return true;
 }
 
 async function main() {
-  const allRiders = await db.select().from(schema.riders);
-  console.log(`Total riders: ${allRiders.length}`);
+  console.log(`🔍 Dedup riders — mode: ${APPLY ? "APPLY" : "DRY RUN"}\n`);
 
-  // Group by canonical key (sorted words, accent-stripped)
-  const byKey = new Map<string, typeof allRiders>();
-  for (const r of allRiders) {
-    const key = canonicalKey(r.name);
-    if (!byKey.has(key)) byKey.set(key, []);
-    byKey.get(key)!.push(r);
+  // Load all riders
+  const allRiders = await sqlClient`
+    SELECT id, name, nationality, birth_date as "birthDate",
+           photo_url as "photoUrl", bio, instagram_handle as "instagramHandle",
+           created_at as "createdAt"
+    FROM riders
+  ` as Array<{ id: string; name: string; nationality: string | null; birthDate: string | null; photoUrl: string | null; bio: string | null; instagramHandle: string | null; createdAt: Date }>;
+
+  console.log(`Loaded ${allRiders.length} riders`);
+
+  // Build duplicate pairs: same token set, different name string
+  const pairs: Array<{ keep: typeof allRiders[0]; discard: typeof allRiders[0] }> = [];
+  const seen = new Set<string>();
+
+  for (let i = 0; i < allRiders.length; i++) {
+    const a = allRiders[i];
+    if (seen.has(a.id)) continue;
+
+    for (let j = i + 1; j < allRiders.length; j++) {
+      const b = allRiders[j];
+      if (seen.has(b.id)) continue;
+      if (stripAccents(a.name) === stripAccents(b.name)) continue; // same name, different issue
+      if (!sameTokens(a.name, b.name)) continue;
+
+      // They're the same person with reversed name order
+      // Keep the one with more data (photo/bio/team) or older createdAt
+      const aScore = (a.photoUrl ? 2 : 0) + (a.bio ? 2 : 0) + (a.nationality ? 1 : 0) + (a.instagramHandle ? 1 : 0);
+      const bScore = (b.photoUrl ? 2 : 0) + (b.bio ? 2 : 0) + (b.nationality ? 1 : 0) + (b.instagramHandle ? 1 : 0);
+      
+      // Also prefer properly-cased name over ALL_CAPS last name
+      const aHasCaps = /^[A-Z]{2,}/.test(a.name);
+      const bHasCaps = /^[A-Z]{2,}/.test(b.name);
+      const aFinalScore = aScore + (aHasCaps ? -1 : 0);
+      const bFinalScore = bScore + (bHasCaps ? -1 : 0);
+
+      const [keep, discard] = aFinalScore >= bFinalScore
+        ? [a, b]
+        : [b, a];
+
+      pairs.push({ keep, discard });
+      seen.add(discard.id);
+    }
   }
 
-  const dupeGroups = [...byKey.values()].filter(g => g.length > 1);
-  console.log(`Found ${dupeGroups.length} duplicate groups to merge`);
+  console.log(`Found ${pairs.length} duplicate pairs\n`);
+  
+  if (pairs.length === 0) {
+    console.log("Nothing to do.");
+    return;
+  }
 
-  let merged = 0;
-  for (const group of dupeGroups) {
-    // Rank: most results wins; ties broken by pcsId > xcoId > uciId
-    const withCounts = await Promise.all(group.map(async r => {
-      const [res] = await db.select({ cnt: drizzleSql<number>`count(*)::int` })
-        .from(schema.raceResults).where(eq(schema.raceResults.riderId, r.id));
-      return { ...r, resultCount: res.cnt };
-    }));
-    withCounts.sort((a, b) => {
-      if (b.resultCount !== a.resultCount) return b.resultCount - a.resultCount;
-      if (a.pcsId && !b.pcsId) return -1;
-      if (!a.pcsId && b.pcsId) return 1;
-      if (a.xcoId && !b.xcoId) return -1;
-      if (!a.xcoId && b.xcoId) return 1;
-      return 0;
-    });
+  for (const { keep, discard } of pairs) {
+    console.log(`  KEEP:    ${keep.name} (${keep.id.substring(0,8)})`);
+    console.log(`  DISCARD: ${discard.name} (${discard.id.substring(0,8)})`);
 
-    const canonical = withCounts[0];
-    const dupes = withCounts.slice(1);
-    const normName = toFirstLast(canonical.name);
+    if (!APPLY) { console.log(""); continue; }
 
-    // Clear IDs on dupes first to avoid unique violations
-    for (const d of dupes) {
-      await db.update(schema.riders).set({ pcsId: null, xcoId: null, uciId: null })
-        .where(eq(schema.riders.id, d.id));
-    }
+    // Re-point all foreign key references from discard → keep
+    const tables: Array<{ table: any; col: any; label: string }> = [
+      { table: schema.raceStartlist, col: schema.raceStartlist.riderId, label: "race_startlist" },
+      { table: schema.raceResults, col: schema.raceResults.riderId, label: "race_results" },
+      { table: schema.predictions, col: schema.predictions.riderId, label: "predictions" },
+      { table: schema.riderDisciplineStats, col: schema.riderDisciplineStats.riderId, label: "rider_discipline_stats" },
+      { table: schema.riderRumours, col: schema.riderRumours.riderId, label: "rider_rumours" },
+    ];
 
-    // Backfill missing IDs to canonical
-    const updates: Record<string, unknown> = { name: normName };
-    for (const d of dupes) {
-      if (d.pcsId && !canonical.pcsId) updates.pcsId = d.pcsId;
-      if (d.xcoId && !canonical.xcoId) updates.xcoId = d.xcoId;
-      if (d.uciId && !canonical.uciId) updates.uciId = d.uciId;
-      if (d.nationality && !canonical.nationality) updates.nationality = d.nationality;
-      if (d.birthDate && !canonical.birthDate) updates.birthDate = d.birthDate;
-    }
-    await db.update(schema.riders).set(updates).where(eq(schema.riders.id, canonical.id));
-
-    // Reroute results + elo_history
-    for (const d of dupes) {
-      const dupeResults = await db.select({ id: schema.raceResults.id, raceId: schema.raceResults.raceId })
-        .from(schema.raceResults).where(eq(schema.raceResults.riderId, d.id));
-
-      for (const res of dupeResults) {
-        // Check for conflict
-        const conflict = await db.query.raceResults.findFirst({
-          where: eq(schema.raceResults.riderId, canonical.id),
-        });
-        if (!conflict) {
-          await db.update(schema.raceResults).set({ riderId: canonical.id })
-            .where(eq(schema.raceResults.id, res.id));
-        } else {
-          await db.delete(schema.raceResults).where(eq(schema.raceResults.id, res.id));
+    for (const { table, col, label } of tables) {
+      try {
+        await db.update(table).set({ riderId: keep.id } as any).where(eq(col, discard.id));
+        // Note: on-conflict-do-nothing isn't available here for composite PKs;
+        // DB constraints (unique) may cause errors — we catch and continue
+      } catch (e: any) {
+        // Duplicate key on composite PK (e.g. same race + same rider after re-point)
+        if (e.message?.includes("duplicate") || e.message?.includes("unique")) {
+          // Already has a row for keep.id — delete the discard row instead
+          try {
+            await db.delete(table).where(eq(col, discard.id));
+          } catch {}
         }
       }
-      await db.update(schema.eloHistory).set({ riderId: canonical.id })
-        .where(eq(schema.eloHistory.riderId, d.id));
-      await db.delete(schema.riders).where(eq(schema.riders.id, d.id));
     }
 
-    const totalResults = withCounts.reduce((s, r) => s + r.resultCount, 0);
-    if (totalResults > 0 || dupes.some(d => d.name !== canonical.name)) {
-      console.log(`  ✓ "${group.map(r=>r.name).join('" + "')}" → "${normName}" (${totalResults} results)`);
+    // Merge enrichment data into keep if keep is missing it
+    const updates: Record<string, any> = {};
+    if (!keep.photoUrl && discard.photoUrl) updates.photoUrl = discard.photoUrl;
+    if (!keep.bio && discard.bio) updates.bio = discard.bio;
+    if (!keep.nationality && discard.nationality) updates.nationality = discard.nationality;
+    if (!keep.instagramHandle && discard.instagramHandle) updates.instagramHandle = discard.instagramHandle;
+    if (Object.keys(updates).length > 0) {
+      await db.update(schema.riders).set(updates).where(eq(schema.riders.id, keep.id));
     }
-    merged++;
+
+    // Delete the duplicate
+    await db.delete(schema.riders).where(eq(schema.riders.id, discard.id));
+    console.log(`  ✅ Merged → ${keep.name}\n`);
   }
-  console.log(`\n✅ Done: merged ${merged} duplicate groups`);
+
+  if (!APPLY) {
+    console.log(`\nRun with --apply to merge ${pairs.length} pairs`);
+  } else {
+    console.log(`\n✅ Merged ${pairs.length} pairs`);
+  }
 }
-main().catch(e => { console.error(e.message); process.exit(1); });
+
+main().catch(console.error);

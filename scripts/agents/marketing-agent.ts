@@ -2,13 +2,11 @@ import { config } from "dotenv";
 config({ path: ".env.local" });
 
 import { execSync } from "child_process";
-import { readFileSync, writeFileSync, existsSync } from "fs";
-import { db, races, raceResults, raceEvents } from "./lib/db";
+import { existsSync, readFileSync } from "fs";
+import { db, races, raceResults, raceEvents, marketingPosts } from "./lib/db";
 import { eq as eqOp } from "drizzle-orm";
 import { and, gte, lte, eq, sql } from "drizzle-orm";
 
-import path from "path";
-const TRACKING_FILE = path.join(process.cwd(), "data/marketing-posted.json");
 const INTEL_DIR = "./data/intel";
 
 interface IntelItem {
@@ -36,28 +34,28 @@ function getIntelForRace(raceName: string, intel: IntelItem[]): IntelItem[] {
   return intel.filter((i) => i.type === "race" && i.subject.toLowerCase().includes(lower.split(" ")[0]));
 }
 
-interface TrackingData {
-  previews: string[]; // race IDs
-  results: string[];  // race IDs
-  igPreviews: string[]; // Instagram story previews
-  igResults: string[];  // Instagram story results
+// ─── DB-backed tracking ───────────────────────────────────────────────────────
+
+async function hasPosted(raceId: string, postType: string, channel: string): Promise<boolean> {
+  const rows = await db
+    .select({ id: marketingPosts.id })
+    .from(marketingPosts)
+    .where(
+      and(
+        eq(marketingPosts.raceId, raceId),
+        eq(marketingPosts.postType, postType),
+        eq(marketingPosts.channel, channel)
+      )
+    )
+    .limit(1);
+  return rows.length > 0;
 }
 
-function loadTracking(): TrackingData {
-  const defaults: TrackingData = { previews: [], results: [], igPreviews: [], igResults: [] };
-  if (existsSync(TRACKING_FILE)) {
-    try {
-      const parsed = JSON.parse(readFileSync(TRACKING_FILE, "utf-8"));
-      return { ...defaults, ...parsed };
-    } catch {
-      // Corrupted file, reset
-    }
-  }
-  return defaults;
-}
-
-function saveTracking(data: TrackingData): void {
-  writeFileSync(TRACKING_FILE, JSON.stringify(data, null, 2));
+async function markPosted(raceId: string, postType: string, channel: string): Promise<void> {
+  await db
+    .insert(marketingPosts)
+    .values({ raceId, postType, channel })
+    .onConflictDoNothing();
 }
 
 
@@ -120,7 +118,6 @@ async function main() {
     process.exit(1);
   }
 
-  const tracking = loadTracking();
   let postsCount = 0;
   const latestIntel = loadTodayIntel();
   if (latestIntel.length > 0) console.log(`📡 Loaded ${latestIntel.length} intel items for today`);
@@ -155,20 +152,18 @@ async function main() {
   }));
 
   for (const race of upcomingRaces) {
-    if (tracking.previews.includes(race.id)) {
+    if (await hasPosted(race.id, "preview", "telegram")) {
       console.log(`⏭️  Already posted preview: ${race.name}`);
       continue;
     }
 
     console.log(`📸 Posting preview: ${race.name} (${race.date})`);
     try {
-      const intelFlag = latestIntel.length > 0 ? `--has-intel` : "";
       execSync(
         `node_modules/.bin/tsx scripts/agents/post-to-telegram.ts --race-id ${race.id} --type preview --channel "${channel}"`,
         { encoding: "utf-8", stdio: "inherit", cwd: process.cwd() }
       );
-      tracking.previews.push(race.id);
-      saveTracking(tracking);
+      await markPosted(race.id, "preview", "telegram");
       postsCount++;
       console.log(`✅ Preview posted: ${race.name}\n`);
     } catch (err) {
@@ -177,7 +172,7 @@ async function main() {
 
     // Instagram Stories — enrich rider photos first, then post
     const igPreviewSlug = await getEventSlug(race);
-    if (igPreviewSlug && shouldPostToInstagram(race) && !tracking.igPreviews.includes(race.id)) {
+    if (igPreviewSlug && shouldPostToInstagram(race) && !(await hasPosted(race.id, "ig-preview", "instagram"))) {
       await enrichRidersForRace(race.id);
       const cat = (race.categorySlug || "").toLowerCase();
       const genders: string[] = cat.includes("women") ? ["women"] : cat.includes("men") ? ["men"] : ["men", "women"];
@@ -194,23 +189,24 @@ async function main() {
         }
         await new Promise(r => setTimeout(r, 3000)); // brief pause between posts
       }
-      tracking.igPreviews.push(race.id);
-      saveTracking(tracking);
+      await markPosted(race.id, "ig-preview", "instagram");
     }
   }
 
-  // ─── 2. RESULTS: Races completed yesterday ────────────────────
+  // ─── 2. RESULTS: Races completed yesterday or 2 days ago ─────
   const yesterday = dayStr(-1);
+  const twoDaysAgo = dayStr(-2);
 
-  console.log(`\n🔍 Looking for completed races from ${yesterday}...\n`);
+  console.log(`\n🔍 Looking for completed races from ${twoDaysAgo} to ${yesterday}...\n`);
 
-  // Find races from yesterday that have results
+  // Find races from the last 2 days that have results
   const completedRacesRaw = await db
     .select()
     .from(races)
     .where(
       and(
-        eq(races.date, yesterday),
+        gte(races.date, twoDaysAgo),
+        lte(races.date, yesterday),
         sql`${races.id} IN (SELECT ${raceResults.raceId} FROM ${raceResults} GROUP BY ${raceResults.raceId})`
       )
     )
@@ -226,7 +222,7 @@ async function main() {
   }));
 
   for (const race of completedRaces) {
-    if (tracking.results.includes(race.id)) {
+    if (await hasPosted(race.id, "result", "telegram")) {
       console.log(`⏭️  Already posted result: ${race.name}`);
       continue;
     }
@@ -237,8 +233,7 @@ async function main() {
         `node_modules/.bin/tsx scripts/agents/post-to-telegram.ts --race-id ${race.id} --type result --channel "${channel}"`,
         { encoding: "utf-8", stdio: "inherit", cwd: process.cwd() }
       );
-      tracking.results.push(race.id);
-      saveTracking(tracking);
+      await markPosted(race.id, "result", "telegram");
       postsCount++;
       console.log(`✅ Result posted: ${race.name}\n`);
     } catch (err) {
@@ -247,7 +242,7 @@ async function main() {
 
     // Instagram Stories — enrich rider photos first, then post
     const igResultSlug = await getEventSlug(race);
-    if (igResultSlug && shouldPostToInstagram(race) && !tracking.igResults.includes(race.id)) {
+    if (igResultSlug && shouldPostToInstagram(race) && !(await hasPosted(race.id, "ig-result", "instagram"))) {
       await enrichRidersForRace(race.id);
       const cat = (race.categorySlug || "").toLowerCase();
       const genders: string[] = cat.includes("women") ? ["women"] : cat.includes("men") ? ["men"] : ["men", "women"];
@@ -264,20 +259,21 @@ async function main() {
         }
         await new Promise(r => setTimeout(r, 3000));
       }
-      tracking.igResults.push(race.id);
-      saveTracking(tracking);
+      await markPosted(race.id, "ig-result", "instagram");
     }
   }
 
   // ─── Summary ──────────────────────────────────────────────────
+  const totalPreviews = await db.select({ count: sql<number>`count(*)` }).from(marketingPosts).where(eq(marketingPosts.postType, "preview"));
+  const totalResults = await db.select({ count: sql<number>`count(*)` }).from(marketingPosts).where(eq(marketingPosts.postType, "result"));
   console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
   console.log(`📊 Marketing Agent Summary`);
   console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
   console.log(`   Upcoming races found: ${upcomingRaces.length}`);
   console.log(`   Completed races found: ${completedRaces.length}`);
   console.log(`   Posts made this run: ${postsCount}`);
-  console.log(`   Total previews posted: ${tracking.previews.length}`);
-  console.log(`   Total results posted: ${tracking.results.length}`);
+  console.log(`   Total previews posted (all time): ${totalPreviews[0]?.count ?? 0}`);
+  console.log(`   Total results posted (all time): ${totalResults[0]?.count ?? 0}`);
   console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
 }
 

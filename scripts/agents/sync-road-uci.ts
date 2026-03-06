@@ -42,61 +42,72 @@ interface RankingEntry {
 }
 
 async function scrapeRankingsPage(
-  url: string,
+  baseUrl: string,
   maxEntries: number
 ): Promise<RankingEntry[]> {
   const entries: RankingEntry[] = [];
+  let page = 1;
 
-  try {
-    console.log(`  Loading: ${url}`);
-    const html = await scrapeDo(url);
-    const $ = cheerio.load(html);
+  while (entries.length < maxEntries) {
+    const url = page === 1 ? baseUrl : `${baseUrl}/p/${page}`;
+    try {
+      console.log(`  Loading: ${url}`);
+      const html = await scrapeDo(url, { timeout: 60000 });
+      const $ = cheerio.load(html);
 
-    // PCS table: [rank, prev, diff, "LASTNAME Firstname", team, points]
-    $("table tbody tr").each((_, row) => {
-      if (entries.length >= maxEntries) return false;
-      const cells = $(row).find("td").map((__, td) => $(td).text().trim()).get();
-      if (cells.length < 4) return;
+      let rowsOnPage = 0;
+      // PCS table: [rank, prev, diff, "LASTNAME Firstname", team, points]
+      $("table tbody tr").each((_, row) => {
+        const cells = $(row).find("td").map((__, td) => $(td).text().trim()).get();
+        if (cells.length < 4) return;
 
-      const rank = parseInt(cells[0]);
-      if (!rank || rank === 0) return;
+        const rank = parseInt(cells[0]);
+        if (!rank || rank === 0) return;
 
-      // cells[3] = "VAN DER POEL Mathieu" — PCS ALL CAPS SURNAME + First name
-      // Convert to "Mathieu van der Poel" format
-      const rawName = cells[3];
-      if (!rawName || rawName.length < 3) return;
+        // cells[3] = "VAN DER POEL Mathieu" — PCS ALL CAPS SURNAME + First name
+        // Convert to "Mathieu van der Poel" format
+        const rawName = cells[3];
+        if (!rawName || rawName.length < 3) return;
 
-      const parts = rawName.split(" ");
-      const firstName = parts[parts.length - 1]; // Last token = first name
-      const lastName = parts.slice(0, -1).join(" "); // Rest = surname
-      // PCS surname is ALL CAPS — convert to Title Case
-      const lastNameTitle = lastName.split(" ").map(w =>
-        w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
-      ).join(" ");
-      const riderName = `${firstName} ${lastNameTitle}`.trim();
+        const parts = rawName.split(" ");
+        const firstName = parts[parts.length - 1]; // Last token = first name
+        const lastName = parts.slice(0, -1).join(" "); // Rest = surname
+        // PCS surname is ALL CAPS — convert to Title Case
+        const lastNameTitle = lastName.split(" ").map(w =>
+          w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+        ).join(" ");
+        const riderName = `${firstName} ${lastNameTitle}`.trim();
 
-      // points = last column
-      const uciPoints = parseInt(cells[cells.length - 1]) || 0;
-      const team = cells[4] || "";
+        // points = last column
+        // Take only the first number (avoids "2,633\n100" → "2633100" concat bug)
+        const uciPoints = parseInt((cells[cells.length - 1].match(/[\d,]+/) || ["0"])[0].replace(/,/g, "")) || 0;
+        const team = cells[4] || "";
 
-      entries.push({ rank, riderName, team, uciPoints, nationality: "" });
-    });
-  } catch (err: any) {
-    console.error(`  Error scraping ${url}: ${err.message}`);
+        entries.push({ rank, riderName, team, uciPoints, nationality: "" });
+        rowsOnPage++;
+      });
+
+      if (rowsOnPage < 10) break; // last page or empty
+      page++;
+      await new Promise(r => setTimeout(r, 600)); // polite delay between pages
+    } catch (err: any) {
+      console.error(`  Error scraping ${url}: ${err.message}`);
+      break;
+    }
   }
 
-  return entries;
+  return entries.slice(0, maxEntries);
 }
 
 async function syncRankings(
   entries: RankingEntry[],
   gender: string
 ): Promise<{ updated: number; notFound: number }> {
-  // Load all riders from DB for matching
+  // Load all riders from DB for matching (no limit — DB has 17k+ riders)
   const allRiders = await db
     .select({ id: schema.riders.id, name: schema.riders.name })
     .from(schema.riders)
-    .limit(10000);
+    .limit(30000);
 
   // Build a lookup map by stripped name — support both "First Last" and "Last First" formats
   const ridersByStrippedName = new Map<string, { id: string; name: string }>();
@@ -215,7 +226,8 @@ async function main() {
     totalNotFound += menResult.notFound;
   }
 
-  // Women's rankings
+  // Women's rankings — wait a moment to avoid scrape.do rate limits after men's pages
+  await new Promise(r => setTimeout(r, 3000));
   console.log("\nWomen Elite Rankings:");
   const womenEntries = await scrapeRankingsPage(
     "https://www.procyclingstats.com/rankings/we/world-ranking",
