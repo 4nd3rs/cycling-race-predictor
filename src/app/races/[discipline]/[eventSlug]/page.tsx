@@ -286,12 +286,12 @@ export default async function EventPage({ params }: PageProps) {
   const otherRaces = sorted.filter(c => c.race.ageCategory !== "elite");
   // Fetch predictions + results + intel + per-race news for elite races
   const [predictionsPerRace, resultsPerRace, intelPerRace, newsPerRace, otherResultsPerRace, otherPredictionsPerRace] = await Promise.all([
-    Promise.all(eliteRaces.map(c => getTopPredictions(c.race.id, 5))),
-    Promise.all(eliteRaces.map(c => getTopResults(c.race.id, 5))),
+    Promise.all(eliteRaces.map(c => getTopPredictions(c.race.id, 10))),
+    Promise.all(eliteRaces.map(c => getTopResults(c.race.id, 10))),
     Promise.all(eliteRaces.map(c => getRaceIntel(c.race.id))),
     Promise.all(eliteRaces.map(c => getRaceSpecificNews(event.id, c.race.id, c.race.gender))),
-    Promise.all(otherRaces.map(c => getTopResults(c.race.id, 5))),
-    Promise.all(otherRaces.map(c => getTopPredictions(c.race.id, 5))),
+    Promise.all(otherRaces.map(c => getTopResults(c.race.id, 10))),
+    Promise.all(otherRaces.map(c => getTopPredictions(c.race.id, 10))),
   ]);
 
   const wx = weather ? wmoToEmoji(weather.weatherCode) : null;
