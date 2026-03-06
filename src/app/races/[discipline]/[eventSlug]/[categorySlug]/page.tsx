@@ -192,6 +192,11 @@ async function getRacePredictions(raceId: string, race: typeof races.$inferSelec
       })
       .from(predictions)
       .innerJoin(riders, eq(predictions.riderId, riders.id))
+      // Only include riders actually in the current startlist
+      .innerJoin(raceStartlist, and(
+        eq(raceStartlist.raceId, raceId),
+        eq(raceStartlist.riderId, riders.id)
+      ))
       .leftJoin(
         riderDisciplineStats,
         isMtbRace
