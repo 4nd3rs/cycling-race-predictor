@@ -3,10 +3,9 @@ import Link from "next/link";
 import { Header } from "@/components/header";
 import { Badge } from "@/components/ui/badge";
 import { getAuthUser } from "@/lib/auth";
-import { db, userFollows, userTelegram, userWhatsapp, riders, raceEvents, races, teams } from "@/lib/db";
+import { db, userFollows, userWhatsapp, riders, raceEvents, races, teams } from "@/lib/db";
 import { eq, and, inArray } from "drizzle-orm";
 import { getFlag } from "@/lib/country-flags";
-import { ConnectTelegramButton } from "@/components/connect-telegram-button";
 import { WhatsAppGroupWidget } from "@/components/whatsapp-group-widget";
 
 
@@ -14,14 +13,11 @@ export default async function ProfilePage() {
   const user = await getAuthUser();
   if (!user) redirect("/sign-in");
 
-  // Fetch follows, telegram status in parallel
-  const [follows, telegramRows, whatsappRows] = await Promise.all([
+  const [follows, whatsappRows] = await Promise.all([
     db.select().from(userFollows).where(eq(userFollows.userId, user.id)),
-    db.select().from(userTelegram).where(eq(userTelegram.userId, user.id)).limit(1),
     db.select().from(userWhatsapp).where(eq(userWhatsapp.userId, user.id)).limit(1),
   ]);
 
-  const telegram = telegramRows[0] || null;
   const whatsapp = whatsappRows[0] || null;
 
   const riderFollows = follows.filter((f) => f.followType === "rider");
@@ -232,17 +228,7 @@ export default async function ProfilePage() {
             <WhatsAppGroupWidget initialPhone={whatsapp?.phoneNumber ?? null} />
           </section>
 
-          {/* Telegram Alerts */}
-          <section>
-            <h2 className="text-lg font-bold mb-3">Telegram Alerts</h2>
-            <div className="rounded-lg border border-border/50 bg-card/20 p-4">
-              {telegram?.connectedAt ? (
-                <p className="text-sm text-green-400 font-medium">Telegram connected</p>
-              ) : (
-                <ConnectTelegramButton />
-              )}
-            </div>
-          </section>
+
 
 
         </div>
