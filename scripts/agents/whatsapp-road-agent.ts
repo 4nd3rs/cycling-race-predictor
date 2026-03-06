@@ -96,8 +96,8 @@ async function getGroupFollowedEventIds(): Promise<Set<string>> {
 // Check if a race is relevant to group members (followed, OR WorldTour/WT category)
 async function isRaceOfInterest(raceEventId: string | null, uciCategory?: string | null): Promise<boolean> {
   if (!raceEventId) return false;
-  // Always include WorldTour races — universally interesting
-  if (uciCategory && ["WT", "WWT", "WorldTour"].includes(uciCategory)) return true;
+  // Always include WorldTour (covers both men's WT and women's WWT) — universally interesting
+  if (uciCategory === "WorldTour") return true;
   const followed = await getGroupFollowedEventIds();
   // If nobody has follows yet, default to allow-all (graceful degradation)
   if (followed.size === 0) return true;
