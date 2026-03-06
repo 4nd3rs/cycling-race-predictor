@@ -12,15 +12,16 @@ import {
   raceResults,
   races,
   raceEvents,
+  raceStartlist,
+  predictions,
 } from "@/lib/db";
-import { eq, desc } from "drizzle-orm";
-import { format } from "date-fns";
+import { eq, desc, and, gte, lte, inArray, asc } from "drizzle-orm";
+import { format, formatDistanceToNow, isPast, isToday, isTomorrow } from "date-fns";
+import { buildEventUrl } from "@/lib/url-utils";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
 }
-
-
 
 function getEloTier(elo: number) {
   if (elo >= 1500) return { label: "Elite", color: "bg-purple-500" };
@@ -30,21 +31,21 @@ function getEloTier(elo: number) {
   return { label: "Developing", color: "bg-gray-300" };
 }
 
+function raceProximityLabel(dateStr: string): { label: string; urgent: boolean } {
+  const d = new Date(dateStr + "T12:00:00");
+  if (isToday(d)) return { label: "Today", urgent: true };
+  if (isTomorrow(d)) return { label: "Tomorrow", urgent: true };
+  if (isPast(d)) return { label: format(d, "d MMM"), urgent: false };
+  return { label: format(d, "d MMM"), urgent: false };
+}
+
 async function getTeamBySlug(slug: string) {
   try {
-    // Try slug first
-    const bySlug = await db.query.teams.findFirst({
-      where: eq(teams.slug, slug),
-    });
+    const bySlug = await db.query.teams.findFirst({ where: eq(teams.slug, slug) });
     if (bySlug) return bySlug;
-    // Fallback to UUID for backward compat
-    const byId = await db.query.teams.findFirst({
-      where: eq(teams.id, slug),
-    });
+    const byId = await db.query.teams.findFirst({ where: eq(teams.id, slug) });
     return byId ?? null;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
 async function getTeamRiders(teamId: string) {
@@ -64,7 +65,6 @@ async function getTeamRiders(teamId: string) {
       .where(eq(riders.teamId, teamId))
       .orderBy(riders.name);
 
-    // Deduplicate: one entry per rider, keep best ELO, sum stats
     const map = new Map<string, {
       rider: typeof rows[0]["rider"];
       bestElo: number;
@@ -99,9 +99,7 @@ async function getTeamRiders(teamId: string) {
     }
 
     return [...map.values()].sort((a, b) => b.bestElo - a.bestElo);
-  } catch {
-    return [];
-  }
+  } catch { return []; }
 }
 
 async function getTeamResults(teamId: string) {
@@ -119,36 +117,167 @@ async function getTeamResults(teamId: string) {
       .leftJoin(raceEvents, eq(races.raceEventId, raceEvents.id))
       .where(eq(raceResults.teamId, teamId))
       .orderBy(desc(races.date))
-      .limit(10);
-  } catch {
+      .limit(15);
+  } catch { return []; }
+}
+
+interface UpcomingRaceEntry {
+  eventId: string;
+  eventName: string;
+  eventSlug: string | null;
+  discipline: string;
+  date: string;
+  endDate: string | null;
+  uciCategory: string | null;
+  riders: Array<{
+    riderId: string;
+    riderName: string;
+    nationality: string | null;
+    photoUrl: string | null;
+    raceId: string;
+    gender: string;
+    categorySlug: string | null;
+    predictedPosition: number | null;
+    winProbability: number | null;
+  }>;
+}
+
+async function getUpcomingRaces(teamId: string): Promise<UpcomingRaceEntry[]> {
+  try {
+    const today = new Date().toISOString().split("T")[0];
+    const twoWeeks = new Date(Date.now() + 14 * 86400000).toISOString().split("T")[0];
+
+    // Get all rider IDs on this team
+    const teamRiders = await db
+      .select({ id: riders.id, name: riders.name, nationality: riders.nationality, photoUrl: riders.photoUrl })
+      .from(riders)
+      .where(eq(riders.teamId, teamId));
+
+    if (teamRiders.length === 0) return [];
+    const riderIds = teamRiders.map(r => r.id);
+
+    // Find startlist entries for these riders in upcoming races
+    const startlistRows = await db
+      .select({
+        sl: raceStartlist,
+        race: races,
+        event: raceEvents,
+      })
+      .from(raceStartlist)
+      .innerJoin(races, eq(raceStartlist.raceId, races.id))
+      .innerJoin(raceEvents, eq(races.raceEventId, raceEvents.id))
+      .where(
+        and(
+          inArray(raceStartlist.riderId, riderIds),
+          gte(raceEvents.date, today),
+          lte(raceEvents.date, twoWeeks),
+          eq(races.status, "active")
+        )
+      )
+      .orderBy(asc(raceEvents.date));
+
+    if (startlistRows.length === 0) return [];
+
+    // Collect race IDs for prediction lookup
+    const raceIdSet = new Set(startlistRows.map(r => r.race.id));
+    const predRows = await db
+      .select({
+        raceId: predictions.raceId,
+        riderId: predictions.riderId,
+        predictedPosition: predictions.predictedPosition,
+        winProbability: predictions.winProbability,
+      })
+      .from(predictions)
+      .where(inArray(predictions.raceId, [...raceIdSet]));
+
+    const predMap = new Map<string, { predictedPosition: number | null; winProbability: number | null }>();
+    for (const p of predRows) {
+      predMap.set(`${p.raceId}:${p.riderId}`, {
+        predictedPosition: p.predictedPosition,
+        winProbability: p.winProbability ? parseFloat(p.winProbability) : null,
+      });
+    }
+
+    const riderMap = new Map(teamRiders.map(r => [r.id, r]));
+
+    // Group by event
+    const eventMap = new Map<string, UpcomingRaceEntry>();
+    for (const { sl, race, event } of startlistRows) {
+      const rider = riderMap.get(sl.riderId);
+      if (!rider) continue;
+
+      if (!eventMap.has(event.id)) {
+        eventMap.set(event.id, {
+          eventId: event.id,
+          eventName: event.name,
+          eventSlug: event.slug,
+          discipline: event.discipline,
+          date: event.date,
+          endDate: event.endDate ?? null,
+          uciCategory: race.uciCategory ?? null,
+          riders: [],
+        });
+      }
+
+      const pred = predMap.get(`${race.id}:${sl.riderId}`);
+      eventMap.get(event.id)!.riders.push({
+        riderId: rider.id,
+        riderName: rider.name,
+        nationality: rider.nationality ?? null,
+        photoUrl: rider.photoUrl ?? null,
+        raceId: race.id,
+        gender: race.gender ?? "men",
+        categorySlug: race.categorySlug ?? null,
+        predictedPosition: pred?.predictedPosition ?? null,
+        winProbability: pred?.winProbability ?? null,
+      });
+    }
+
+    // Sort riders within each event by predicted position (nulls last), then name
+    for (const entry of eventMap.values()) {
+      entry.riders.sort((a, b) => {
+        if (a.predictedPosition !== null && b.predictedPosition !== null)
+          return a.predictedPosition - b.predictedPosition;
+        if (a.predictedPosition !== null) return -1;
+        if (b.predictedPosition !== null) return 1;
+        return a.riderName.localeCompare(b.riderName);
+      });
+      // Deduplicate same rider across multiple stages/categories
+      const seen = new Set<string>();
+      entry.riders = entry.riders.filter(r => {
+        if (seen.has(r.riderId)) return false;
+        seen.add(r.riderId);
+        return true;
+      });
+    }
+
+    return [...eventMap.values()].sort((a, b) =>
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+  } catch (e) {
+    console.error("getUpcomingRaces error:", e);
     return [];
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default async function TeamProfilePage({ params }: PageProps) {
   const { slug } = await params;
   const team = await getTeamBySlug(slug);
+  if (!team) notFound();
 
-  if (!team) {
-    notFound();
-  }
-
-  const [rosterRiders, recentResults] = await Promise.all([
+  const [rosterRiders, recentResults, upcomingRaces] = await Promise.all([
     getTeamRiders(team.id),
     getTeamResults(team.id),
+    getUpcomingRaces(team.id),
   ]);
 
-  // Aggregate team-level stats
   const teamTotalWins = rosterRiders.reduce((s, r) => s + r.totalWins, 0);
   const teamTotalPodiums = rosterRiders.reduce((s, r) => s + r.totalPodiums, 0);
   const teamBestElo = rosterRiders.length > 0 ? Math.max(...rosterRiders.map(r => r.bestElo)) : 0;
 
-  const initials = team.name
-    .split(/[\s-]+/)
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 3);
+  const initials = team.name.split(/[\s-]+/).map((w) => w[0]).join("").toUpperCase().slice(0, 3);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -158,8 +287,6 @@ export default async function TeamProfilePage({ params }: PageProps) {
         {/* ── HERO ──────────────────────────────────────────────────────── */}
         <section className="border-b border-border/50">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-8">
-
-            {/* Breadcrumb */}
             <nav className="flex items-center gap-1.5 mb-5 text-xs text-muted-foreground">
               <Link href="/teams" className="hover:text-foreground transition-colors">Teams</Link>
               <span>/</span>
@@ -167,8 +294,6 @@ export default async function TeamProfilePage({ params }: PageProps) {
             </nav>
 
             <div className="flex flex-col sm:flex-row gap-6 items-start">
-
-              {/* Logo / Initials */}
               <div className="shrink-0">
                 {team.logoUrl ? (
                   <div className="w-28 h-28 rounded-2xl overflow-hidden border border-border/50 bg-muted flex items-center justify-center">
@@ -182,20 +307,15 @@ export default async function TeamProfilePage({ params }: PageProps) {
                 )}
               </div>
 
-              {/* Identity */}
               <div className="flex-1 space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  {team.division && (
-                    <Badge className="bg-blue-500 text-white text-xs">{team.division}</Badge>
-                  )}
+                  {team.division && <Badge className="bg-blue-500 text-white text-xs">{team.division}</Badge>}
                   {team.discipline && (
                     <Badge variant="outline" className="text-xs capitalize">
                       {team.discipline === "mtb" ? "MTB" : team.discipline}
                     </Badge>
                   )}
-                  {team.uciCode && (
-                    <Badge variant="outline" className="text-xs font-mono">{team.uciCode}</Badge>
-                  )}
+                  {team.uciCode && <Badge variant="outline" className="text-xs font-mono">{team.uciCode}</Badge>}
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -206,7 +326,6 @@ export default async function TeamProfilePage({ params }: PageProps) {
                   <FollowButton entityId={team.id} followType="team" entityName={team.name} />
                 </div>
 
-                {/* Social links */}
                 {(team.website || team.twitter || team.instagram) && (
                   <div className="flex items-center gap-3 text-xs pt-1">
                     {team.website && (
@@ -230,7 +349,6 @@ export default async function TeamProfilePage({ params }: PageProps) {
                   </div>
                 )}
 
-                {/* Key stats strip */}
                 <div className="flex flex-wrap gap-4 pt-2">
                   <div className="text-center">
                     <div className="text-xl font-black">{rosterRiders.length}</div>
@@ -248,10 +366,10 @@ export default async function TeamProfilePage({ params }: PageProps) {
                       <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Podiums</div>
                     </div>
                   )}
-                  {teamBestElo > 0 && (
+                  {upcomingRaces.length > 0 && (
                     <div className="text-center">
-                      <div className="text-xl font-black">{Math.round(teamBestElo)}</div>
-                      <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Top ELO</div>
+                      <div className="text-xl font-black">{upcomingRaces.length}</div>
+                      <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Upcoming</div>
                     </div>
                   )}
                 </div>
@@ -259,6 +377,112 @@ export default async function TeamProfilePage({ params }: PageProps) {
             </div>
           </div>
         </section>
+
+        {/* ── UPCOMING RACES ────────────────────────────────────────────── */}
+        {upcomingRaces.length > 0 && (
+          <section className="border-b border-border/50 bg-muted/20">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-6">
+              <h2 className="text-base font-bold mb-4">
+                Upcoming Races
+                <span className="ml-2 text-xs font-normal text-muted-foreground">next 2 weeks</span>
+              </h2>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {upcomingRaces.map((entry) => {
+                  const { label, urgent } = raceProximityLabel(entry.date);
+                  const eventUrl = entry.eventSlug
+                    ? buildEventUrl(entry.discipline, entry.eventSlug)
+                    : null;
+                  const topPredicted = entry.riders.find(r => r.predictedPosition !== null && r.winProbability !== null);
+
+                  return (
+                    <div key={entry.eventId} className="rounded-xl border border-border/50 bg-background p-4 space-y-3">
+                      {/* Race header */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          {eventUrl ? (
+                            <Link href={eventUrl} className="font-semibold text-sm hover:text-primary transition-colors line-clamp-2">
+                              {entry.eventName}
+                            </Link>
+                          ) : (
+                            <p className="font-semibold text-sm line-clamp-2">{entry.eventName}</p>
+                          )}
+                          <div className="flex items-center gap-2 mt-0.5">
+                            {entry.uciCategory && (
+                              <span className="text-[10px] text-muted-foreground font-mono">{entry.uciCategory}</span>
+                            )}
+                          </div>
+                        </div>
+                        <span className={`shrink-0 text-xs font-bold px-2 py-0.5 rounded-full ${
+                          urgent ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                        }`}>
+                          {label}
+                        </span>
+                      </div>
+
+                      {/* Top predicted rider callout */}
+                      {topPredicted && (
+                        <div className="flex items-center gap-2 rounded-lg bg-primary/10 border border-primary/20 px-3 py-2">
+                          {topPredicted.photoUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={topPredicted.photoUrl} alt={topPredicted.riderName}
+                              className="w-7 h-7 rounded-full object-cover shrink-0" />
+                          ) : (
+                            <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold shrink-0">
+                              {topPredicted.riderName.charAt(0)}
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <Link href={`/riders/${topPredicted.riderId}`}
+                              className="text-sm font-semibold truncate block hover:text-primary transition-colors">
+                              {topPredicted.riderName}
+                            </Link>
+                            <p className="text-[10px] text-muted-foreground">Best predicted rider</p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-sm font-black text-primary">
+                              {(topPredicted.winProbability! * 100).toFixed(1)}%
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">win chance</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Rider list */}
+                      <div className="space-y-1.5">
+                        {entry.riders.slice(0, 6).map((rider) => (
+                          <div key={rider.riderId} className="flex items-center gap-2 text-sm">
+                            <span className="text-xs w-4 shrink-0 text-center text-muted-foreground">
+                              {rider.nationality ? getFlag(rider.nationality) : ""}
+                            </span>
+                            <Link href={`/riders/${rider.riderId}`}
+                              className="flex-1 truncate font-medium hover:text-primary transition-colors text-xs">
+                              {rider.riderName}
+                            </Link>
+                            {rider.predictedPosition !== null ? (
+                              <span className="text-[10px] tabular-nums text-muted-foreground shrink-0">
+                                P{rider.predictedPosition}
+                                {rider.winProbability !== null && rider.winProbability > 0.02
+                                  ? ` · ${(rider.winProbability * 100).toFixed(0)}%`
+                                  : ""}
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground/50 shrink-0">entered</span>
+                            )}
+                          </div>
+                        ))}
+                        {entry.riders.length > 6 && (
+                          <p className="text-[10px] text-muted-foreground pt-0.5">
+                            +{entry.riders.length - 6} more riders
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* ── ROSTER + RESULTS ─────────────────────────────────────────── */}
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-6">
@@ -275,6 +499,7 @@ export default async function TeamProfilePage({ params }: PageProps) {
                       ? Math.floor((Date.now() - birthDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000))
                       : null;
                     const tier = bestElo > 0 ? getEloTier(bestElo) : null;
+                    const isEntered = upcomingRaces.some(r => r.riders.some(ri => ri.riderId === rider.id));
 
                     return (
                       <Link key={rider.id} href={`/riders/${rider.id}`}
@@ -283,7 +508,14 @@ export default async function TeamProfilePage({ params }: PageProps) {
                           {rider.nationality ? getFlag(rider.nationality) : rider.name.charAt(0)}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{rider.name}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium truncate">{rider.name}</p>
+                            {isEntered && (
+                              <span className="text-[9px] font-bold bg-primary/20 text-primary px-1 py-0 rounded shrink-0">
+                                RACING
+                              </span>
+                            )}
+                          </div>
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
                             {rider.nationality && <span>{rider.nationality}</span>}
                             {age && <span>· {age}y</span>}
@@ -350,6 +582,7 @@ export default async function TeamProfilePage({ params }: PageProps) {
                 </div>
               )}
             </div>
+
           </div>
         </div>
 
