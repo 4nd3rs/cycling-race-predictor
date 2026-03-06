@@ -963,9 +963,9 @@ export default async function CategoryPage({ params }: PageProps) {
             <TabsTrigger value="startlist">
               Startlist ({startlist.length})
             </TabsTrigger>
-            {!isCompleted && (
+            {(formattedPredictions.length > 0 || race.postRaceAnalysis) && (
               <TabsTrigger value="predictions">
-                Top Contenders ({formattedPredictions.length})
+                {isCompleted ? "Predictions & Analysis" : `Top Contenders (${formattedPredictions.length})`}
               </TabsTrigger>
             )}
           </TabsList>
@@ -1195,10 +1195,36 @@ export default async function CategoryPage({ params }: PageProps) {
             )}
           </TabsContent>
 
-          {/* Top Contenders Tab */}
-          {!isCompleted && (
-            <TabsContent value="predictions">
-              {formattedPredictions.length > 0 ? (
+          {/* Top Contenders / Race Analysis Tab */}
+          <TabsContent value="predictions">
+            {isCompleted && race.postRaceAnalysis ? (
+              /* Completed race: show analysis + predictions side by side */
+              <div className="space-y-6">
+                {/* Post-race analysis */}
+                <Card className="border-primary/20 bg-primary/5">
+                  <CardContent className="pt-5 pb-5">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-base">🏁</span>
+                      <h3 className="font-semibold text-sm uppercase tracking-wide text-primary">Race Analysis</h3>
+                    </div>
+                    <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-line">{race.postRaceAnalysis}</p>
+                    {race.analysisGeneratedAt && (
+                      <p className="text-xs text-muted-foreground mt-3">
+                        Analysis generated {new Date(race.analysisGeneratedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+                {/* Pre-race predictions for reference */}
+                {formattedPredictions.length > 0 && (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-3">Pre-race predictions for reference:</p>
+                    <PredictionList predictions={formattedPredictions} isSuperCup={isSuperCup} />
+                  </div>
+                )}
+              </div>
+            ) : !isCompleted ? (
+              formattedPredictions.length > 0 ? (
                 <div>
                   <p className="text-sm text-muted-foreground mb-4">Top contenders ranked by predicted race performance.</p>
                   <PredictionList predictions={formattedPredictions} isSuperCup={isSuperCup} />
@@ -1213,9 +1239,17 @@ export default async function CategoryPage({ params }: PageProps) {
                     </p>
                   </CardContent>
                 </Card>
-              )}
-            </TabsContent>
-          )}
+              )
+            ) : (
+              /* Completed but no analysis yet */
+              formattedPredictions.length > 0 ? (
+                <div>
+                  <p className="text-sm text-muted-foreground mb-4">Pre-race predictions:</p>
+                  <PredictionList predictions={formattedPredictions} isSuperCup={isSuperCup} />
+                </div>
+              ) : null
+            )}
+          </TabsContent>
         </Tabs>
         </div>{/* /tabs container */}
 

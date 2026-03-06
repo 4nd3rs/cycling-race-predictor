@@ -159,12 +159,37 @@ Rules:
  * Only applied for road discipline races with ≥15 riders.
  * Blended 70% AI / 30% ELO for a more realistic probability distribution.
  */
+/** Fetch post-race analysis from the most recent previous edition of this event */
+async function getPreviousEditionAnalysis(raceEventId: string | null | undefined, gender: string): Promise<string | null> {
+  if (!raceEventId) return null;
+  try {
+    // Find the race event's name to search for previous year's event
+    const rows = await sql`
+      SELECT r.post_race_analysis
+      FROM races r
+      JOIN race_events re2 ON re2.id = r.race_event_id
+      JOIN race_events re_cur ON re_cur.id = ${raceEventId}
+      WHERE re2.name = re_cur.name
+        AND r.gender = ${gender}
+        AND r.race_event_id != ${raceEventId}
+        AND r.post_race_analysis IS NOT NULL
+        AND r.status = 'completed'
+      ORDER BY r.date DESC
+      LIMIT 1
+    `;
+    return (rows[0] as any)?.post_race_analysis ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function getAIKnowledgeProbabilities(
   raceName: string,
   raceDate: string,
   discipline: string,
   gender: string,
-  riderNames: Map<string, string>  // riderId → name
+  riderNames: Map<string, string>,  // riderId → name
+  raceEventId?: string | null
 ): Promise<Map<string, number>> {
   const probMap = new Map<string, number>();
 
@@ -173,8 +198,12 @@ async function getAIKnowledgeProbabilities(
 
   const riderList = [...riderNames.values()].join("\n");
   const genderLabel = gender === "women" ? "Women\'s" : "Men\'s";
+  const previousAnalysis = await getPreviousEditionAnalysis(raceEventId, gender);
+  const analysisSection = previousAnalysis
+    ? `\nLessons from our previous prediction for this race:\n${previousAnalysis}\n`
+    : "";
 
-  const prompt = `You are an expert professional cycling analyst with deep knowledge of riders, race profiles, and results up to early 2026.
+  const prompt = `You are an expert professional cycling analyst with deep knowledge of riders, race profiles, and results up to early 2026.${analysisSection}
 
 Race: ${raceName}
 Date: ${raceDate}
@@ -362,7 +391,7 @@ async function generateForRace(raceId: string): Promise<void> {
 
   // Get AI knowledge-based win probabilities (Gemini knows rider profiles & race history)
   const aiProbabilities = await getAIKnowledgeProbabilities(
-    race.name, race.date, race.discipline, race.gender ?? "men", riderNamesMap
+    race.name, race.date, race.discipline, race.gender ?? "men", riderNamesMap, race.raceEventId
   );
 
   // Monte-Carlo probability simulation via TrueSkill (ELO-based)

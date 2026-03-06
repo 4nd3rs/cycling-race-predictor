@@ -1,6 +1,6 @@
 # SCRAPE_STATUS.md — Pipeline Status
 
-_Last updated: 2026-03-06 06:02:46 (Stockholm)_
+_Last updated: 2026-03-06 14:54:42 (Stockholm)_
 
 ## 📅 Race Calendar
 - **Last run:** 2026-03-01 23:21:41
@@ -8,13 +8,13 @@ _Last updated: 2026-03-06 06:02:46 (Stockholm)_
 - Road (PCS): 267 found, 242 new, 25 existed. MTB (XCOdata): 0 found, 0 new, 0 existed.
 
 ## 📋 Startlists
-- **Last run:** 2026-03-05 08:04:54
+- **Last run:** 2026-03-06 14:54:42
 - **Status:** ✅ OK
-- 0 new riders added, 0 updated across 1 race(s)
+- 83 new riders added, 0 updated across 1 race(s)
 
 | Race | Date | Riders | Status | Scraped |
 |------|------|---------|--------|---------|
-| Salverda Bouw Ster van Zwolle - Elite Men | 2026-03-07 | 172 | ✅ up to date | 2026-03-05 08:04:54 |
+| Tirreno-Adriatico | 2026-03-09 | 83 | ✅ +83 new | 2026-03-06 14:54:42 |
 
 ## 🏁 Results
 - **Last run:** 2026-03-06 00:06:02
@@ -31,17 +31,17 @@ _Last updated: 2026-03-06 06:02:46 (Stockholm)_
   "startlists": {
     "component": "startlists",
     "status": "ok",
-    "summary": "0 new riders added, 0 updated across 1 race(s)",
+    "summary": "83 new riders added, 0 updated across 1 race(s)",
     "raceRows": [
       {
-        "name": "Salverda Bouw Ster van Zwolle - Elite Men",
-        "date": "2026-03-07",
-        "count": 172,
-        "status": "✅ up to date",
-        "scrapedAt": "2026-03-05 08:04:54"
+        "name": "Tirreno-Adriatico",
+        "date": "2026-03-09",
+        "count": 83,
+        "status": "✅ +83 new",
+        "scrapedAt": "2026-03-06 14:54:42"
       }
     ],
-    "updatedAt": "2026-03-05 08:04:54"
+    "updatedAt": "2026-03-06 14:54:42"
   },
   "results": {
     "component": "results",

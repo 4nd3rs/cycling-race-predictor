@@ -162,6 +162,9 @@ export const races = pgTable(
     submittedBy: uuid("submitted_by").references(() => users.id),
     status: varchar("status", { length: 20 }).default("active"), // 'pending' | 'active' | 'completed'
     pcsUrl: varchar("pcs_url", { length: 500 }), // ProCyclingStats URL
+    // Post-race analysis
+    postRaceAnalysis: text("post_race_analysis"), // AI-generated prediction vs result analysis
+    analysisGeneratedAt: timestamp("analysis_generated_at"), // When analysis was last generated
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },

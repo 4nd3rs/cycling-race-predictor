@@ -134,7 +134,7 @@ async function getEventCategories(eventId: string) {
   } catch { return []; }
 }
 
-async function getTopPredictions(raceId: string, limit = 5) {
+async function getTopPredictions(raceId: string, limit = 10) {
   try {
     const rows = await db
       .select({ prediction: predictions, rider: riders })

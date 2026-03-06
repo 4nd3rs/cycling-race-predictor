@@ -544,6 +544,12 @@ async function processRace(
         fireAndForget("scripts/agents/generate-predictions.ts", ["--discipline", race.discipline, "--days", "30"]);
         console.log(`   🔮 Predictions refresh queued for ${race.discipline}`);
 
+        // Post-race analysis: compare predictions vs results for road elite races
+        if (race.discipline === "road" && race.ageCategory === "elite") {
+          fireAndForget("scripts/agents/analyze-race-results.ts", ["--race-id", race.id]);
+          console.log(`   📝 Post-race analysis queued`);
+        }
+
         // Marketing: only for WorldTour / 2.Pro / 1.Pro / major MTB — skip NC/2.2/lower
         const significantCats = new Set(["WorldTour", "2.Pro", "1.Pro", "2.HC", "1.HC", "1.1", "2.1"]);
         const isSignificant = race.discipline === "mtb" || significantCats.has((race as any).uciCategory ?? "");
