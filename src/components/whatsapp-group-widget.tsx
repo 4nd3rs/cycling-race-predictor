@@ -26,7 +26,9 @@ export function WhatsAppGroupWidget({ initialPhone }: Props) {
         setMessage(data.error ?? "Something went wrong");
       } else {
         setStatus("success");
-        setMessage("✅ Done! Check your WhatsApp — we've sent you the group invite link.");
+        setMessage(data.emailSent
+          ? "✅ Invite sent! Check your WhatsApp (look in Message Requests if you don't see it) — we also emailed it to you as backup."
+          : "✅ Invite sent via WhatsApp! Look in Message Requests if you don't see it in your main chats.");
       }
     } catch {
       setStatus("error");

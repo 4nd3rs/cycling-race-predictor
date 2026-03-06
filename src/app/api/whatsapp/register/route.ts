@@ -6,6 +6,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth";
 import { db, userWhatsapp, waGroupMembers } from "@/lib/db";
 import { eq } from "drizzle-orm";
+import { sendEmail, waInviteEmailHtml } from "@/lib/email";
+import { clerkClient } from "@clerk/nextjs/server";
 
 const OPENCLAW_GATEWAY = process.env.OPENCLAW_GATEWAY_URL ?? "http://127.0.0.1:18789";
 const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN!;
@@ -100,5 +102,23 @@ _procyclingpredictor.com_`;
 
   const dmSent = await sendWaDm(normalized, welcomeMsg);
 
-  return NextResponse.json({ ok: true, phone: normalized, dmSent });
+  // Also send invite via email — catches WhatsApp Message Requests filtering
+  let emailSent = false;
+  try {
+    const clerk = await clerkClient();
+    const clerkUser = await clerk.users.getUser(user.clerkId);
+    const email = clerkUser.emailAddresses?.[0]?.emailAddress;
+    const name = clerkUser.fullName ?? clerkUser.firstName ?? null;
+    if (email) {
+      emailSent = await sendEmail({
+        to: email,
+        subject: "Your Pro Cycling Predictor WhatsApp invite 🚴",
+        html: waInviteEmailHtml(name),
+      });
+    }
+  } catch (err) {
+    console.error("[register] Email send failed:", err);
+  }
+
+  return NextResponse.json({ ok: true, phone: normalized, dmSent, emailSent });
 }
