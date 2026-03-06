@@ -3,10 +3,11 @@ import Link from "next/link";
 import { Header } from "@/components/header";
 import { Badge } from "@/components/ui/badge";
 import { getAuthUser } from "@/lib/auth";
-import { db, userFollows, userTelegram, riders, raceEvents, races, teams } from "@/lib/db";
+import { db, userFollows, userTelegram, userWhatsapp, riders, raceEvents, races, teams } from "@/lib/db";
 import { eq, and, inArray } from "drizzle-orm";
 import { getFlag } from "@/lib/country-flags";
 import { ConnectTelegramButton } from "@/components/connect-telegram-button";
+import { WhatsAppGroupWidget } from "@/components/whatsapp-group-widget";
 
 
 export default async function ProfilePage() {
@@ -14,12 +15,14 @@ export default async function ProfilePage() {
   if (!user) redirect("/sign-in");
 
   // Fetch follows, telegram status in parallel
-  const [follows, telegramRows] = await Promise.all([
+  const [follows, telegramRows, whatsappRows] = await Promise.all([
     db.select().from(userFollows).where(eq(userFollows.userId, user.id)),
     db.select().from(userTelegram).where(eq(userTelegram.userId, user.id)).limit(1),
+    db.select().from(userWhatsapp).where(eq(userWhatsapp.userId, user.id)).limit(1),
   ]);
 
   const telegram = telegramRows[0] || null;
+  const whatsapp = whatsappRows[0] || null;
 
   const riderFollows = follows.filter((f) => f.followType === "rider");
   const raceFollows = follows.filter((f) => f.followType === "race_event");
@@ -221,6 +224,12 @@ export default async function ProfilePage() {
             ) : (
               <p className="text-sm text-muted-foreground rounded-lg border border-border/50 bg-card/20 p-6 text-center">No followed teams yet.</p>
             )}
+          </section>
+
+          {/* WhatsApp Group */}
+          <section>
+            <h2 className="text-lg font-bold mb-3">WhatsApp — Road Cycling Group</h2>
+            <WhatsAppGroupWidget initialPhone={whatsapp?.phoneNumber ?? null} />
           </section>
 
           {/* Telegram Alerts */}

@@ -43,6 +43,13 @@
       "when": 1772208725689,
       "tag": "0005_amazing_storm",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1772782452229,
+      "tag": "0006_last_mephistopheles",
+      "breakpoints": true
     }
   ]
 }

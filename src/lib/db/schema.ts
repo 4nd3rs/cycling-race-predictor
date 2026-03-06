@@ -753,3 +753,24 @@ export type UserTelegram = typeof userTelegram.$inferSelect;
 export type NewUserTelegram = typeof userTelegram.$inferInsert;
 export type UserWhatsapp = typeof userWhatsapp.$inferSelect;
 export type NewUserWhatsapp = typeof userWhatsapp.$inferInsert;
+
+// ── WA Group Members (admin tracking) ────────────────────────────────────────
+export const waGroupMembers = pgTable("wa_group_members", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  jid: varchar("jid", { length: 40 }).notNull().unique(), // e.g. 46707961967@s.whatsapp.net
+  phoneNumber: varchar("phone_number", { length: 20 }),
+  displayName: varchar("display_name", { length: 100 }),
+  isAdmin: boolean("is_admin").default(false).notNull(),
+  // Registration link
+  inviteSentAt: timestamp("invite_sent_at"),   // when we sent them the WA DM with invite
+  joinedAt: timestamp("joined_at"),            // when they joined the group (manual/detected)
+  // Warning state
+  warningCount: integer("warning_count").default(0).notNull(),
+  firstWarnedAt: timestamp("first_warned_at"),
+  lastWarnedAt: timestamp("last_warned_at"),
+  kickedAt: timestamp("kicked_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+export type WaGroupMember = typeof waGroupMembers.$inferSelect;
+export type NewWaGroupMember = typeof waGroupMembers.$inferInsert;
