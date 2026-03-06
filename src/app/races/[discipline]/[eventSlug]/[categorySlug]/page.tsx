@@ -1091,17 +1091,7 @@ export default async function CategoryPage({ params }: PageProps) {
                                 )}
                               </div>
                             </div>
-                            <div className="w-16 text-right shrink-0">
-                              <div className="text-xs text-muted-foreground">ELO</div>
-                              <div className="font-semibold text-sm">
-                                {stats?.currentElo && parseFloat(stats.currentElo) > 0
-                                  ? <span>
-                                      {(stats.racesTotal ?? 0) === 0 && <span className="text-muted-foreground text-xs">~</span>}
-                                      {Math.round(parseFloat(stats.currentElo))}
-                                    </span>
-                                  : "—"}
-                              </div>
-                            </div>
+
                           </Link>
                         ))}
                       </div>
@@ -1175,18 +1165,7 @@ export default async function CategoryPage({ params }: PageProps) {
                         </div>
                       )}
 
-                      {/* ELO column — show if any ELO data exists, tilde if UCI-seeded (no race history) */}
-                      <div className="w-16 text-right shrink-0">
-                        <div className="text-xs text-muted-foreground">ELO</div>
-                        <div className="font-semibold text-sm">
-                          {stats?.currentElo && parseFloat(stats.currentElo) > 0
-                            ? <span title={stats.racesTotal ? `Based on ${stats.racesTotal} races` : "Seeded from UCI points"}>
-                                {(stats.racesTotal ?? 0) === 0 && <span className="text-muted-foreground text-xs">~</span>}
-                                {Math.round(parseFloat(stats.currentElo))}
-                              </span>
-                            : "—"}
-                        </div>
-                      </div>
+
                     </Link>
                   ));
                 })()}
