@@ -1,6 +1,6 @@
 # SCRAPE_STATUS.md — Pipeline Status
 
-_Last updated: 2026-03-05 18:02:45 (Stockholm)_
+_Last updated: 2026-03-06 06:02:46 (Stockholm)_
 
 ## 📅 Race Calendar
 - **Last run:** 2026-03-01 23:21:41
@@ -17,13 +17,13 @@ _Last updated: 2026-03-05 18:02:45 (Stockholm)_
 | Salverda Bouw Ster van Zwolle - Elite Men | 2026-03-07 | 172 | ✅ up to date | 2026-03-05 08:04:54 |
 
 ## 🏁 Results
-- **Last run:** 2026-03-05 18:02:45
+- **Last run:** 2026-03-06 00:06:02
 - **Status:** ✅ OK
-- 135 results imported across 1 race(s). 0 race(s) missing pcsUrl.
+- 156 results imported across 1 race(s). 0 race(s) missing pcsUrl.
 
 | Race | Date | Results | Status | Scraped |
 |------|------|---------|--------|---------|
-| Omloop Het Nieuwsblad 2026 - Elite Women | 2026-02-28 | 135 | ✅ imported | 2026-03-05 18:02:20 |
+| Ename Samyn Classic - Elite Women | 2026-03-03 | 156 | 🔍 dry-run | 2026-03-06 00:05:45 |
 
 ---
 <!-- STATUS_JSON
@@ -46,17 +46,17 @@ _Last updated: 2026-03-05 18:02:45 (Stockholm)_
   "results": {
     "component": "results",
     "status": "ok",
-    "summary": "135 results imported across 1 race(s). 0 race(s) missing pcsUrl.",
+    "summary": "156 results imported across 1 race(s). 0 race(s) missing pcsUrl.",
     "raceRows": [
       {
-        "name": "Omloop Het Nieuwsblad 2026 - Elite Women",
-        "date": "2026-02-28",
-        "count": 135,
-        "status": "✅ imported",
-        "scrapedAt": "2026-03-05 18:02:20"
+        "name": "Ename Samyn Classic - Elite Women",
+        "date": "2026-03-03",
+        "count": 156,
+        "status": "🔍 dry-run",
+        "scrapedAt": "2026-03-06 00:05:45"
       }
     ],
-    "updatedAt": "2026-03-05 18:02:45"
+    "updatedAt": "2026-03-06 00:06:02"
   },
   "calendar": {
     "component": "calendar",
@@ -67,94 +67,17 @@ _Last updated: 2026-03-05 18:02:45 (Stockholm)_
   "mtb-results": {
     "component": "mtb-results",
     "status": "warn",
-    "summary": "0 MTB results imported across 12 race(s).",
+    "summary": "0 MTB results imported across 1 race(s).",
     "raceRows": [
       {
         "name": "Gran Premio Zaragoza XCO - Elite Men",
         "date": "2026-03-01",
         "count": 0,
         "status": "⏳ pending",
-        "scrapedAt": "2026-03-04 14:03:00"
-      },
-      {
-        "name": "Gran Premio Zaragoza XCO - Elite Women",
-        "date": "2026-03-01",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-04 14:03:03"
-      },
-      {
-        "name": "VTT Chabrières + UCI XCO Junior Series - Elite Men",
-        "date": "2026-03-01",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-04 14:03:05"
-      },
-      {
-        "name": "VTT Chabrières + UCI XCO Junior Series - Elite Women",
-        "date": "2026-03-01",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-04 14:03:07"
-      },
-      {
-        "name": "VTT Chabrières + UCI XCO Junior Series - U23 Women",
-        "date": "2026-03-01",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-04 14:03:09"
-      },
-      {
-        "name": "VTT Chabrières + UCI XCO Junior Series - Junior Men",
-        "date": "2026-03-01",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-04 14:03:11"
-      },
-      {
-        "name": "VTT Chabrières + UCI XCO Junior Series - Junior Women",
-        "date": "2026-03-01",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-04 14:03:13"
-      },
-      {
-        "name": "Gran Premio Zaragoza XCO - U23 Women",
-        "date": "2026-03-01",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-04 14:03:15"
-      },
-      {
-        "name": "Gran Premio Zaragoza XCO - Junior Men",
-        "date": "2026-03-01",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-04 14:03:17"
-      },
-      {
-        "name": "Gran Premio Zaragoza XCO - Junior Women",
-        "date": "2026-03-01",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-04 14:03:19"
-      },
-      {
-        "name": "VTT Chabrières + UCI XCO Junior Series - U23 Men",
-        "date": "2026-03-01",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-04 14:03:21"
-      },
-      {
-        "name": "Gran Premio Zaragoza XCO - U23 Men",
-        "date": "2026-03-01",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-04 14:03:23"
+        "scrapedAt": "2026-03-06 06:02:45"
       }
     ],
-    "updatedAt": "2026-03-04 14:03:23"
+    "updatedAt": "2026-03-06 06:02:46"
   }
 }
 STATUS_JSON -->

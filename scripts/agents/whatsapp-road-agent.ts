@@ -6,7 +6,7 @@
 import { config } from "dotenv";
 config({ path: ".env.local" });
 
-import { db, races, raceResults, raceEvents, riders, raceStartlist, teams, predictions } from "./lib/db";
+import { db, races, raceResults, raceEvents, riders, raceStartlist, teams, predictions, userFollows, userWhatsapp } from "./lib/db";
 import { eq, and, gte, lte, lt, desc, inArray, isNotNull, sql } from "drizzle-orm";
 import { readFileSync, existsSync } from "fs";
 import { GoogleGenerativeAI } from "@google/generative-ai";
@@ -62,12 +62,54 @@ function loadTodayIntel() {
   return readFileSync(file, "utf-8").split("\n").filter(Boolean).map(l => JSON.parse(l));
 }
 
+// ── Group interest filter ─────────────────────────────────────────────────────
+// Returns the set of race_event IDs followed by users who have a WA phone registered.
+// WT/WorldTour races are always included regardless of follows.
+let _cachedFollowedEventIds: Set<string> | null = null;
+
+async function getGroupFollowedEventIds(): Promise<Set<string>> {
+  if (_cachedFollowedEventIds) return _cachedFollowedEventIds;
+
+  // All users with a registered WA phone
+  const waUsers = await db.select({ userId: userWhatsapp.userId })
+    .from(userWhatsapp);
+  const userIds = waUsers.map(u => u.userId);
+
+  if (userIds.length === 0) {
+    _cachedFollowedEventIds = new Set();
+    return _cachedFollowedEventIds;
+  }
+
+  // Their race_event follows
+  const follows = await db.select({ entityId: userFollows.entityId })
+    .from(userFollows)
+    .where(and(
+      eq(userFollows.followType, "race_event"),
+      inArray(userFollows.userId, userIds),
+    ));
+
+  _cachedFollowedEventIds = new Set(follows.map(f => f.entityId));
+  console.log(`📋 Group interest: ${_cachedFollowedEventIds.size} followed events from ${userIds.length} registered members`);
+  return _cachedFollowedEventIds;
+}
+
+// Check if a race is relevant to group members (followed, OR WorldTour/WT category)
+async function isRaceOfInterest(raceEventId: string | null, uciCategory?: string | null): Promise<boolean> {
+  if (!raceEventId) return false;
+  // Always include WorldTour races — universally interesting
+  if (uciCategory && ["WT", "WWT", "WorldTour"].includes(uciCategory)) return true;
+  const followed = await getGroupFollowedEventIds();
+  // If nobody has follows yet, default to allow-all (graceful degradation)
+  if (followed.size === 0) return true;
+  return followed.has(raceEventId);
+}
+
 // ── Race queries ──────────────────────────────────────────────────────────────
 
 async function getUpcomingRaces(dayMin: number, dayMax: number) {
   return db.select({
     id: races.id, name: races.name, date: races.date, discipline: races.discipline,
-    gender: races.gender,
+    gender: races.gender, uciCategory: races.uciCategory,
     raceEventId: races.raceEventId, pcsUrl: races.pcsUrl,
     eventName: raceEvents.name, eventSlug: raceEvents.slug, country: raceEvents.country,
   })
@@ -168,9 +210,14 @@ async function postPreview() {
     // Replace with men's edition if current slot is women's (men's has more/better predictions usually)
     if ((race as any).gender === "men" && (existing as any).gender !== "men") bySlug.set(key, race);
   }
-  // From all unique events, pick up to 2 that actually have predictions
+  // From all unique events, pick up to 2 that are of interest AND have predictions
   const racesWithPreds: Array<{ race: typeof races48h[0]; preds: Awaited<ReturnType<typeof getTopPredictions>> }> = [];
   for (const race of Array.from(bySlug.values())) {
+    const interested = await isRaceOfInterest(race.raceEventId, race.uciCategory);
+    if (!interested) {
+      console.log(`⏭️  Skipping ${race.eventName ?? race.name} — not followed by group members`);
+      continue;
+    }
     const preds = await getTopPredictions(race.id);
     if (preds.length === 0) {
       console.log(`⚠️  Skipping ${race.eventName ?? race.name} — no predictions in DB`);
@@ -234,6 +281,8 @@ async function postRaceDay() {
   const uniqueToday = todayRaces.filter(r => { const k = r.eventSlug ?? r.id; if (seenRD.has(k)) return false; seenRD.add(k); return true; });
 
   for (const race of uniqueToday.slice(0, 2)) {
+    const interested = await isRaceOfInterest(race.raceEventId, race.uciCategory);
+    if (!interested) { console.log(`⏭️  Skipping raceday ${race.eventName ?? race.name} — not followed by group members`); continue; }
     const preds = await getTopPredictions(race.id, 3);
     const url = race.eventSlug ? `${APP_URL}/races/road/${race.eventSlug}` : APP_URL;
 
@@ -257,7 +306,7 @@ Link: ${url}`;
 async function postResults() {
   // Find races from yesterday/today that are now completed
   const window = await db.select({
-    id: races.id, name: races.name, date: races.date,
+    id: races.id, name: races.name, date: races.date, uciCategory: races.uciCategory,
     raceEventId: races.raceEventId, eventName: raceEvents.name, eventSlug: raceEvents.slug,
   })
     .from(races)
@@ -274,6 +323,8 @@ async function postResults() {
   if (window.length === 0) { console.log("No completed races to post"); return; }
 
   for (const race of window) {
+    const interested = await isRaceOfInterest(race.raceEventId ?? null, race.uciCategory);
+    if (!interested) { console.log(`⏭️  Skipping results ${race.eventName ?? race.name} — not followed by group members`); continue; }
     const results = await getRecentResults(race.id);
     if (results.length < 3) continue;
 
