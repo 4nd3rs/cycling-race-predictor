@@ -15,7 +15,7 @@ import { config } from "dotenv";
 config({ path: ".env.local" });
 
 import { db, waGroupMembers, userWhatsapp } from "./lib/db";
-import { eq, isNull, lt, and } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 
 const WA_GROUP_JID = "120363425402092416@g.us";
 const OPENCLAW_GATEWAY = process.env.OPENCLAW_GATEWAY_URL ?? "http://127.0.0.1:18789";
@@ -57,27 +57,7 @@ async function sendDm(phone: string, message: string): Promise<boolean> {
   } catch { return false; }
 }
 
-async function kickMember(jid: string): Promise<boolean> {
-  if (dryRun) {
-    console.log(`  🚫 DRY RUN KICK: ${jid}`);
-    return true;
-  }
-  try {
-    const { execSync } = await import("child_process");
-    const scriptPath = new URL("./wa-kick.ts", import.meta.url).pathname;
-    const result = execSync(
-      `node_modules/.bin/tsx "${scriptPath}" "${jid}" "${WA_GROUP_JID}"`,
-      { cwd: process.cwd(), timeout: 30000, encoding: "utf-8" }
-    );
-    console.log(`  🚫 Kicked ${jid}:`, result.trim());
-    // Wait for OpenClaw to reconnect
-    await new Promise(r => setTimeout(r, 5000));
-    return true;
-  } catch (err: any) {
-    console.error(`  ❌ Kick failed for ${jid}:`, err.message ?? err);
-    return false;
-  }
-}
+
 
 // ── Seed member manually ──────────────────────────────────────────────────────
 
@@ -99,104 +79,46 @@ async function seedMember(phone: string, name?: string) {
 // ── Main check ────────────────────────────────────────────────────────────────
 
 async function runCheck() {
-  console.log(`🔍 Running WA group admin check${dryRun ? " (DRY RUN)" : ""}...`);
-
-  // Get all known group members
   const members = await db.select().from(waGroupMembers).where(isNull(waGroupMembers.kickedAt));
-  console.log(`📋 ${members.length} active tracked members`);
-
-  // Get all registered phones
   const registered = await db.select({ phone: userWhatsapp.phoneNumber }).from(userWhatsapp);
   const registeredPhones = new Set(registered.map(r => r.phone?.replace(/^\+/, "") ?? ""));
 
-  let warned = 0, kicked = 0, ok = 0, skipped = 0;
+  const unregistered: string[] = [];
 
   for (const member of members) {
+    if (member.isAdmin) continue;
     const memberPhone = member.phoneNumber?.replace(/^\+/, "") ?? member.jid.replace("@s.whatsapp.net", "");
-    const isRegistered = registeredPhones.has(memberPhone);
+    if (!registeredPhones.has(memberPhone)) {
+      const label = member.displayName ? `${member.displayName} (${member.phoneNumber ?? member.jid})` : (member.phoneNumber ?? member.jid);
+      unregistered.push(label);
 
-    if (isRegistered || member.isAdmin) {
-      ok++;
-      continue;
-    }
+      // Send them a friendly DM reminder (once per day max)
+      if (!member.lastWarnedAt || daysDiff(new Date(member.lastWarnedAt)) >= 1) {
+        const warningNum = member.warningCount + 1;
+        const msg = `👋 Hey! You're in the *Pro Cycling Predictor Road* WhatsApp group.
 
-    // Not registered — check if we should warn or kick
-    const joinedAt = member.joinedAt ?? member.createdAt;
-    const daysInGroup = daysDiff(new Date(joinedAt));
-    const firstWarnedAt = member.firstWarnedAt ? new Date(member.firstWarnedAt) : null;
-    const daysSinceFirstWarning = firstWarnedAt ? daysDiff(firstWarnedAt) : 0;
-
-    console.log(`⚠️  Unregistered: ${member.phoneNumber ?? member.jid} | warnings: ${member.warningCount} | days in group: ${daysInGroup.toFixed(1)}`);
-
-    // Kick if: 2+ warnings AND 3+ days since first warning
-    if (member.warningCount >= 2 && firstWarnedAt && daysSinceFirstWarning >= 3) {
-      console.log(`  🚫 Kicking — ${member.warningCount} warnings, ${daysSinceFirstWarning.toFixed(1)} days since first warning`);
-      const phone = jidToPhone(member.jid);
-      await sendDm(phone, `👋 Your time in the *Pro Cycling Predictor Road* group has ended.
-
-You received ${member.warningCount} reminders to register at ${APP_URL}/profile but haven't done so.
-
-You've been removed from the group. You can re-join anytime by registering and adding your WhatsApp number on your profile page.
-
-No hard feelings — see you on the road! 🚴`);
-      await kickMember(member.jid);
-      if (!dryRun) {
-        await db.update(waGroupMembers)
-          .set({ kickedAt: new Date(), updatedAt: new Date() })
-          .where(eq(waGroupMembers.id, member.id));
-      }
-      kicked++;
-      continue;
-    }
-
-    // Don't warn if joined <24h ago (grace period)
-    if (daysInGroup < 1) {
-      console.log(`  ⏳ Grace period — joined ${(daysInGroup * 24).toFixed(0)}h ago`);
-      skipped++;
-      continue;
-    }
-
-    // Don't re-warn within 24h of last warning
-    if (member.lastWarnedAt && daysDiff(new Date(member.lastWarnedAt)) < 1) {
-      console.log(`  ⏳ Already warned recently`);
-      skipped++;
-      continue;
-    }
-
-    // Send warning DM
-    const warningNum = member.warningCount + 1;
-    const phone = jidToPhone(member.jid);
-    const warningMsg = warningNum === 1
-      ? `👋 Hey! You've joined the *Pro Cycling Predictor Road* WhatsApp group — welcome!
-
-To stay in the group, please register your account at:
-👉 ${APP_URL}/profile
-
-Add your WhatsApp number there and you'll get full access to predictions, results and race intel.
-
-Takes 30 seconds — no hard feelings if you'd rather not, but we'll need to remove unregistered members to keep the group quality high. 🚴`
-      : `👋 Reminder — you haven't registered your account yet for the *PCP Road* group.
-
+To stay in the group, please register at:
 👉 ${APP_URL}/profile → add your WhatsApp number
 
-This is your final reminder. If you're not registered within 3 days of this message, you'll be removed from the group.`;
-
-    await sendDm(phone, warningMsg);
-
-    if (!dryRun) {
-      await db.update(waGroupMembers)
-        .set({
-          warningCount: warningNum,
-          firstWarnedAt: member.firstWarnedAt ?? new Date(),
-          lastWarnedAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(eq(waGroupMembers.id, member.id));
+Takes 30 seconds. If you need help, just reply here. 🚴`;
+        await sendDm(jidToPhone(member.jid), msg);
+        if (!dryRun) {
+          await db.update(waGroupMembers)
+            .set({ warningCount: warningNum, firstWarnedAt: member.firstWarnedAt ?? new Date(), lastWarnedAt: new Date(), updatedAt: new Date() })
+            .where(eq(waGroupMembers.id, member.id));
+        }
+      }
     }
-    warned++;
   }
 
-  console.log(`\n✅ Done: ${ok} registered, ${warned} warned, ${kicked} kicked, ${skipped} skipped`);
+  if (unregistered.length > 0) {
+    const report = `🛡️ *PCP Road Group — Unregistered Members*\n\n${unregistered.map((u, i) => `${i + 1}. ${u}`).join("\n")}\n\nThey've been sent a registration reminder. Kick them manually if needed.`;
+    console.log(report);
+    // Notify admin (Anders) via WA DM
+    await sendDm("+46707961967", report);
+  } else {
+    console.log(`✅ All ${members.length} group members are registered.`);
+  }
 }
 
 // ── Entry point ───────────────────────────────────────────────────────────────
