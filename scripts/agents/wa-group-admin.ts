@@ -63,19 +63,20 @@ async function kickMember(jid: string): Promise<boolean> {
     return true;
   }
   try {
-    const res = await fetch(`${OPENCLAW_GATEWAY}/tools/invoke`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${GATEWAY_TOKEN}` },
-      body: JSON.stringify({
-        tool: "message",
-        args: { action: "send", channel: "whatsapp", target: WA_GROUP_JID, message: `__kick__${jid}` },
-      }),
-    });
-    // Note: actual kick via Baileys requires a dedicated endpoint — this is a placeholder
-    // The gateway may need a custom action; for now log and mark as kicked in DB
-    console.log(`  ℹ️  Kick signal sent for ${jid} (needs gateway kick support)`);
+    const { execSync } = await import("child_process");
+    const scriptPath = new URL("./wa-kick.ts", import.meta.url).pathname;
+    const result = execSync(
+      `node_modules/.bin/tsx "${scriptPath}" "${jid}" "${WA_GROUP_JID}"`,
+      { cwd: process.cwd(), timeout: 30000, encoding: "utf-8" }
+    );
+    console.log(`  🚫 Kicked ${jid}:`, result.trim());
+    // Wait for OpenClaw to reconnect
+    await new Promise(r => setTimeout(r, 5000));
     return true;
-  } catch { return false; }
+  } catch (err: any) {
+    console.error(`  ❌ Kick failed for ${jid}:`, err.message ?? err);
+    return false;
+  }
 }
 
 // ── Seed member manually ──────────────────────────────────────────────────────
