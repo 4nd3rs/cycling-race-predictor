@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Header } from "@/components/header";
 import { PredictionList } from "@/components/prediction-card";
-import { TelegramSubscribeButton } from "@/components/telegram-subscribe-button";
+import { WhatsAppJoinButton } from "@/components/whatsapp-join-button";
 import { FollowButton } from "@/components/follow-button";
 import { RaceLinksSection } from "@/components/race-links";
 import { Badge } from "@/components/ui/badge";
@@ -783,7 +783,7 @@ export default async function CategoryPage({ params }: PageProps) {
                     </a>
                   )}
                   <FollowButton followType="race" entityId={race.id} entityName={`${event.name} – ${race.gender === "men" ? "M" : "F"}${race.ageCategory === "elite" ? "" : race.ageCategory === "u23" ? " U23" : race.ageCategory === "junior" ? " Junior" : ""}`} />
-                  <TelegramSubscribeButton />
+                  <WhatsAppJoinButton />
                 </div>
 
               </div>{/* /left */}

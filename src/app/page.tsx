@@ -512,14 +512,14 @@ export default async function Home({ searchParams }: HomePageProps) {
             <div className="max-w-2xl mb-10">
               <h2 className="text-2xl font-black tracking-tight mb-3">Never miss a race you care about</h2>
               <p className="text-muted-foreground">
-                Follow your favourite races and riders. Get a personal race briefing sent straight to your{" "}
-                                <span className="text-foreground font-semibold">Telegram</span> — before every start.
+                Follow your favourite races and riders. Get predictions, results and race intel sent straight to your{" "}
+                                <span className="text-foreground font-semibold">WhatsApp</span> — for every WorldTour race.
               </p>
             </div>
             <div className="grid gap-6 sm:grid-cols-3">
               <div className="rounded-lg border border-border/50 p-5 bg-background/40">
-                <h3 className="font-bold text-sm uppercase tracking-wide text-primary mb-2">Race Briefings on Telegram</h3>
-                <p className="text-sm text-muted-foreground">Follow a race and get a personalised message before the start — who to watch, key intel, weather. No app needed.</p>
+                <h3 className="font-bold text-sm uppercase tracking-wide text-primary mb-2">WhatsApp Race Group</h3>
+                <p className="text-sm text-muted-foreground">Join the Road Cycling group. Get predictions before the start, podium posts after the finish — all in WhatsApp.</p>
               </div>
               <div className="rounded-lg border border-border/50 p-5 bg-background/40">
                 <h3 className="font-bold text-sm uppercase tracking-wide text-primary mb-2">Your Races, Your Riders</h3>
