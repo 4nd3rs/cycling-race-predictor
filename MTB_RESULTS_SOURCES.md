@@ -15,6 +15,18 @@ Full results are usually only on the **organizer website** or their **timing sys
 
 ---
 
+## cyclingflash.com ⭐ PRIMARY SOURCE
+- **What it is:** Clean XCO results aggregator — covers C1, C2, World Cup, Continental events
+- **URL pattern:** `https://cyclingflash.com/event/{race-slug}-{year}`
+  - e.g. `https://cyclingflash.com/event/gran-premio-zaragoza-xco-2026`
+  - e.g. `https://cyclingflash.com/event/vtt-chabrieres-2026` (TBD — try this next time)
+- **Coverage:** International UCI races, usually published within 1–2 days
+- **Format:** Clean HTML — top-3 per category with times and team names, rider profile links
+- **Fetching:** Works with plain web_fetch — no JS rendering needed ✅
+- **Rider links:** `/profile/{rider-slug}` — useful for future rider matching
+- **Team links:** `/team/{team-slug}-{year}`
+- **Added:** 2026-03-06 (Anders tip — used for Gran Premio Zaragoza)
+
 ## Known Timing Platforms
 
 ### my.raceresult.com
@@ -55,9 +67,11 @@ Full results are usually only on the **organizer website** or their **timing sys
 - **Next edition:** Coupe de France round at same venue, Apr 17–19 2026
 
 ### Gran Premio Zaragoza XCO (Spain) — UCI C1
-- **xcodata ID:** 9240 (2026), check `/race/9240/`
-- **Status:** "No results available yet" as of Mar 6 — 6+ days post race (Feb 28)
-- **Organizer source:** TBD — search `"Gran Premio Zaragoza" XCO 2026 resultados`
+- **xcodata ID:** 9240 (2026)
+- **cyclingflash:** https://cyclingflash.com/event/gran-premio-zaragoza-xco-2026 ✅
+- **2026 results (inserted Mar 6):**
+  - Elite Men: 1. Lillelund Tobias (DEN), 2. François Thibaut (FRA), 3. Dawson Christopher
+  - Elite Women: 1. Terpstra Anne (NED), 2. Sagardoy Zunzarren Estibaliz (ESP), 3. Lõiv Janika (EST)
 
 ### Internacionales Chelva XCO (Spain) — UCI C1
 - **xcodata ID:** TBD
