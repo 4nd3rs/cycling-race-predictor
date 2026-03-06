@@ -29,14 +29,9 @@ export function Footer() {
               Privacy Policy
             </Link>
             <span className="hidden sm:inline text-border">·</span>
-            <a
-              href="https://t.me/procyclingpredictions"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-foreground transition-colors"
-            >
-              Telegram
-            </a>
+            <Link href="/notifications" className="hover:text-foreground transition-colors">
+              WhatsApp
+            </Link>
             <span className="hidden sm:inline text-border">·</span>
             <a
               href="https://discord.gg/YaKmfkHqYu"
