@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/Footer";
-import { WhatsAppJoinButton } from "@/components/whatsapp-join-button";
+import { WhatsAppGroupWidget } from "@/components/whatsapp-group-widget";
+import { getAuthUser } from "@/lib/auth";
+import { db, userWhatsapp } from "@/lib/db";
+import { eq } from "drizzle-orm";
 
 export const metadata = {
   title: "Race Notifications — Pro Cycling Predictor",
@@ -9,7 +12,14 @@ export const metadata = {
     "Get race predictions, podium results and breaking news for every WorldTour race — delivered straight to your WhatsApp.",
 };
 
-export default function NotificationsPage() {
+export default async function NotificationsPage() {
+  const user = await getAuthUser().catch(() => null);
+
+  const whatsappRows = user
+    ? await db.select().from(userWhatsapp).where(eq(userWhatsapp.userId, user.id)).limit(1)
+    : [];
+  const whatsapp = whatsappRows[0] ?? null;
+
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       <Header />
@@ -28,10 +38,35 @@ export default function NotificationsPage() {
               Race updates in your WhatsApp
             </h1>
             <p className="text-lg text-muted-foreground max-w-xl mx-auto mb-8">
-              Join the Pro Cycling Predictor Road group. Register your number, get the invite — and we&apos;ll handle the rest.
+              Join the Pro Cycling Predictor Road group. Enter your number and we&apos;ll send you the invite — no public link, registered members only.
             </p>
-            <div className="flex justify-center">
-              <WhatsAppJoinButton />
+
+            {/* CTA — auth-aware */}
+            <div className="max-w-md mx-auto">
+              {user ? (
+                <WhatsAppGroupWidget initialPhone={whatsapp?.phoneNumber ?? null} />
+              ) : (
+                <div className="rounded-lg border border-border/50 bg-card/20 p-5 space-y-3 text-left">
+                  <p className="text-sm font-medium">Create a free account to join</p>
+                  <p className="text-xs text-muted-foreground">
+                    We verify members before sending the group invite — takes 30 seconds to sign up.
+                  </p>
+                  <div className="flex gap-2 pt-1">
+                    <Link
+                      href="/sign-up?redirect_url=/notifications"
+                      className="flex-1 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
+                    >
+                      Create free account
+                    </Link>
+                    <Link
+                      href="/sign-in?redirect_url=/notifications"
+                      className="flex-1 inline-flex items-center justify-center rounded-md border border-border/50 px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-border transition-colors"
+                    >
+                      Sign in
+                    </Link>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </section>
@@ -40,7 +75,6 @@ export default function NotificationsPage() {
         <section className="mx-auto max-w-3xl px-6 py-16">
           <h2 className="text-2xl font-bold tracking-tight mb-8 text-center">What you get</h2>
           <div className="grid gap-6 sm:grid-cols-2">
-
             <div className="rounded-xl border border-border/50 bg-card/30 p-6">
               <div className="text-2xl mb-3">🔮</div>
               <h3 className="font-semibold mb-2">Race Previews</h3>
@@ -48,7 +82,6 @@ export default function NotificationsPage() {
                 48 hours before every WorldTour race — our top picks, win probabilities, and key intel on who to watch.
               </p>
             </div>
-
             <div className="rounded-xl border border-border/50 bg-card/30 p-6">
               <div className="text-2xl mb-3">🏆</div>
               <h3 className="font-semibold mb-2">Podium Results</h3>
@@ -56,7 +89,6 @@ export default function NotificationsPage() {
                 Same evening as the finish — the top 3, how the race unfolded, and how well our predictions held up.
               </p>
             </div>
-
             <div className="rounded-xl border border-border/50 bg-card/30 p-6">
               <div className="text-2xl mb-3">🌅</div>
               <h3 className="font-semibold mb-2">Race Day Hype</h3>
@@ -64,7 +96,6 @@ export default function NotificationsPage() {
                 Morning of every race — a quick briefing with our top pick and what to expect from the day.
               </p>
             </div>
-
             <div className="rounded-xl border border-border/50 bg-card/30 p-6">
               <div className="text-2xl mb-3">🔴</div>
               <h3 className="font-semibold mb-2">Breaking News</h3>
@@ -72,46 +103,36 @@ export default function NotificationsPage() {
                 Injuries, withdrawals, late scratches — important race news delivered within hours of breaking.
               </p>
             </div>
-
           </div>
         </section>
 
         {/* How to join */}
         <section className="border-t border-border/50 bg-zinc-950/60">
           <div className="mx-auto max-w-3xl px-6 py-16">
-            <h2 className="text-2xl font-bold tracking-tight mb-8 text-center">How to join</h2>
+            <h2 className="text-2xl font-bold tracking-tight mb-8 text-center">How it works</h2>
             <ol className="space-y-6">
               <li className="flex gap-4">
                 <span className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-sm font-bold text-primary">1</span>
                 <div>
                   <p className="font-medium">Create a free account</p>
-                  <p className="text-sm text-muted-foreground mt-0.5">Sign up at <Link href="/sign-up" className="text-primary hover:underline">procyclingpredictor.com</Link> — takes 30 seconds.</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">Sign up — takes 30 seconds, no credit card needed.</p>
                 </div>
               </li>
               <li className="flex gap-4">
                 <span className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-sm font-bold text-primary">2</span>
                 <div>
-                  <p className="font-medium">Add your WhatsApp number</p>
-                  <p className="text-sm text-muted-foreground mt-0.5">Go to <Link href="/profile" className="text-primary hover:underline">your profile</Link> and enter your number. We&apos;ll send you the group invite link via WhatsApp.</p>
+                  <p className="font-medium">Enter your WhatsApp number</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">Add your number on this page or in your profile. We&apos;ll send you a private invite link via WhatsApp DM.</p>
                 </div>
               </li>
               <li className="flex gap-4">
                 <span className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-sm font-bold text-primary">3</span>
                 <div>
-                  <p className="font-medium">Join the group</p>
-                  <p className="text-sm text-muted-foreground mt-0.5">Tap the invite link in the DM we send you. You&apos;re in — race updates start from the next WorldTour race.</p>
+                  <p className="font-medium">Join via the invite we send you</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">Tap the link in your DM. Race updates start from the next WorldTour race.</p>
                 </div>
               </li>
             </ol>
-            <div className="mt-10 flex flex-col sm:flex-row gap-3 justify-center">
-              <Link
-                href="/sign-up"
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
-              >
-                Create free account
-              </Link>
-              <WhatsAppJoinButton />
-            </div>
           </div>
         </section>
 
@@ -120,26 +141,11 @@ export default function NotificationsPage() {
           <h2 className="text-2xl font-bold tracking-tight mb-8">Questions</h2>
           <dl className="space-y-6">
             {[
-              {
-                q: "Is it free?",
-                a: "Yes. The WhatsApp group is free for all registered users.",
-              },
-              {
-                q: "How often will I get messages?",
-                a: "On WorldTour race days you'll get 3–4 messages (preview, race day, results). Non-race days you may get a breaking news update if something important happens. No spam.",
-              },
-              {
-                q: "Which races are covered?",
-                a: "All UCI WorldTour and Women's WorldTour road races — monuments, Grand Tours, stage races. We'll expand to more categories over time.",
-              },
-              {
-                q: "Can I leave the group?",
-                a: "Of course — just leave the WhatsApp group at any time. No questions asked.",
-              },
-              {
-                q: "Why do I need to register?",
-                a: "We verify registrations to keep the group quality high and ensure members are genuine cycling fans, not bots.",
-              },
+              { q: "Is it free?", a: "Yes. The WhatsApp group is completely free for all registered users." },
+              { q: "How often will I get messages?", a: "On WorldTour race days: 3–4 messages (preview, race morning, results). Between races: only if something important breaks. No spam." },
+              { q: "Which races are covered?", a: "All UCI WorldTour and Women's WorldTour road races — monuments, Grand Tours, stage races. More categories coming." },
+              { q: "Why do I need to register?", a: "We verify members to keep the group quality high. No public invite link — everyone in the group has a registered account." },
+              { q: "Can I leave?", a: "Of course — just leave the WhatsApp group at any time. No questions asked." },
             ].map(({ q, a }) => (
               <div key={q} className="border-b border-border/50 pb-6">
                 <dt className="font-semibold mb-1">{q}</dt>
