@@ -46,29 +46,42 @@ function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 
 // ─── Rider upsert ─────────────────────────────────────────────────────────────
 
-function normalizeName(raw: string): { firstName: string; lastName: string } {
-  const parts = raw.trim().split(/\s+/);
-  if (parts.length === 1) return { firstName: "", lastName: parts[0] };
-  if (/^[A-Z][A-Z\-]+$/.test(parts[0])) {
-    const lastName = parts[0].charAt(0) + parts[0].slice(1).toLowerCase();
-    const firstName = parts.slice(1).map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(" ");
-    return { firstName, lastName };
-  }
-  return { firstName: parts.slice(0, -1).join(" "), lastName: parts[parts.length - 1] };
+function stripAccents(str: string): string {
+  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 }
 
-async function upsertRider(rawName: string, nationality?: string): Promise<string | null> {
-  const { firstName, lastName } = normalizeName(rawName);
-  if (!lastName) return null;
+function normalizeForMatch(name: string): string {
+  return name.toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z\s]/g, "")
+    .trim().split(/\s+/).sort().join(" ");
+}
 
-  const existing = await db.query.riders.findFirst({
-    where: and(eq(schema.riders.firstName, firstName), eq(schema.riders.lastName, lastName)),
-  });
-  if (existing) return existing.id;
+let riderCache: Map<string, string> | null = null;
 
-  const [created] = await db.insert(schema.riders).values({
-    firstName, lastName, nationality: nationality ?? null, discipline: "mtb",
-  }).returning({ id: schema.riders.id });
+async function getRiderCache(): Promise<Map<string, string>> {
+  if (riderCache) return riderCache;
+  const all = await db.select({ id: schema.riders.id, name: schema.riders.name })
+    .from(schema.riders).limit(20000);
+  riderCache = new Map();
+  for (const r of all) {
+    riderCache.set(`name:${stripAccents(r.name)}`, r.id);
+    riderCache.set(`norm:${normalizeForMatch(r.name)}`, r.id);
+  }
+  return riderCache;
+}
+
+async function upsertRider(rawName: string, _nationality?: string): Promise<string | null> {
+  if (!rawName.trim()) return null;
+  const cache = await getRiderCache();
+  const stripped = stripAccents(rawName);
+  if (cache.has(`name:${stripped}`)) return cache.get(`name:${stripped}`)!;
+  const norm = normalizeForMatch(rawName);
+  if (cache.has(`norm:${norm}`)) return cache.get(`norm:${norm}`)!;
+  const [created] = await db.insert(schema.riders).values({ name: rawName.trim() })
+    .returning({ id: schema.riders.id });
+  cache.set(`name:${stripped}`, created.id);
+  cache.set(`norm:${norm}`, created.id);
   return created.id;
 }
 
