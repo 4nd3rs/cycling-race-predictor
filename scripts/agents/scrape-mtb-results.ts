@@ -311,7 +311,15 @@ async function main() {
   for (const race of raceRows) {
     console.log(`\n🔍 ${race.name} (${race.date})`);
     const now = new Date().toLocaleString("sv-SE", { timeZone: "Europe/Stockholm" }).replace("T", " ");
-    const { inserted, status } = await processRace(race);
+    let inserted = 0, status = "error";
+    try {
+      const result = await processRace(race);
+      inserted = result.inserted;
+      status = result.status;
+    } catch (e: any) {
+      console.error(`   💥 ${e.message}`);
+      status = "error";
+    }
     totalInserted += inserted;
 
     const statusEmoji =

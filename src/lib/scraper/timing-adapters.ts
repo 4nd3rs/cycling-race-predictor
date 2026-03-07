@@ -38,18 +38,50 @@ export interface CategoryMatch {
 // ─── Category classifier ──────────────────────────────────────────────────────
 
 const CATEGORY_PATTERNS: Array<{ re: RegExp; match: CategoryMatch }> = [
-  { re: /elite.*(men|herr|herre|mænd|man\b)|men.*elite|herrer.*elite/i, match: { ageCategory: "elite", gender: "men" } },
-  { re: /elite.*(wom[ae]n|dam|kvind|ladies)|wom[ae]n.*elite|damer.*elite/i, match: { ageCategory: "elite", gender: "women" } },
-  { re: /u23.*(men|herr)|men.*u23|under.?23.*men|under.?23.*herr/i, match: { ageCategory: "u23", gender: "men" } },
-  { re: /u23.*(wom[ae]n|dam)|wom[ae]n.*u23|under.?23.*dam/i, match: { ageCategory: "u23", gender: "women" } },
-  { re: /junior.*(men|herr|dreng)|men.*junior|junior.*m[ae]n/i, match: { ageCategory: "junior", gender: "men" } },
-  { re: /junior.*(wom[ae]n|dam|pige)|wom[ae]n.*junior|junior.*wom[ae]n/i, match: { ageCategory: "junior", gender: "women" } },
-  { re: /\bmen\b.*\belite\b|\belite\b.*\bmen\b/i, match: { ageCategory: "elite", gender: "men" } },
-  { re: /\bwom[ae]n\b.*\belite\b|\belite\b.*\bwom[ae]n\b/i, match: { ageCategory: "elite", gender: "women" } },
-  { re: /\bmen\b.*\bunder\s?23\b|\bunder\s?23\b.*\bmen\b/i, match: { ageCategory: "u23", gender: "men" } },
+  // IMPORTANT: Women patterns MUST come before men patterns to avoid "man" matching inside "woman"
+
+  // Junior Series (French RaceResult format) — must come before generic junior
+  { re: /junior\s+series\b.*\b(?:femme|woman|fille)\b/i, match: { ageCategory: "junior", gender: "women" } },
+  { re: /junior\s+series\b.*\b(?:homme|\bman\b|garçon)\b/i, match: { ageCategory: "junior", gender: "men" } },
+
+  // Elite women — multi-language
+  { re: /elite.*(wom[ae]n|dam|kvind|ladies|femme|femenin|frauen|donne)/i, match: { ageCategory: "elite", gender: "women" } },
+  { re: /(?:wom[ae]n|femme|femenin|frauen|donne).*elite/i, match: { ageCategory: "elite", gender: "women" } },
+  { re: /damer.*elite/i, match: { ageCategory: "elite", gender: "women" } },
+  // Elite men — multi-language (use \bman\b to avoid matching "woman")
+  { re: /elite.*(?:\bmen\b|herr|herre|mænd|\bman\b|homme|masculin|männer|uomini)/i, match: { ageCategory: "elite", gender: "men" } },
+  { re: /(?:\bmen\b|homme|masculin|männer).*elite/i, match: { ageCategory: "elite", gender: "men" } },
+  { re: /herrer.*elite/i, match: { ageCategory: "elite", gender: "men" } },
+
+  // U23
+  { re: /u23.*(?:wom[ae]n|dam|femme|femenin)/i, match: { ageCategory: "u23", gender: "women" } },
+  { re: /(?:wom[ae]n|femme|femenin).*u23/i, match: { ageCategory: "u23", gender: "women" } },
+  { re: /under.?23.*(?:wom[ae]n|dam|femme)/i, match: { ageCategory: "u23", gender: "women" } },
+  { re: /u23.*(?:\bmen\b|herr|homme|masculin)/i, match: { ageCategory: "u23", gender: "men" } },
+  { re: /(?:\bmen\b|homme|masculin).*u23/i, match: { ageCategory: "u23", gender: "men" } },
+  { re: /under.?23.*(?:\bmen\b|herr|homme)/i, match: { ageCategory: "u23", gender: "men" } },
+
+  // Junior
+  { re: /junior.*(?:wom[ae]n|dam|pige|femme|fille|femenin)/i, match: { ageCategory: "junior", gender: "women" } },
+  { re: /(?:wom[ae]n|femme).*junior/i, match: { ageCategory: "junior", gender: "women" } },
+  { re: /junior.*(?:\bmen\b|herr|dreng|homme|garçon|masculin)/i, match: { ageCategory: "junior", gender: "men" } },
+  { re: /(?:\bmen\b|homme).*junior/i, match: { ageCategory: "junior", gender: "men" } },
+
+  // Generic word-boundary patterns
+  { re: /\bwom[ae]n\b.*\belite\b|\belite\b.*\bwom[ae]n\b|\belite\b.*\bfemme\b|\bfemme\b.*\belite\b/i, match: { ageCategory: "elite", gender: "women" } },
+  { re: /\bmen\b.*\belite\b|\belite\b.*\bmen\b|\belite\b.*\bhomme\b|\bhomme\b.*\belite\b/i, match: { ageCategory: "elite", gender: "men" } },
   { re: /\bwom[ae]n\b.*\bunder\s?23\b|\bunder\s?23\b.*\bwom[ae]n\b/i, match: { ageCategory: "u23", gender: "women" } },
-  { re: /\bmen\b.*\bjunior\b|\bjunior\b.*\bmen\b/i, match: { ageCategory: "junior", gender: "men" } },
+  { re: /\bmen\b.*\bunder\s?23\b|\bunder\s?23\b.*\bmen\b/i, match: { ageCategory: "u23", gender: "men" } },
   { re: /\bwom[ae]n\b.*\bjunior\b|\bjunior\b.*\bwom[ae]n\b/i, match: { ageCategory: "junior", gender: "women" } },
+  { re: /\bmen\b.*\bjunior\b|\bjunior\b.*\bmen\b/i, match: { ageCategory: "junior", gender: "men" } },
+
+  // RaceResult French combined format: "U23 & Elite Homme / Man UCI"
+  { re: /\b(?:u23|under.?23)\b.*\b(?:femme|wom[ae]n)\b/i, match: { ageCategory: "elite", gender: "women" } },
+  { re: /\b(?:u23|under.?23)\b.*\b(?:homme|\bman\b)\b/i, match: { ageCategory: "elite", gender: "men" } },
+
+  // Catch-all: "Homme / Man" or "Femme / Woman" without age category → elite
+  { re: /\bfemme\b.*\bwom[ae]n\b|\bwom[ae]n\b.*\bfemme\b/i, match: { ageCategory: "elite", gender: "women" } },
+  { re: /\bhomme\b.*\bman\b|\bman\b.*\bhomme\b/i, match: { ageCategory: "elite", gender: "men" } },
 ];
 
 export function classifyCategory(name: string): CategoryMatch | null {
@@ -248,18 +280,29 @@ interface RaceResultConfig {
   key: string;
   contests: Record<string, string>;
   lists: Array<{ Name: string; Contest: string; ID: string }>;
+  server?: string;
 }
 
 interface RaceResultData {
   data: Record<string, Array<string[]>>;
 }
 
-async function fetchRaceResultConfig(eventId: string): Promise<RaceResultConfig> {
-  return fetchJSON<RaceResultConfig>(`https://my.raceresult.com/${eventId}/RRPublish/data/config`);
+function rrBaseUrl(cfg: RaceResultConfig, eventId: string): string {
+  const host = cfg.server ?? "my.raceresult.com";
+  return `https://${host}/${eventId}/RRPublish/data`;
 }
 
-async function fetchRaceResultList(eventId: string, key: string, listName: string): Promise<RaceResultData> {
-  const url = `https://my.raceresult.com/${eventId}/RRPublish/data/list?key=${key}&listname=${encodeURIComponent(listName)}&contest=0`;
+async function fetchRaceResultConfig(eventId: string): Promise<RaceResultConfig> {
+  // Try my.raceresult.com first, fall back to my2
+  try {
+    return await fetchJSON<RaceResultConfig>(`https://my.raceresult.com/${eventId}/RRPublish/data/config`);
+  } catch {
+    return fetchJSON<RaceResultConfig>(`https://my2.raceresult.com/${eventId}/RRPublish/data/config`);
+  }
+}
+
+async function fetchRaceResultList(base: string, key: string, listName: string, contest: string = "0"): Promise<RaceResultData> {
+  const url = `${base}/list?key=${key}&listname=${encodeURIComponent(listName)}&contest=${contest}`;
   return fetchJSON<RaceResultData>(url);
 }
 
@@ -269,48 +312,96 @@ function parseRaceResultRow(row: string[]): {
   dnf: boolean; dns: boolean;
 } | null {
   if (row.length < 5) return null;
-  const posStr = (row[2] ?? "").toString().trim();
-  const name = (row[4] ?? "").toString().trim();
+  const posStr = (row[2] ?? "").toString().trim().replace(/\.$/, ""); // strip trailing dot
+  // Name can be at index 4 or 5 depending on format (some have flag img at index 4)
+  let name = "";
+  let club: string | undefined;
+  for (let i = 4; i < Math.min(row.length, 7); i++) {
+    const val = (row[i] ?? "").toString().trim();
+    if (val && !val.startsWith("[img:") && !name) {
+      name = val;
+    } else if (val && !val.startsWith("[img:") && name && !club) {
+      club = val || undefined;
+      break;
+    }
+  }
   if (!name) return null;
   const isDNF = /^dnf$/i.test(posStr);
   const isDNS = /^dns$/i.test(posStr);
   const isDSQ = /^d[sq]{2}$/i.test(posStr);
   const pos = (isDNF || isDNS || isDSQ) ? null : parseInt(posStr, 10) || null;
   const bib = (row[0] ?? row[3] ?? "").toString().trim();
-  const club = (row[5] ?? "").toString().trim() || undefined;
-  // Time is typically in column 7
-  const timeRaw = (row[7] ?? "").toString().trim();
-  const timeSeconds = (isDNF || isDNS || isDSQ) ? null : parseTimeToSeconds(timeRaw);
+  // Time: scan for a time-like string in remaining columns
+  let timeSeconds: number | null = null;
+  if (!isDNF && !isDNS && !isDSQ) {
+    for (let i = 6; i < row.length; i++) {
+      const val = (row[i] ?? "").toString().trim();
+      const t = parseTimeToSeconds(val);
+      if (t !== null) { timeSeconds = t; break; }
+    }
+  }
   return { bib, name, club, position: pos, timeSeconds, dnf: isDNF || isDSQ, dns: isDNS };
 }
 
 export async function raceresultResults(rrId: string): Promise<TimingRaceResult[]> {
   const cfg = await fetchRaceResultConfig(rrId);
   if (!cfg.key) throw new Error("No API key in RaceResult config");
+  const base = rrBaseUrl(cfg, rrId);
 
-  const listEntry = cfg.lists.find(l => /result/i.test(l.Name)) ?? cfg.lists[0];
-  if (!listEntry) throw new Error("No lists in RaceResult config");
-
-  await sleep(500);
-  const data = await fetchRaceResultList(rrId, cfg.key, listEntry.Name);
-  if (!data?.data) return [];
+  // Find "Classement Scratch" lists per contest — these have the actual results
+  const scratchLists = cfg.lists.filter(l =>
+    /scratch|result/i.test(l.Name) && l.Mode !== "hidden"
+  );
+  const listsToTry = scratchLists.length > 0 ? scratchLists : cfg.lists.filter(l => l.Mode !== "hidden");
+  if (listsToTry.length === 0) throw new Error("No visible lists in RaceResult config");
 
   const allResults: TimingRaceResult[] = [];
 
-  for (const [key, rows] of Object.entries(data.data)) {
-    const catName = key.replace(/^#\d+_/, "");
-    for (const row of rows) {
-      const parsed = parseRaceResultRow(row);
-      if (!parsed) continue;
-      allResults.push({
-        position: parsed.position,
-        riderName: parsed.name,
-        team: parsed.club,
-        timeSeconds: parsed.timeSeconds,
-        dnf: parsed.dnf,
-        dns: parsed.dns,
-        categoryName: catName,
-      });
+  // Fetch each contest's results separately
+  for (const listEntry of listsToTry) {
+    const contest = listEntry.Contest || "0";
+    const contestName = cfg.contests[contest] ?? `Contest ${contest}`;
+    await sleep(500);
+    try {
+      const data = await fetchRaceResultList(base, cfg.key, listEntry.Name, contest);
+      if (!data?.data) continue;
+
+      for (const [key, rows] of Object.entries(data.data)) {
+        const catName = key.replace(/^#\d+_/, "").trim();
+        // Use contest name for category since catName is often empty or generic
+        const displayName = contestName;
+        // Skip DNF/DNS/Abandons categories — they're handled by position parsing
+        if (/abandon|non\s+partant|dnf|dns/i.test(catName)) {
+          // Still parse them as DNF/DNS entries
+          for (const row of rows) {
+            const parsed = parseRaceResultRow(row);
+            if (!parsed) continue;
+            allResults.push({
+              position: null, riderName: parsed.name, team: parsed.club,
+              timeSeconds: null, dnf: parsed.dnf || /abandon/i.test(catName),
+              dns: parsed.dns || /non\s+partant/i.test(catName),
+              categoryName: displayName,
+            });
+          }
+          continue;
+        }
+
+        for (const row of rows) {
+          const parsed = parseRaceResultRow(row);
+          if (!parsed) continue;
+          allResults.push({
+            position: parsed.position,
+            riderName: parsed.name,
+            team: parsed.club,
+            timeSeconds: parsed.timeSeconds,
+            dnf: parsed.dnf,
+            dns: parsed.dns,
+            categoryName: displayName,
+          });
+        }
+      }
+    } catch {
+      continue;
     }
   }
 
@@ -320,27 +411,31 @@ export async function raceresultResults(rrId: string): Promise<TimingRaceResult[
 export async function raceresultStartlist(rrId: string): Promise<StartlistEntry[]> {
   const cfg = await fetchRaceResultConfig(rrId);
   if (!cfg.key) throw new Error("No API key in RaceResult config");
+  const base = rrBaseUrl(cfg, rrId);
 
-  // Look for a startlist-type list, fall back to first list
-  const listEntry = cfg.lists.find(l => /start/i.test(l.Name)) ?? cfg.lists[0];
+  const listEntry = cfg.lists.find(l => /start|grille/i.test(l.Name)) ?? cfg.lists[0];
   if (!listEntry) return [];
 
   await sleep(500);
-  const data = await fetchRaceResultList(rrId, cfg.key, listEntry.Name);
-  if (!data?.data) return [];
+  try {
+    const contest = listEntry.Contest || "0";
+    const data = await fetchRaceResultList(base, cfg.key, listEntry.Name, contest);
+    if (!data?.data) return [];
 
-  const entries: StartlistEntry[] = [];
-  for (const [key, rows] of Object.entries(data.data)) {
-    const catName = key.replace(/^#\d+_/, "");
-    for (const row of rows) {
-      if (row.length < 5) continue;
-      const name = (row[4] ?? "").toString().trim();
-      const bib = (row[0] ?? row[3] ?? "").toString().trim();
-      if (name) entries.push({ riderName: name, bibNumber: parseInt(bib) || undefined, categoryName: catName });
+    const entries: StartlistEntry[] = [];
+    for (const [key, rows] of Object.entries(data.data)) {
+      const catName = key.replace(/^#\d+_/, "");
+      for (const row of rows) {
+        if (row.length < 5) continue;
+        const name = (row[4] ?? "").toString().trim();
+        const bib = (row[0] ?? row[3] ?? "").toString().trim();
+        if (name) entries.push({ riderName: name, bibNumber: parseInt(bib) || undefined, categoryName: catName });
+      }
     }
+    return entries;
+  } catch {
+    return [];
   }
-
-  return entries;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
