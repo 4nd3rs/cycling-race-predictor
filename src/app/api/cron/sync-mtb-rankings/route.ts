@@ -260,6 +260,11 @@ export async function GET() {
       let updated = 0, created = 0, notFound = 0;
 
       for (const rider of riderList) {
+        // Skip obviously invalid names (navigation artifacts, too short, no spaces for full names)
+        if (!rider.name || rider.name.length < 4 || /^[a-z]/.test(rider.name) || /goto|H2H|click|button/i.test(rider.name)) {
+          notFound++;
+          continue;
+        }
         const match = findRider(rider.name, rider.uciId, allRiders);
         if (!match) {
           // Create new rider
