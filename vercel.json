@@ -31,7 +31,7 @@
     },
     {
       "path": "/api/cron/marketing-agent",
-      "schedule": "0 */2 * * *"
+      "schedule": "10 */2 * * *"
     },
     {
       "path": "/api/cron/gossip-hunter",
@@ -39,7 +39,7 @@
     },
     {
       "path": "/api/cron/results-hunter",
-      "schedule": "0 */2 * * *"
+      "schedule": "20 */2 * * *"
     },
     {
       "path": "/api/cron/scrape-race-news",
@@ -47,7 +47,7 @@
     },
     {
       "path": "/api/cron/sync-startlists",
-      "schedule": "30 */2 * * *"
+      "schedule": "45 */2 * * *"
     },
     {
       "path": "/api/cron/sync-race-calendar",
@@ -55,7 +55,7 @@
     },
     {
       "path": "/api/cron/send-notifications",
-      "schedule": "0 */2 * * *"
+      "schedule": "5 */2 * * *"
     }
   ]
 }

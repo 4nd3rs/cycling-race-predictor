@@ -462,6 +462,15 @@ export async function GET() {
     });
   } catch (error) {
     console.error("[cron/marketing-agent]", error);
+    // Post to Discord for visibility
+    const discordToken = process.env.DISCORD_BOT_TOKEN;
+    if (discordToken) {
+      await fetch("https://discord.com/api/v10/channels/1476643255243509912/messages", {
+        method: "POST",
+        headers: { "Authorization": `Bot ${discordToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ content: `📢 Marketing Agent ⚠️ Error: ${String(error).substring(0, 200)}` }),
+      }).catch(() => {});
+    }
     return NextResponse.json(
       { error: String(error) },
       { status: 500 }

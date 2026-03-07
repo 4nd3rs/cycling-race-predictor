@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { db, races, raceResults, raceStartlist, raceEvents, riders, riderDisciplineStats, predictions } from "@/lib/db";
-import { and, eq, lt, gte, lte, isNull, exists, notExists, sql, asc, inArray } from "drizzle-orm";
+import { and, eq, lt, gte, lte, isNull, exists, notExists, sql, asc, inArray, ne } from "drizzle-orm";
 import { scrapeDo } from "@/lib/scraper/scrape-do";
 import * as cheerio from "cheerio";
 import { neon } from "@neondatabase/serverless";
@@ -130,7 +130,7 @@ async function markStaleRaces(): Promise<number> {
       notExists(db.select({ id: raceResults.id }).from(raceResults).where(eq(raceResults.raceId, races.id)))
     ));
   if (stale.length > 0) {
-    await db.update(races).set({ status: "completed" }).where(sql`${races.id} = ANY(${stale.map(r => r.id)})`);
+    await db.update(races).set({ status: "completed" }).where(inArray(races.id, stale.map(r => r.id)));
   }
   return stale.length;
 }
@@ -146,7 +146,7 @@ async function markRacesWithResults(): Promise<number> {
       exists(db.select({ id: raceResults.id }).from(raceResults).where(eq(raceResults.raceId, races.id)))
     ));
   if (withResults.length > 0) {
-    await db.update(races).set({ status: "completed" }).where(sql`${races.id} = ANY(${withResults.map(r => r.id)})`);
+    await db.update(races).set({ status: "completed" }).where(inArray(races.id, withResults.map(r => r.id)));
   }
   return withResults.length;
 }
@@ -204,9 +204,8 @@ async function fillMissingPredictions(): Promise<number> {
       const toInsert = scored.map((r, i) => ({
         raceId: race.id,
         riderId: r.riderId,
-        rank: i + 1,
+        predictedPosition: i + 1,
         winProbability: (Math.max(r.score, 0.001) / total).toFixed(6),
-        source: "elo" as const,
       }));
 
       await db.insert(predictions).values(toInsert).onConflictDoNothing();
