@@ -24,3 +24,28 @@ export function toDateStr(d: string | Date | null | undefined): string {
 export function toRaceDate(d: string | Date | null | undefined): Date {
   return new Date(toDateStr(d) + "T12:00:00Z");
 }
+
+/**
+ * Return today's date as YYYY-MM-DD in Europe/Stockholm timezone.
+ * Use this instead of new Date().toISOString().split("T")[0] to avoid
+ * off-by-one errors caused by races stored as midnight CET (= 23:00 UTC).
+ */
+export function todayStr(): string {
+  return new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Stockholm" });
+}
+
+/**
+ * Calendar-day distance from today (Stockholm) to a race date string.
+ * Unlike date-fns differenceInDays, this counts calendar days, not 24h periods.
+ * Paris-Nice on March 8 at 21:00 UTC will return 1 ("TOMORROW"), not 0 ("TODAY").
+ */
+export function calendarDaysUntil(raceDateStr: string | Date | null | undefined): number {
+  const raceStr = toDateStr(raceDateStr);
+  if (!raceStr) return Infinity;
+  const today = todayStr();
+  const [ty, tm, td] = today.split("-").map(Number);
+  const [ry, rm, rd] = raceStr.split("-").map(Number);
+  const todayUTC = Date.UTC(ty, tm - 1, td);
+  const raceUTC = Date.UTC(ry, rm - 1, rd);
+  return Math.round((raceUTC - todayUTC) / 86_400_000);
+}

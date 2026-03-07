@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { db, races, raceEvents, riderRumours, riders, raceResults, predictions } from "@/lib/db";
 import { desc, eq, gte, lt, and, sql, isNotNull, asc } from "drizzle-orm";
-import { format, formatDistanceToNow, differenceInDays } from "date-fns";
-import { toRaceDate, toDateStr } from "@/lib/utils";
+import { format, formatDistanceToNow } from "date-fns";
+import { toRaceDate, toDateStr, calendarDaysUntil, todayStr } from "@/lib/utils";
 import { getFlag } from "@/lib/country-flags";
 import { buildEventUrl, buildRaceUrl, getDisciplineShortLabel, normalizeUciCategory, getDisciplineColor } from "@/lib/url-utils";
 import { EventListView } from "@/components/event-card";
@@ -71,7 +71,7 @@ function getBuzzScore(hypeScore: number, newsCount: number, daysUntil: number): 
 }
 
 async function getHighHypeRaces(discipline?: string | null, gender?: string | null): Promise<{ hero: HomepageEvent | null; calendar: HomepageEvent[] }> {
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayStr();
   try {
     const conditions: Parameters<typeof and>[0][] = [gte(raceEvents.date, today), eq(races.status, "active")];
     if (discipline && discipline !== "all") conditions.push(eq(raceEvents.discipline, discipline as any));
@@ -141,14 +141,14 @@ async function getHighHypeRaces(discipline?: string | null, gender?: string | nu
     // Pick hero by buzz score (hype + news + proximity), not just chronological order
     const now = new Date();
     const heroPool = pool.filter(e => {
-      const d = differenceInDays(toRaceDate(e.date), now);
+      const d = calendarDaysUntil(e.date);
       return d >= 0 && d <= 7; // Only consider races in the next 7 days as potential hero
     });
     const fallbackPool = pool; // if nothing in 7 days, use soonest high-hype
 
     const scoredPool = (heroPool.length > 0 ? heroPool : fallbackPool).map(e => ({
       event: e,
-      buzzScore: getBuzzScore(e.hypeScore, e.newsCount, differenceInDays(toRaceDate(e.date), now)),
+      buzzScore: getBuzzScore(e.hypeScore, e.newsCount, calendarDaysUntil(e.date)),
     })).sort((a, b) => b.buzzScore - a.buzzScore);
 
     const hero = scoredPool[0]?.event ?? null;
@@ -180,7 +180,7 @@ async function getLatestIntel() {
 }
 
 async function getRecentResults() {
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayStr();
   try {
     const result = await db
       .select({
@@ -270,7 +270,7 @@ async function getFilteredCalendarEvents(
   country: string | null,
   cat: string | null = null
 ) {
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayStr();
   try {
     const conditions: Parameters<typeof and>[0][] = [gte(raceEvents.date, today)];
     if (discipline && discipline !== "all") conditions.push(eq(raceEvents.discipline, discipline as any));
@@ -318,7 +318,7 @@ async function getFilteredCalendarEvents(
 }
 
 async function getUpcomingCountries() {
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayStr();
   try {
     const rows = await db.selectDistinct({ country: raceEvents.country }).from(raceEvents)
       .where(and(gte(raceEvents.date, today), sql`${raceEvents.country} IS NOT NULL`))
@@ -574,7 +574,7 @@ function NextRaceHero({
   heroPredictions: Map<string, HeroPick[]>;
 }) {
   const raceDate = toRaceDate(ev.date);
-  const daysUntil = differenceInDays(raceDate, new Date());
+  const daysUntil = calendarDaysUntil(ev.date);
   const url = ev.slug ? buildEventUrl(ev.discipline, ev.slug) : `/races/${ev.id}`;
   const subLabel = ev.subDiscipline ? getDisciplineShortLabel(ev.subDiscipline) : null;
 

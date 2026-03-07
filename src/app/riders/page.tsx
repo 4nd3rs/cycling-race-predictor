@@ -223,22 +223,35 @@ function RiderTable({
   icon,
   riders,
   showDiscipline = false,
+  viewAllHref,
 }: {
   title: string;
   icon: string;
   riders: RiderRow[];
   showDiscipline?: boolean;
+  viewAllHref?: string;
 }) {
   if (riders.length === 0) return null;
   return (
     <div className="mb-10">
-      <h2 className="text-lg font-bold mb-3 flex items-center gap-2">
-        <span>{icon}</span>
-        <span>{title}</span>
-        <span className="text-xs text-muted-foreground font-normal ml-1">by UCI points</span>
-      </h2>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-lg font-bold flex items-center gap-2">
+          <span>{icon}</span>
+          <span>{title}</span>
+          <span className="text-xs text-muted-foreground font-normal ml-1">by UCI points</span>
+        </h2>
+        {viewAllHref && (
+          <Link
+            href={viewAllHref}
+            className="text-xs text-muted-foreground hover:text-white transition-colors flex items-center gap-1"
+          >
+            View all →
+          </Link>
+        )}
+      </div>
       <div className="rounded-xl border border-white/10 overflow-hidden bg-white/2">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[520px]">
           <thead>
             <tr className="border-b border-white/10 bg-white/5">
               <th className="px-4 py-2.5 text-xs font-medium text-muted-foreground text-center w-10">#</th>
@@ -265,6 +278,7 @@ function RiderTable({
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
@@ -330,12 +344,12 @@ export default async function RidersPage({ searchParams }: PageProps) {
         {/* 2-column grid: Road left, MTB right */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-8">
           <div>
-            <RiderTable title="Road — Men" icon="🚴" riders={roadMen} />
-            <RiderTable title="Road — Women" icon="🚴" riders={roadWomen} />
+            <RiderTable title="Road — Men" icon="🚴" riders={roadMen} viewAllHref="/riders/road/men" />
+            <RiderTable title="Road — Women" icon="🚴" riders={roadWomen} viewAllHref="/riders/road/women" />
           </div>
           <div>
-            <RiderTable title="MTB — Men" icon="🚵" riders={mtbMen} />
-            <RiderTable title="MTB — Women" icon="🚵" riders={mtbWomen} />
+            <RiderTable title="MTB — Men" icon="🚵" riders={mtbMen} viewAllHref="/riders/mtb/men" />
+            <RiderTable title="MTB — Women" icon="🚵" riders={mtbWomen} viewAllHref="/riders/mtb/women" />
           </div>
         </div>
       </main>
