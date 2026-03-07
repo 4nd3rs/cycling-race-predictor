@@ -1,6 +1,6 @@
 # SCRAPE_STATUS.md — Pipeline Status
 
-_Last updated: 2026-03-07 19:05:01 (Stockholm)_
+_Last updated: 2026-03-07 20:15:42 (Stockholm)_
 
 ## 📅 Race Calendar
 - **Last run:** 2026-03-01 23:21:41
@@ -70,14 +70,14 @@ _Last updated: 2026-03-07 19:05:01 (Stockholm)_
     "summary": "0 MTB results imported across 1 race(s).",
     "raceRows": [
       {
-        "name": "Italia Bike Cup - Internazionali Crosscountry Coppa Citta Di Albenga + UCI XCO Junior Series - Junior Men",
+        "name": "Italia Bike Cup - Internazionali Crosscountry Coppa Citta Di Albenga + UCI XCO Junior Series - Elite Men",
         "date": "2026-03-07",
         "count": 0,
         "status": "⏳ pending",
-        "scrapedAt": "2026-03-07 11:28:17"
+        "scrapedAt": "2026-03-07 20:15:42"
       }
     ],
-    "updatedAt": "2026-03-07 11:28:17"
+    "updatedAt": "2026-03-07 20:15:42"
   }
 }
 STATUS_JSON -->
