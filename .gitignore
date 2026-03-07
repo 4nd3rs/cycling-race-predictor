@@ -41,3 +41,17 @@ yarn-error.log*
 next-env.d.ts
 .env*.local
 data/marketing-posted.json
+
+# generated artifacts
+firebase-debug.log
+.playwright-mcp/
+
+# one-off scripts (not part of the pipeline)
+scripts/agents/add-missing-men-races.ts
+scripts/agents/check-pcs-urls.ts
+scripts/agents/debug-events.ts
+scripts/agents/find-missing-majors.ts
+scripts/agents/fix-major-pcs.ts
+scripts/agents/fix-remaining-pcs.ts
+scripts/agents/sync-startlists-local.ts
+scripts/agents/check-mtb-data.ts
