@@ -5,6 +5,7 @@ import {
   text,
   timestamp,
   date,
+  time,
   decimal,
   integer,
   boolean,
@@ -165,6 +166,7 @@ export const races = pgTable(
     startlistUrl: varchar("startlist_url", { length: 500 }), // Official source URL
     submittedBy: uuid("submitted_by").references(() => users.id),
     status: varchar("status", { length: 20 }).default("active"), // 'pending' | 'active' | 'completed'
+    startTime: time("start_time"), // Local race start time (HH:MM), used to indicate when results are expected
     pcsUrl: varchar("pcs_url", { length: 500 }), // ProCyclingStats URL
     // Post-race analysis
     postRaceAnalysis: text("post_race_analysis"), // AI-generated prediction vs result analysis

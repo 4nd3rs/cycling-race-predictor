@@ -487,9 +487,16 @@ export default async function EventPage({ params }: PageProps) {
                           )}
                         </div>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          {event.externalLinks?.raceStart && <span>{event.externalLinks.raceStart}</span>}
-                          <Badge variant={hasResults ? "secondary" : "default"} className={!hasResults ? "bg-green-500 text-white text-xs" : "text-xs"}>
-                            {hasResults ? "Completed" : "Upcoming"}
+                          {(race.startTime || event.externalLinks?.raceStart) && (
+                            <span>🕐 {race.startTime ? race.startTime.substring(0, 5) : event.externalLinks!.raceStart}</span>
+                          )}
+                          <Badge variant={hasResults ? "secondary" : "default"} className={
+                            hasResults ? "text-xs" :
+                            !hasResults && !race.startTime && new Date() > new Date(new Date(race.date).getTime() + 18 * 60 * 60 * 1000)
+                              ? "bg-amber-500 text-white text-xs"
+                              : "bg-green-500 text-white text-xs"
+                          }>
+                            {hasResults ? "Completed" : !race.startTime && new Date() > new Date(new Date(race.date).getTime() + 18 * 60 * 60 * 1000) ? "Results pending" : "Upcoming"}
                           </Badge>
                         </div>
                       </div>

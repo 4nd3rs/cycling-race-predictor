@@ -774,8 +774,8 @@ export default async function CategoryPage({ params }: PageProps) {
                   )}
                   {race.raceType === "one_day" && discipline !== "mtb" && <span>🏁 One-day classic</span>}
                   {race.raceType === "stage_race" && <span>📅 Stage race</span>}
-                  {event.externalLinks?.raceStart && (
-                    <span>🕐 Start {event.externalLinks.raceStart}</span>
+                  {(race.startTime || event.externalLinks?.raceStart) && (
+                    <span>🕐 Start {race.startTime ? race.startTime.substring(0, 5) : event.externalLinks!.raceStart} local</span>
                   )}
                   {event.externalLinks?.raceFinish && (
                     <span>🏁 Est. finish {event.externalLinks.raceFinish}</span>
@@ -960,6 +960,25 @@ export default async function CategoryPage({ params }: PageProps) {
                   </div>
                 </div>
               )}
+            </div>
+          </section>
+        )}
+
+        {/* ── Results Pending Banner ──────────────────────────────────── */}
+        {!isCompleted && !isUpcoming && !isLive && raceDate <= new Date() && (
+          <section className="border-b border-amber-500/30 bg-amber-500/5">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-4">
+              <div className="flex items-center gap-3 text-amber-600 dark:text-amber-400">
+                <span className="text-xl">⏳</span>
+                <div>
+                  <p className="font-semibold text-sm">Results pending</p>
+                  <p className="text-xs text-amber-600/80 dark:text-amber-400/70">
+                    {race.startTime
+                      ? `Race started at ${race.startTime.substring(0, 5)} local time — results usually arrive within 1–2 hours of the finish.`
+                      : "The race has finished — results are usually published within 1–2 hours. Predictions shown below."}
+                  </p>
+                </div>
+              </div>
             </div>
           </section>
         )}
