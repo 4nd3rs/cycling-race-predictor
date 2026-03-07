@@ -7,13 +7,15 @@ import { countryFlags } from "@/lib/country-flags";
 
 type Discipline = "road" | "mtb";
 type Gender = "men" | "women";
+type AgeCategory = "elite" | "junior";
 
 const VALID_DISCIPLINES: Discipline[] = ["road", "mtb"];
 const VALID_GENDERS: Gender[] = ["men", "women"];
+const VALID_AGE_CATEGORIES: AgeCategory[] = ["elite", "junior"];
 
 interface PageProps {
   params: Promise<{ discipline: string; gender: string }>;
-  searchParams: Promise<{ q?: string; country?: string }>;
+  searchParams: Promise<{ q?: string; country?: string; age?: string }>;
 }
 
 type RiderRow = {
@@ -30,7 +32,7 @@ type RiderRow = {
   uciPoints: number;
 };
 
-async function getCountries(discipline: Discipline, gender: Gender): Promise<string[]> {
+async function getCountries(discipline: Discipline, gender: Gender, ageCategory: AgeCategory): Promise<string[]> {
   try {
     const rows = await db
       .selectDistinct({ nationality: riders.nationality })
@@ -40,7 +42,7 @@ async function getCountries(discipline: Discipline, gender: Gender): Promise<str
         and(
           eq(riderDisciplineStats.discipline, discipline),
           eq(riderDisciplineStats.gender, gender),
-          eq(riderDisciplineStats.ageCategory, "elite"),
+          eq(riderDisciplineStats.ageCategory, ageCategory),
           sql`${riders.nationality} IS NOT NULL`
         )
       )
@@ -54,6 +56,7 @@ async function getCountries(discipline: Discipline, gender: Gender): Promise<str
 async function getRiders(
   discipline: Discipline,
   gender: Gender,
+  ageCategory: AgeCategory,
   q?: string,
   country?: string
 ): Promise<RiderRow[]> {
@@ -61,7 +64,7 @@ async function getRiders(
     const conditions = [
       eq(riderDisciplineStats.discipline, discipline),
       eq(riderDisciplineStats.gender, gender),
-      eq(riderDisciplineStats.ageCategory, "elite"),
+      eq(riderDisciplineStats.ageCategory, ageCategory),
     ];
     if (country) {
       conditions.push(eq(riders.nationality, country.toUpperCase()));
@@ -126,7 +129,7 @@ const TITLE_MAP: Record<string, Record<string, { title: string; icon: string }>>
 
 export default async function CategoryRidersPage({ params, searchParams }: PageProps) {
   const { discipline, gender } = await params;
-  const { q, country } = await searchParams;
+  const { q, country, age } = await searchParams;
 
   if (
     !VALID_DISCIPLINES.includes(discipline as Discipline) ||
@@ -137,12 +140,19 @@ export default async function CategoryRidersPage({ params, searchParams }: PageP
 
   const disc = discipline as Discipline;
   const gen = gender as Gender;
+  const ageCategory: AgeCategory = VALID_AGE_CATEGORIES.includes(age as AgeCategory)
+    ? (age as AgeCategory)
+    : "elite";
+
   const { title, icon } = TITLE_MAP[disc][gen];
 
   const [riderRows, countries] = await Promise.all([
-    getRiders(disc, gen, q, country),
-    getCountries(disc, gen),
+    getRiders(disc, gen, ageCategory, q, country),
+    getCountries(disc, gen, ageCategory),
   ]);
+
+  // Build base URL (without age param) for tab links
+  const baseHref = `/riders/${disc}/${gen}`;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -169,8 +179,30 @@ export default async function CategoryRidersPage({ params, searchParams }: PageP
           </div>
         </div>
 
+        {/* Age category tabs */}
+        <div className="flex gap-1 mb-5 border-b border-white/10">
+          {VALID_AGE_CATEGORIES.map((cat) => {
+            const isActive = cat === ageCategory;
+            return (
+              <Link
+                key={cat}
+                href={`${baseHref}?age=${cat}`}
+                className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors capitalize ${
+                  isActive
+                    ? "bg-white/10 text-white border-b-2 border-white"
+                    : "text-muted-foreground hover:text-white hover:bg-white/5"
+                }`}
+              >
+                {cat.charAt(0).toUpperCase() + cat.slice(1)}
+              </Link>
+            );
+          })}
+        </div>
+
         {/* Filters */}
         <form method="GET" className="flex flex-col sm:flex-row gap-3 mb-6">
+          {/* Preserve age tab in form submissions */}
+          <input type="hidden" name="age" value={ageCategory} />
           <input
             type="search"
             name="q"
@@ -198,7 +230,7 @@ export default async function CategoryRidersPage({ params, searchParams }: PageP
           </button>
           {(q || country) && (
             <Link
-              href={`/riders/${disc}/${gen}`}
+              href={`${baseHref}?age=${ageCategory}`}
               className="px-5 py-2 text-muted-foreground hover:text-white rounded-lg text-sm font-medium transition-colors border border-white/10 text-center"
             >
               Clear
