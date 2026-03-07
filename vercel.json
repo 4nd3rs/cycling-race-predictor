@@ -22,6 +22,14 @@
       "schedule": "0 10 * * 2"
     },
     {
+      "path": "/api/cron/sync-road-uci",
+      "schedule": "0 14 * * 2"
+    },
+    {
+      "path": "/api/cron/scrape-mtb-results",
+      "schedule": "0 */6 * * *"
+    },
+    {
       "path": "/api/cron/marketing-agent",
       "schedule": "0 */2 * * *"
     },
