@@ -152,7 +152,7 @@ export default async function CategoryRidersPage({ params, searchParams }: PageP
   ]);
 
   // Build base URL (without age param) for tab links
-  const baseHref = `/riders/${disc}/${gen}`;
+  const baseHref = `/riders/category/${disc}/${gen}`;
 
   return (
     <div className="min-h-screen flex flex-col">
