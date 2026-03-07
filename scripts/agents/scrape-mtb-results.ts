@@ -14,7 +14,7 @@ config({ path: ".env.local" });
 
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
-import { eq, and, gte, lte, or, isNull, ne } from "drizzle-orm";
+import { eq, and, gte, lte, or, isNull, ne, inArray } from "drizzle-orm";
 import * as schema from "../../src/lib/db/schema";
 import * as cheerio from "cheerio";
 /** Fetch XCOdata pages directly — no Cloudflare, no scrape.do needed */
@@ -370,10 +370,27 @@ async function importMTBResults(
       });
       existingIds.add(riderId);
       inserted++;
-      await db.insert(schema.riderDisciplineStats).values({
-        riderId, discipline: "mtb", ageCategory, gender,
-        currentElo: "1500", eloMean: "1500", eloVariance: "350", uciPoints: 0,
-      }).onConflictDoNothing();
+      // Only create a stats row if the rider doesn't already have a higher-category row
+      // (prevents a historical junior result from re-tagging a rider who has since moved up)
+      const higherCategories =
+        ageCategory === "junior" ? ["u23", "elite"] :
+        ageCategory === "u23"    ? ["elite"] : [];
+      const hasHigherRow = higherCategories.length > 0
+        ? !!(await db.query.riderDisciplineStats.findFirst({
+            where: and(
+              eq(schema.riderDisciplineStats.riderId, riderId),
+              eq(schema.riderDisciplineStats.discipline, "mtb"),
+              eq(schema.riderDisciplineStats.gender, gender),
+              inArray(schema.riderDisciplineStats.ageCategory, higherCategories),
+            ),
+          }))
+        : false;
+      if (!hasHigherRow) {
+        await db.insert(schema.riderDisciplineStats).values({
+          riderId, discipline: "mtb", ageCategory, gender,
+          currentElo: "1500", eloMean: "1500", eloVariance: "350", uciPoints: 0,
+        }).onConflictDoNothing();
+      }
     } catch (e: any) {
       console.error(`   ❌ ${r.riderName}: ${e.message}`);
       errors++;

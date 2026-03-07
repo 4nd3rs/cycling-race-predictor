@@ -363,6 +363,55 @@ async function main() {
 
   console.log(`\n${"─".repeat(50)}`);
   console.log(`Done — ${totalUpdated} updated, ${totalCreated} new, ${totalNotFound} unmatched`);
+
+  // Cleanup: remove stale lower-category rows for riders who have moved up.
+  // A rider appearing in u23 or elite rankings should not also appear as junior.
+  // A rider appearing in elite should not also appear as u23 (they've graduated).
+  if (!DRY_RUN) {
+    await cleanupStaleCategoryRows("mtb");
+  }
+}
+
+/**
+ * Deletes stale lower-category rider_discipline_stats rows.
+ * Rule: if a rider has an elite row, remove their junior + u23 rows (same discipline+gender).
+ *       if a rider has a u23 row, remove their junior rows (same discipline+gender).
+ * This ensures riders who aged up don't continue to appear in lower-category pages.
+ */
+async function cleanupStaleCategoryRows(discipline: string) {
+  const { sql: rawSql } = await import("drizzle-orm");
+
+  // Remove junior rows where rider also has u23 or elite (same discipline+gender)
+  const juniorResult = await db.execute(rawSql`
+    DELETE FROM rider_discipline_stats a
+    USING rider_discipline_stats b
+    WHERE a.rider_id = b.rider_id
+      AND a.discipline = ${discipline}
+      AND b.discipline = ${discipline}
+      AND a.gender = b.gender
+      AND a.age_category = 'junior'
+      AND b.age_category IN ('u23', 'elite')
+  `);
+  const juniorDeleted = (juniorResult as any).rowCount ?? 0;
+
+  // Remove u23 rows where rider also has elite (same discipline+gender)
+  const u23Result = await db.execute(rawSql`
+    DELETE FROM rider_discipline_stats a
+    USING rider_discipline_stats b
+    WHERE a.rider_id = b.rider_id
+      AND a.discipline = ${discipline}
+      AND b.discipline = ${discipline}
+      AND a.gender = b.gender
+      AND a.age_category = 'u23'
+      AND b.age_category = 'elite'
+  `);
+  const u23Deleted = (u23Result as any).rowCount ?? 0;
+
+  if (juniorDeleted > 0 || u23Deleted > 0) {
+    console.log(`\n🧹 Stale category cleanup (${discipline}): removed ${juniorDeleted} junior row(s) and ${u23Deleted} u23 row(s) for riders who have moved up`);
+  } else {
+    console.log(`\n🧹 Stale category cleanup: no stale rows found`);
+  }
 }
 
 main().catch(console.error);
