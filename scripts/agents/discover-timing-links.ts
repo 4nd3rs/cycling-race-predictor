@@ -5,8 +5,7 @@
  * the correct timing system and event ID automatically via:
  *   1. Brave Search API: "{race name} {year} site:sportstiming.dk"
  *   2. Brave Search API: "{race name} {year} site:live.eqtiming.com"
- *   3. Brave Search API: "{race name} {year} xcodata.com"
- *   4. General search to find the race website, then probe for timing links
+ *   3. General search to find the race website, then probe for timing links
  *
  * Stores discovered timing_system + timing_event_id + timing_event_url in race_events.
  *
@@ -84,11 +83,6 @@ function extractEqTimingId(url: string): string | null {
   return m ? m[1] : null;
 }
 
-function extractXcoDataId(url: string): string | null {
-  const m = url.match(/xcodata\.com\/races?\/(\d+)/i);
-  return m ? m[1] : null;
-}
-
 function extractRaceResultId(url: string): string | null {
   const m = url.match(/my\.raceresult\.com\/(\d+)/i);
   return m ? m[1] : null;
@@ -112,7 +106,6 @@ async function discoverTiming(eventName: string, year: number): Promise<TimingRe
   const queries = [
     { q: `"${clean}" ${year} site:sportstiming.dk`,     system: "sportstiming", extractor: extractSportstimingId },
     { q: `"${clean}" ${year} site:live.eqtiming.com`,   system: "eqtiming",     extractor: extractEqTimingId },
-    { q: `"${clean}" ${year} xcodata.com`,              system: "xcodata",      extractor: extractXcoDataId },
     { q: `"${clean}" ${year} site:my.raceresult.com`,   system: "raceresult",   extractor: extractRaceResultId },
     { q: `"${short}" ${year} site:sportstiming.dk`,     system: "sportstiming", extractor: extractSportstimingId },
     { q: `"${short}" ${year} site:live.eqtiming.com`,   system: "eqtiming",     extractor: extractEqTimingId },
@@ -133,8 +126,8 @@ async function discoverTiming(eventName: string, year: number): Promise<TimingRe
       if (stId) return { system: "sportstiming", eventId: stId, url: `https://www.sportstiming.dk/event/${stId}` };
       const eqId = extractEqTimingId(allText);
       if (eqId) return { system: "eqtiming", eventId: eqId, url: `https://live.eqtiming.com/${eqId}` };
-      const xcoId = extractXcoDataId(allText);
-      if (xcoId) return { system: "xcodata", eventId: xcoId, url: `https://xcodata.com/races/${xcoId}` };
+      const rrId = extractRaceResultId(allText);
+      if (rrId) return { system: "raceresult", eventId: rrId, url: `https://my.raceresult.com/${rrId}` };
     }
   }
 
