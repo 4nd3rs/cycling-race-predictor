@@ -67,7 +67,16 @@ async function getNewsBasedAdjustments(
     context += headlineOnly.map(a => "- " + a.title + " (" + a.source + ")").join("\n");
   }
 
-  const riderList = [...riderNames.values()].slice(0, 50).join(", ");
+  // Normalize names to proper case so the AI recognizes well-known riders
+  function normalizeForAI(name: string): string {
+    const words = name.split(" ");
+    if (words.length >= 2 && words[0] === words[0].toUpperCase() && /^[A-ZÀ-Ö]+$/.test(words[0])) {
+      return `${words.slice(1).join(" ")} ${words[0].charAt(0) + words[0].slice(1).toLowerCase()}`;
+    }
+    return name;
+  }
+  // Include all riders (normalized to proper case) so the AI can identify any of them
+  const riderList = [...riderNames.values()].map(normalizeForAI).join(", ");
 
   const prompt = `You are a cycling expert analyzing pre-race intelligence to predict rider performance.
 
@@ -113,17 +122,44 @@ Rules:
 
     const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z ]/g,"").replace(/\s+/g," ").trim().toLowerCase();
 
-    function findRider(name: string): string | null {
-      const nameWords = norm(name).split(" ").filter(w => w.length > 2);
-      for (const [riderId, rName] of riderNames) {
-        const rWords = norm(rName).split(" ");
-        const overlap = nameWords.filter(w => rWords.includes(w)).length;
-        if (overlap >= 2 || (overlap >= 1 && nameWords.length === 1)) return riderId;
-      }
-      return null;
+    // Build normalized lookup: riderId → set of name words, and a "surname-priority" token
+    // PCS format is "LASTNAME Firstname"; normalize both to catch all formats
+    function normalizeRiderName(raw: string): string[] {
+      const n = norm(raw);
+      // If all-caps first word (PCS format "LASTNAME Firstname"), swap to "firstname lastname"
+      const words = raw.split(" ");
+      const swapped = words[0] === words[0].toUpperCase() && words[0].length > 2
+        ? [words.slice(1).join(" "), words[0]].join(" ") : raw;
+      return [...new Set([...norm(n).split(" "), ...norm(swapped).split(" ")])].filter(w => w.length > 2);
     }
 
-    const MULTIPLIERS = { tier1: 1.4, tier2: 1.2, tier3: 1.1, injuries: 0.05, withdrawals: 0.05 };
+    function findRider(name: string): string | null {
+      const nameWords = norm(name).split(" ").filter(w => w.length > 2);
+      if (nameWords.length === 0) return null;
+
+      let bestMatch: string | null = null;
+      let bestScore = 0;
+
+      for (const [riderId, rName] of riderNames) {
+        const rWords = normalizeRiderName(rName);
+        const overlap = nameWords.filter(w => rWords.includes(w)).length;
+        // Require at least 2 word overlap OR exact surname match (longest word >= 5 chars)
+        const hasLongWordMatch = nameWords.some(w => w.length >= 5 && rWords.includes(w));
+        if (overlap >= 2 || (overlap >= 1 && hasLongWordMatch)) {
+          // Prefer matches with more overlap and longer matched words
+          const score = overlap * 10 + nameWords.filter(w => w.length >= 5 && rWords.includes(w)).length;
+          if (score > bestScore) { bestScore = score; bestMatch = riderId; }
+        }
+      }
+      return bestMatch;
+    }
+
+    // Strong news multipliers — news/expert consensus should dominate ELO for big races.
+    // tier1 (clear favourite): ×4.0 — puts them well ahead regardless of ELO
+    // tier2 (podium contender): ×2.5 — solid boost
+    // tier3 (outsider/dark horse): ×1.5
+    // injuries/withdrawals: ×0.05 — effectively removes them
+    const MULTIPLIERS = { tier1: 4.0, tier2: 2.5, tier3: 1.5, injuries: 0.05, withdrawals: 0.05 };
 
     for (const [tier, multiplier] of Object.entries(MULTIPLIERS) as [keyof typeof MULTIPLIERS, number][]) {
       for (const name of (intel[tier] || [])) {
@@ -196,7 +232,19 @@ async function getAIKnowledgeProbabilities(
   // Only use for road races where Gemini has reliable knowledge
   if (discipline !== "road") return probMap;
 
-  const riderList = [...riderNames.values()].join("\n");
+  // Normalize PCS ALL_CAPS format ("VINGEGAARD Jonas" → "Jonas Vingegaard") so Gemini
+  // can recognize riders by their well-known names rather than PCS import format.
+  function toProperCase(name: string): string {
+    const words = name.split(" ");
+    // Detect PCS ALL_CAPS format: first word is all uppercase letters
+    if (words.length >= 2 && words[0] === words[0].toUpperCase() && /^[A-ZÀ-Ö]+$/.test(words[0])) {
+      const lastName = words[0].charAt(0) + words[0].slice(1).toLowerCase();
+      const firstName = words.slice(1).join(" ");
+      return `${firstName} ${lastName}`;
+    }
+    return name;
+  }
+  const riderList = [...riderNames.values()].map(toProperCase).join("\n");
   const genderLabel = gender === "women" ? "Women\'s" : "Men\'s";
   const previousAnalysis = await getPreviousEditionAnalysis(raceEventId, gender);
   const analysisSection = previousAnalysis
@@ -242,23 +290,43 @@ Return ONLY valid JSON, no text: {"ExactName": percentage_number, "ExactName2": 
     }
 
     const raw = JSON.parse(jsonMatch[0]) as Record<string, number>;
-    const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z ]/g,"").replace(/\s+/g," ").trim().toLowerCase();
+    const normStr = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z ]/g,"").replace(/\s+/g," ").trim().toLowerCase();
+
+    // Build normalized word set for each rider (handles PCS ALL_CAPS format)
+    function riderWords(rName: string): string[] {
+      const n = normStr(rName);
+      const words = rName.split(" ");
+      const swapped = words[0] === words[0].toUpperCase() && words[0].length > 2
+        ? normStr([words.slice(1).join(" "), words[0]].join(" "))
+        : n;
+      return [...new Set([...n.split(" "), ...swapped.split(" ")])].filter(w => w.length > 2);
+    }
 
     let totalMapped = 0;
     const aiPicks: string[] = [];
 
     for (const [aiName, pct] of Object.entries(raw)) {
       if (typeof pct !== "number" || pct <= 0) continue;
-      const nameWords = norm(aiName).split(" ").filter(w => w.length > 2);
+      const nameWords = normStr(aiName).split(" ").filter(w => w.length > 2);
+
+      let bestRiderId: string | null = null;
+      let bestScore = 0;
+
       for (const [riderId, rName] of riderNames) {
-        const rWords = norm(rName).split(" ");
+        const rWords = riderWords(rName);
         const overlap = nameWords.filter(w => rWords.includes(w)).length;
-        if (overlap >= 2 || (overlap >= 1 && nameWords.length === 1)) {
-          probMap.set(riderId, pct / 100);
-          totalMapped += pct;
-          aiPicks.push(`${rName} ${pct.toFixed(0)}%`);
-          break;
+        const hasLongWordMatch = nameWords.some(w => w.length >= 5 && rWords.includes(w));
+        // Require surname-level match — no short first-name-only matches
+        if (overlap >= 2 || (overlap >= 1 && hasLongWordMatch)) {
+          const score = overlap * 10 + nameWords.filter(w => w.length >= 5 && rWords.includes(w)).length;
+          if (score > bestScore) { bestScore = score; bestRiderId = riderId; }
         }
+      }
+
+      if (bestRiderId && !probMap.has(bestRiderId)) {
+        probMap.set(bestRiderId, pct / 100);
+        totalMapped += pct;
+        aiPicks.push(`${riderNames.get(bestRiderId)} ${pct.toFixed(0)}%`);
       }
     }
 
@@ -402,13 +470,57 @@ async function generateForRace(raceId: string): Promise<void> {
   const aiWeight = aiProbabilities.size > 0 && race.discipline === "road" ? 0.7 : 0.0;
   const eloWeight = 1 - aiWeight;
 
+  // ── Blending: ELO base + AI signal ──────────────────────────────────────────
+  // Problem with naive 70/30 blend: if AI only maps N riders (say 38% total prob),
+  // the remaining riders get 0% AI weight → their blended prob collapses to 30% of ELO.
+  // This tanks real favorites who happened to be missed by the AI name matcher.
+  //
+  // Fix: distribute the AI's "unaccounted" probability across un-mapped riders
+  // proportional to their ELO win probability. This way a rider like Vingegaard
+  // who is missed by the AI name match still gets a realistic probability.
+  const totalAiMapped = [...aiProbabilities.values()].reduce((s, p) => s + p, 0);
+  const aiUnaccounted = Math.max(0, 1.0 - totalAiMapped); // portion AI didn't assign
+
+  // Sum ELO wins only for riders NOT named by AI (they share the unaccounted pool)
+  let eloSumUnmapped = 0;
+  for (const [riderId] of skillsMap) {
+    if (!aiProbabilities.has(riderId)) {
+      eloSumUnmapped += eloProbabilities.get(riderId)?.win ?? 0;
+    }
+  }
+
   const probabilities = new Map<string, { win: number; podium: number; top10: number }>();
   for (const [riderId] of skillsMap) {
     const elo = eloProbabilities.get(riderId) ?? { win: 0, podium: 0, top10: 0 };
-    const aiWin = aiProbabilities.get(riderId) ?? 0;
+    const meta = riderMeta.get(riderId)!;
+    const skill = skillsMap.get(riderId)!;
+
+    let effectiveAiWin: number;
+    if (aiProbabilities.has(riderId)) {
+      // AI explicitly named this rider — use their assigned probability
+      effectiveAiWin = aiProbabilities.get(riderId)!;
+    } else if (eloSumUnmapped > 0) {
+      // AI didn't mention this rider — give them a share of unaccounted AI probability
+      // proportional to their ELO win probability among all un-mapped riders
+      effectiveAiWin = (aiUnaccounted * elo.win) / eloSumUnmapped;
+    } else {
+      effectiveAiWin = 0;
+    }
+
+    let win = aiWeight * effectiveAiWin + eloWeight * elo.win;
+
+    // Sanity cap: domestiques/unknowns can't have high win probabilities.
+    // Riders with 0 UCI points + low ELO + few races → cap at 1.5%.
+    // This prevents name-matching bugs from surfacing domestiques as contenders.
+    const isUnproven = meta.uciPoints === 0 && skill.mean < 1400 && meta.racesTotal < 15;
+    const isWeakElo = meta.uciPoints < 50 && skill.mean < 1300;
+    if (isUnproven || isWeakElo) {
+      win = Math.min(win, 0.015);
+    }
+
     probabilities.set(riderId, {
-      win: aiWeight * aiWin + eloWeight * elo.win,
-      podium: elo.podium,   // Keep ELO-based podium/top10 (AI only covers win%)
+      win,
+      podium: elo.podium,
       top10: elo.top10,
     });
   }

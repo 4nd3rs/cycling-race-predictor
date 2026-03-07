@@ -4,7 +4,7 @@ config({ path: ".env.local" });
 import { execSync } from "child_process";
 import { readFileSync } from "fs";
 import { db, races, raceEvents, predictions, riders, raceResults, raceStartlist, riderRumours, teams, riderDisciplineStats } from "./lib/db";
-import { eq, and, asc, desc } from "drizzle-orm";
+import { eq, and, asc, desc, isNull, isNotNull, sql } from "drizzle-orm";
 
 // ─── Intel file ─────────────────────────────────────────────────────────────
 import { readFileSync, existsSync } from "fs";
@@ -135,7 +135,11 @@ async function getTop3Results(raceId: string) {
     })
     .from(raceResults)
     .innerJoin(riders, eq(raceResults.riderId, riders.id))
-    .where(eq(raceResults.raceId, raceId))
+    .where(and(
+      eq(raceResults.raceId, raceId),
+      isNotNull(raceResults.position),
+      sql`(${raceResults.dnf} IS NULL OR ${raceResults.dnf} = false)`,
+    ))
     .orderBy(asc(raceResults.position))
     .limit(3);
 }

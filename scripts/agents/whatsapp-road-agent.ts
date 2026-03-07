@@ -6,7 +6,7 @@
 import { config } from "dotenv";
 config({ path: ".env.local" });
 
-import { db, races, raceResults, raceEvents, riders, raceStartlist, teams, predictions, userFollows, userWhatsapp } from "./lib/db";
+import { db, races, raceResults, raceEvents, riders, raceStartlist, teams, predictions, userFollows, userWhatsapp, marketingPosts } from "./lib/db";
 import { eq, and, gte, lte, lt, desc, inArray, isNotNull, sql } from "drizzle-orm";
 import { readFileSync, existsSync } from "fs";
 import { GoogleGenerativeAI } from "@google/generative-ai";
@@ -31,6 +31,20 @@ function daysFromNow(n: number) {
   return d.toISOString().slice(0, 10);
 }
 function parseDate(raw: string) { return new Date(raw).toISOString().slice(0, 10); }
+
+async function hasRacePosted(raceId: string, postType: string, channel: string): Promise<boolean> {
+  const rows = await db.select({ id: marketingPosts.id }).from(marketingPosts)
+    .where(and(
+      eq(marketingPosts.raceId, raceId),
+      eq(marketingPosts.postType, postType),
+      eq(marketingPosts.channel, channel),
+    )).limit(1);
+  return rows.length > 0;
+}
+
+async function markRacePosted(raceId: string, postType: string, channel: string) {
+  await db.insert(marketingPosts).values({ raceId, postType, channel }).onConflictDoNothing();
+}
 
 async function sendToWA(text: string) {
   if (dryRun) { console.log("DRY RUN:\n" + text); return; }
@@ -148,11 +162,16 @@ async function getTopPredictions(raceId: string, limit = 5) {
 }
 
 async function getRecentResults(raceId: string) {
+  // Only return riders with a real finishing position (not DNF/DNS/null)
   return db.select({ position: raceResults.position, riderName: riders.name, teamName: teams.name })
     .from(raceResults)
     .leftJoin(riders, eq(raceResults.riderId, riders.id))
     .leftJoin(teams, eq(raceResults.teamId, teams.id))
-    .where(eq(raceResults.raceId, raceId))
+    .where(and(
+      eq(raceResults.raceId, raceId),
+      sql`${raceResults.position} IS NOT NULL`,
+      sql`(${raceResults.dnf} IS NULL OR ${raceResults.dnf} = false)`,
+    ))
     .orderBy(raceResults.position)
     .limit(10);
 }
@@ -323,10 +342,22 @@ async function postResults() {
   if (window.length === 0) { console.log("No completed races to post"); return; }
 
   for (const race of window) {
+    // Dedup: skip if already posted results for this race
+    if (await hasRacePosted(race.id, "result", "whatsapp-road")) {
+      console.log(`⏭️  Already posted results for ${race.eventName ?? race.name}`);
+      continue;
+    }
+
     const interested = await isRaceOfInterest(race.raceEventId ?? null, race.uciCategory);
     if (!interested) { console.log(`⏭️  Skipping results ${race.eventName ?? race.name} — not followed by group members`); continue; }
+
     const results = await getRecentResults(race.id);
-    if (results.length < 3) continue;
+
+    // Require at least 3 real finishers (position IS NOT NULL, NOT dnf — enforced in getRecentResults)
+    if (results.length < 3) {
+      console.log(`⏭️  Skipping ${race.eventName ?? race.name} — only ${results.length} finishers in DB (race may still be in progress)`);
+      continue;
+    }
 
     const podium = results.slice(0, 3).map((r, i) => `${i + 1}. *${r.riderName}* (${r.teamName ?? "?"})`).join("\n");
     const url = race.eventSlug ? `${APP_URL}/races/road/${race.eventSlug}` : APP_URL;
@@ -341,6 +372,7 @@ End with updated rankings link: ${url}`;
 
     const text = await generate(prompt);
     await sendToWA(text);
+    await markRacePosted(race.id, "result", "whatsapp-road");
   }
 }
 

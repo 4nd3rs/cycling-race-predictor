@@ -1,6 +1,6 @@
 # SCRAPE_STATUS.md — Pipeline Status
 
-_Last updated: 2026-03-07 11:28:17 (Stockholm)_
+_Last updated: 2026-03-07 19:05:01 (Stockholm)_
 
 ## 📅 Race Calendar
 - **Last run:** 2026-03-01 23:21:41
@@ -17,13 +17,13 @@ _Last updated: 2026-03-07 11:28:17 (Stockholm)_
 | Tirreno-Adriatico | 2026-03-09 | 83 | ✅ +83 new | 2026-03-06 14:54:42 |
 
 ## 🏁 Results
-- **Last run:** 2026-03-06 00:06:02
+- **Last run:** 2026-03-07 19:05:01
 - **Status:** ✅ OK
-- 156 results imported across 1 race(s). 0 race(s) missing pcsUrl.
+- 175 results imported across 1 race(s). 0 race(s) missing pcsUrl.
 
 | Race | Date | Results | Status | Scraped |
 |------|------|---------|--------|---------|
-| Ename Samyn Classic - Elite Women | 2026-03-03 | 156 | 🔍 dry-run | 2026-03-06 00:05:45 |
+| Strade Bianche - Elite Men | 2026-03-07 | 175 | ✅ imported | 2026-03-07 19:03:54 |
 
 ---
 <!-- STATUS_JSON
@@ -46,17 +46,17 @@ _Last updated: 2026-03-07 11:28:17 (Stockholm)_
   "results": {
     "component": "results",
     "status": "ok",
-    "summary": "156 results imported across 1 race(s). 0 race(s) missing pcsUrl.",
+    "summary": "175 results imported across 1 race(s). 0 race(s) missing pcsUrl.",
     "raceRows": [
       {
-        "name": "Ename Samyn Classic - Elite Women",
-        "date": "2026-03-03",
-        "count": 156,
-        "status": "🔍 dry-run",
-        "scrapedAt": "2026-03-06 00:05:45"
+        "name": "Strade Bianche - Elite Men",
+        "date": "2026-03-07",
+        "count": 175,
+        "status": "✅ imported",
+        "scrapedAt": "2026-03-07 19:03:54"
       }
     ],
-    "updatedAt": "2026-03-06 00:06:02"
+    "updatedAt": "2026-03-07 19:05:01"
   },
   "calendar": {
     "component": "calendar",

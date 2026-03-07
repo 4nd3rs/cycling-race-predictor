@@ -2,7 +2,7 @@ import { config } from "dotenv";
 config({ path: ".env.local" });
 
 import { db, races, riders, raceResults, teams } from "./lib/db";
-import { and, ilike, eq, asc } from "drizzle-orm";
+import { and, ilike, eq, asc, isNotNull, sql } from "drizzle-orm";
 import { notifyRaceEventFollowers, notifyRaceEventCombined, notifyRiderFollowers, getRaceEventId, getRaceEventInfo, type RaceSection } from "./lib/notify-followers";
 
 interface ResultInput {
@@ -213,10 +213,23 @@ async function main() {
     }
   }
 
-  // Mark races with results as completed
+  // Mark races with results as completed — only if we have real finishers (not just DNF/DNS entries)
   let racesCompleted = 0;
   for (const raceId of racesWithNewResults) {
     try {
+      const finisherRows = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(raceResults)
+        .where(and(
+          eq(raceResults.raceId, raceId),
+          isNotNull(raceResults.position),
+          eq(raceResults.dnf, false),
+        ));
+      const finisherCount = Number(finisherRows[0]?.count ?? 0);
+      if (finisherCount < 3) {
+        console.warn(`⚠️  Race ${raceId} has only ${finisherCount} finishers — NOT marking completed yet`);
+        continue;
+      }
       await db
         .update(races)
         .set({ status: "completed", updatedAt: new Date() })
