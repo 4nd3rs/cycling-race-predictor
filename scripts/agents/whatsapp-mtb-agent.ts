@@ -10,12 +10,14 @@
 import { config } from "dotenv";
 config({ path: ".env.local" });
 
-import { execSync } from "child_process";
 import { db, races, raceResults, raceEvents, riders, predictions } from "./lib/db";
 import { eq, and, gte, lte, desc, isNotNull, sql } from "drizzle-orm";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const APP_URL = "https://procyclingpredictor.com";
+const MTB_WA_GROUP = "120363405998540593@g.us";
+const OPENCLAW_GATEWAY = "http://127.0.0.1:18789";
+const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN!;
 
 const MTB_HIGH_PRIORITY = new Set(["WorldCup", "World Cup", "WHOOP UCI MTB World Series", "CC"]);
 const MTB_MED_PRIORITY  = new Set(["C1", "HC"]);
@@ -53,20 +55,23 @@ function formatCountry(code: string | null): string {
   return map[code] ?? code;
 }
 
-async function sendToChannel(text: string): Promise<void> {
+async function sendToGroup(text: string): Promise<void> {
   if (dryRun) {
     console.log("── DRY RUN ──────────────────────────────");
     console.log(text);
     console.log("─────────────────────────────────────────");
     return;
   }
-  // Escape single quotes in text
-  const safe = text.replace(/'/g, "'\\''");
-  execSync(
-    `node scripts/agents/post-to-whatsapp-channel.js --channel mtb --text '${safe}'`,
-    { encoding: "utf-8", stdio: "inherit", cwd: process.cwd(), timeout: 60000 }
-  );
-  console.log("✅ Sent to MTB WA channel");
+  const res = await fetch(`${OPENCLAW_GATEWAY}/tools/invoke`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GATEWAY_TOKEN}` },
+    body: JSON.stringify({
+      tool: "message",
+      args: { action: "send", channel: "whatsapp", target: MTB_WA_GROUP, message: text },
+    }),
+  });
+  if (!res.ok) throw new Error(`Gateway send failed: ${res.status} ${await res.text()}`);
+  console.log("✅ Sent to MTB WA group");
 }
 
 async function generate(prompt: string): Promise<string> {
@@ -194,7 +199,7 @@ Rules:
 - End with 👉 link to most relevant race (only if available above)`;
 
   const text = await generate(prompt);
-  await sendToChannel(text);
+  await sendToGroup(text);
 }
 
 // ── Mode: PREVIEW ─────────────────────────────────────────────────────────────
@@ -244,7 +249,7 @@ Rules:
 - No hashtags, max 2 emojis`;
 
     const text = await generate(prompt);
-    await sendToChannel(text);
+    await sendToGroup(text);
   }
 }
 
@@ -272,7 +277,7 @@ One sharp tactical insight. End with predictions link: ${url}
 No hashtags.`;
 
     const text = await generate(prompt);
-    await sendToChannel(text);
+    await sendToGroup(text);
   }
 }
 
@@ -338,7 +343,7 @@ End with results link: ${url}
 No hashtags.`;
 
       const text = await generate(prompt);
-      await sendToChannel(text);
+      await sendToGroup(text);
       // Brief pause between men's and women's posts
       if (toPost.length > 1) await new Promise(r => setTimeout(r, 3000));
     }

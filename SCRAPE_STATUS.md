@@ -1,6 +1,6 @@
 # SCRAPE_STATUS.md — Pipeline Status
 
-_Last updated: 2026-03-07 08:38:53 (Stockholm)_
+_Last updated: 2026-03-07 11:28:17 (Stockholm)_
 
 ## 📅 Race Calendar
 - **Last run:** 2026-03-01 23:21:41
@@ -67,206 +67,17 @@ _Last updated: 2026-03-07 08:38:53 (Stockholm)_
   "mtb-results": {
     "component": "mtb-results",
     "status": "warn",
-    "summary": "0 MTB results imported across 28 race(s).",
+    "summary": "0 MTB results imported across 1 race(s).",
     "raceRows": [
-      {
-        "name": "VTT Chabrières + UCI XCO Junior Series - U23 Women",
-        "date": "2026-03-01",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-07 08:37:57"
-      },
-      {
-        "name": "VTT Chabrières + UCI XCO Junior Series - Junior Men",
-        "date": "2026-03-01",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-07 08:38:00"
-      },
-      {
-        "name": "VTT Chabrières + UCI XCO Junior Series - Junior Women",
-        "date": "2026-03-01",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-07 08:38:02"
-      },
-      {
-        "name": "Gran Premio Zaragoza XCO - U23 Women",
-        "date": "2026-03-01",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-07 08:38:04"
-      },
-      {
-        "name": "Gran Premio Zaragoza XCO - Junior Men",
-        "date": "2026-03-01",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-07 08:38:06"
-      },
-      {
-        "name": "Gran Premio Zaragoza XCO - Junior Women",
-        "date": "2026-03-01",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-07 08:38:08"
-      },
-      {
-        "name": "VTT Chabrières + UCI XCO Junior Series - U23 Men",
-        "date": "2026-03-01",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-07 08:38:10"
-      },
-      {
-        "name": "Gran Premio Zaragoza XCO - U23 Men",
-        "date": "2026-03-01",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-07 08:38:12"
-      },
-      {
-        "name": "International Cup XCO - Cmpc Angol + UCI XCO Junior Series - Elite Men",
-        "date": "2026-03-06",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-07 08:38:14"
-      },
-      {
-        "name": "International Cup XCO - Cmpc Angol + UCI XCO Junior Series - Elite Women",
-        "date": "2026-03-06",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-07 08:38:16"
-      },
-      {
-        "name": "Taça Brasil de Cross-Country RJ - Elite Men",
-        "date": "2026-03-06",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-07 08:38:18"
-      },
-      {
-        "name": "Taça Brasil de Cross-Country RJ - Elite Women",
-        "date": "2026-03-06",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-07 08:38:21"
-      },
-      {
-        "name": "International Cup XCO - Cmpc Angol + UCI XCO Junior Series - U23 Women",
-        "date": "2026-03-06",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-07 08:38:23"
-      },
-      {
-        "name": "International Cup XCO - Cmpc Angol + UCI XCO Junior Series - Junior Men",
-        "date": "2026-03-06",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-07 08:38:25"
-      },
-      {
-        "name": "International Cup XCO - Cmpc Angol + UCI XCO Junior Series - Junior Women",
-        "date": "2026-03-06",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-07 08:38:27"
-      },
-      {
-        "name": "Taça Brasil de Cross-Country RJ - U23 Women",
-        "date": "2026-03-06",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-07 08:38:29"
-      },
-      {
-        "name": "Taça Brasil de Cross-Country RJ - Junior Men",
-        "date": "2026-03-06",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-07 08:38:31"
-      },
-      {
-        "name": "Taça Brasil de Cross-Country RJ - Junior Women",
-        "date": "2026-03-06",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-07 08:38:33"
-      },
-      {
-        "name": "International Cup XCO - Cmpc Angol + UCI XCO Junior Series - U23 Men",
-        "date": "2026-03-06",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-07 08:38:35"
-      },
-      {
-        "name": "Taça Brasil de Cross-Country RJ - U23 Men",
-        "date": "2026-03-06",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-07 08:38:37"
-      },
-      {
-        "name": "Italia Bike Cup - Internazionali Crosscountry Coppa Citta Di Albenga + UCI XCO Junior Series - Elite Men",
-        "date": "2026-03-07",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-07 08:38:39"
-      },
-      {
-        "name": "Italia Bike Cup - Internazionali Crosscountry Coppa Citta Di Albenga + UCI XCO Junior Series - Elite Women",
-        "date": "2026-03-07",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-07 08:38:41"
-      },
-      {
-        "name": "Oceanian Continental Championships - XCO - Elite Men",
-        "date": "2026-03-07",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-07 08:38:43"
-      },
-      {
-        "name": "Oceanian Continental Championships - XCO - Elite Women",
-        "date": "2026-03-07",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-07 08:38:45"
-      },
-      {
-        "name": "Italia Bike Cup - Internazionali Crosscountry Coppa Citta Di Albenga + UCI XCO Junior Series - U23 Women",
-        "date": "2026-03-07",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-07 08:38:47"
-      },
       {
         "name": "Italia Bike Cup - Internazionali Crosscountry Coppa Citta Di Albenga + UCI XCO Junior Series - Junior Men",
         "date": "2026-03-07",
         "count": 0,
         "status": "⏳ pending",
-        "scrapedAt": "2026-03-07 08:38:49"
-      },
-      {
-        "name": "Italia Bike Cup - Internazionali Crosscountry Coppa Citta Di Albenga + UCI XCO Junior Series - Junior Women",
-        "date": "2026-03-07",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-07 08:38:51"
-      },
-      {
-        "name": "Italia Bike Cup - Internazionali Crosscountry Coppa Citta Di Albenga + UCI XCO Junior Series - U23 Men",
-        "date": "2026-03-07",
-        "count": 0,
-        "status": "⏳ pending",
-        "scrapedAt": "2026-03-07 08:38:53"
+        "scrapedAt": "2026-03-07 11:28:17"
       }
     ],
-    "updatedAt": "2026-03-07 08:38:53"
+    "updatedAt": "2026-03-07 11:28:17"
   }
 }
 STATUS_JSON -->
