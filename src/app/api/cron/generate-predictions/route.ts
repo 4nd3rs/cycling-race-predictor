@@ -184,7 +184,9 @@ async function generateForRace(raceId: string): Promise<{ name: string; count: n
   const race = await db.query.races.findFirst({ where: eq(races.id, raceId) });
   if (!race) return null;
 
-  const { discipline, ageCategory = "elite", gender = "men" } = race;
+  const { discipline } = race;
+  const ageCategory = race.ageCategory ?? "elite";
+  const gender = race.gender ?? "men";
 
   const startlistEntries = await db.query.raceStartlist.findMany({
     where: eq(raceStartlist.raceId, raceId),
