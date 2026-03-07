@@ -595,6 +595,13 @@ export default async function CategoryPage({ params }: PageProps) {
   const hasResults = results.length > 0;
   const isCompleted = race.status === "completed" || hasResults;
 
+  // Date helpers — race.date is stored as UTC midnight of local race day
+  // (e.g. 2026-03-06T23:00Z = March 7 Italy/Stockholm)
+  const raceDate = new Date(race.date);
+  const raceEndApprox = new Date(raceDate.getTime() + 18 * 60 * 60 * 1000);
+  const isUpcoming = raceEndApprox > new Date() && !isCompleted;
+  const isLive = !isCompleted && raceDate <= new Date() && raceEndApprox > new Date();
+
   // Get startlist (with stats for point-based sorting)
   const startlist = await getRaceStartlist(race.id, race);
 
@@ -617,9 +624,11 @@ export default async function CategoryPage({ params }: PageProps) {
   const [raceIntel, weather, latestNews] = await Promise.all([
     getRaceIntel(race.id),
     (() => {
-      // Only fetch weather for upcoming races
-      const rd = new Date(String(race.date).split("T")[0] + "T12:00:00Z");
-      return rd > new Date() ? getRaceWeather(event.country, race.date) : Promise.resolve(null);
+      // Fetch weather for upcoming + live races
+      // race.date is stored as UTC midnight of the local race day (e.g. 2026-03-06T23:00Z = March 7 Italy)
+      // Add 1h to get correct YYYY-MM-DD in the race's local timezone
+      const localDateStr = new Date(raceDate.getTime() + 60 * 60 * 1000).toISOString().split("T")[0];
+      return isUpcoming ? getRaceWeather(event.country, localDateStr) : Promise.resolve(null);
     })(),
     getRaceNews(event.id, race.id),
   ]);
@@ -680,9 +689,6 @@ export default async function CategoryPage({ params }: PageProps) {
 ;
 
   const isSuperCup = event.series === "supercup";
-
-  const raceDate = new Date(String(race.date).split("T")[0] + "T12:00:00Z");
-  const isUpcoming = raceDate > new Date() && !isCompleted;
   const disciplineLabel = getDisciplineLabel(discipline);
   const categoryDisplay = formatCategoryDisplay(race.ageCategory || "elite", race.gender || "men");
 
@@ -725,9 +731,11 @@ export default async function CategoryPage({ params }: PageProps) {
                   {race.uciCategory && (
                     <Badge variant="outline" className="border-primary/50 text-primary font-mono font-semibold">{normalizeUciCategory(race.uciCategory)}</Badge>
                   )}
-                  {isUpcoming
-                    ? <Badge className="bg-green-500 text-white">Upcoming</Badge>
-                    : <Badge variant="secondary">Completed</Badge>}
+                  {isCompleted
+                    ? <Badge variant="secondary">Completed</Badge>
+                    : isLive
+                    ? <Badge className="bg-red-500 text-white">🔴 Live</Badge>
+                    : <Badge className="bg-green-500 text-white">Upcoming</Badge>}
                 </div>
 
                 {/* Title */}

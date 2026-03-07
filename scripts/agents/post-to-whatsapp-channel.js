@@ -8,8 +8,8 @@
 const { execSync, spawn } = require("child_process");
 const path = require("path");
 const fs = require("fs");
-const { makeWASocket, useMultiFileAuthState, makeCacheableSignalKeyStore, Browsers, downloadMediaMessage } = require("/Users/amalabs/.nvm/versions/node/v24.14.0/lib/node_modules/openclaw/node_modules/@whiskeysockets/baileys");
-const pino = require("/Users/amalabs/.nvm/versions/node/v24.14.0/lib/node_modules/openclaw/node_modules/pino");
+const { makeWASocket, useMultiFileAuthState, makeCacheableSignalKeyStore, Browsers, downloadMediaMessage } = require("/Users/amalabs/.nvm/versions/node/v22.22.0/lib/node_modules/openclaw/node_modules/@whiskeysockets/baileys");
+const pino = require("/Users/amalabs/.nvm/versions/node/v22.22.0/lib/node_modules/openclaw/node_modules/pino");
 
 const CREDS = "/Users/amalabs/.openclaw/credentials/whatsapp/default";
 const CHANNEL_INVITES = {

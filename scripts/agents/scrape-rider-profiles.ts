@@ -13,8 +13,6 @@ import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { eq, isNull, or, gte, and, inArray } from "drizzle-orm";
 import { riders, races, raceStartlist, raceEvents } from "../../src/lib/db/schema";
-import { chromium } from "playwright";
-
 const sql = neon(process.env.DATABASE_URL!);
 const db = drizzle(sql);
 
@@ -76,46 +74,6 @@ async function fetchWikiSummary(title: string): Promise<WikiSummary | null> {
   }
 }
 
-async function fetchPCSPhoto(pcsId: string): Promise<string | null> {
-  const browser = await chromium.launch({ headless: true });
-  try {
-    const page = await browser.newPage();
-    await page.goto(`https://www.procyclingstats.com/rider/${pcsId}`, {
-      waitUntil: "domcontentloaded", timeout: 15000,
-    });
-    const imgSrc = await page.$eval(
-      'div.rdr-img-cont img, .rider-header img, img[src*="/images/riders/"]',
-      (el: any) => el.src
-    ).catch(() => null);
-    return imgSrc ?? null;
-  } catch {
-    return null;
-  } finally {
-    await browser.close();
-  }
-}
-
-async function fetchInstagramPhoto(handle: string): Promise<string | null> {
-  const browser = await chromium.launch({ headless: true });
-  try {
-    const page = await browser.newPage();
-    await page.setExtraHTTPHeaders({ "Accept-Language": "en-US,en;q=0.9" });
-    await page.goto(`https://www.instagram.com/${handle}/`, {
-      waitUntil: "domcontentloaded", timeout: 15000,
-    });
-    // Try og:image meta tag
-    const ogImage = await page.$eval(
-      'meta[property="og:image"]',
-      (el: any) => el.content
-    ).catch(() => null);
-    return ogImage ?? null;
-  } catch {
-    return null;
-  } finally {
-    await browser.close();
-  }
-}
-
 function truncateBio(text: string, maxLen = 400): string {
   if (text.length <= maxLen) return text;
   // Truncate at sentence boundary
@@ -127,24 +85,6 @@ function truncateBio(text: string, maxLen = 400): string {
 async function enrichRider(rider: { id: string; name: string; photoUrl: string | null; bio: string | null; wikiSlug: string | null; pcsId?: string | null; instagramHandle?: string | null }) {
   // Skip if already fully enriched
   if (rider.bio && rider.photoUrl) return false;
-
-  // Photo-only enrichment via PCS or Instagram (if bio exists but photo missing)
-  if (rider.bio && !rider.photoUrl) {
-    let photoUrl: string | null = null;
-    if (rider.pcsId) {
-      console.log(`  📷 ${rider.name} — trying PCS photo...`);
-      photoUrl = await fetchPCSPhoto(rider.pcsId);
-    }
-    if (!photoUrl && rider.instagramHandle) {
-      console.log(`  📷 ${rider.name} — trying Instagram photo...`);
-      photoUrl = await fetchInstagramPhoto(rider.instagramHandle);
-    }
-    if (photoUrl) {
-      await db.update(riders).set({ photoUrl }).where(eq(riders.id, rider.id));
-      console.log(`     ✅ Photo: ${photoUrl.substring(0, 80)}`);
-      return true;
-    }
-  }
 
   console.log(`  🔍 ${rider.name}`);
 
