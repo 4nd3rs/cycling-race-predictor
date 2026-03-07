@@ -344,12 +344,12 @@ export default async function RidersPage({ searchParams }: PageProps) {
         {/* 2-column grid: Road left, MTB right */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-8">
           <div>
-            <RiderTable title="Road — Men" icon="🚴" riders={roadMen} viewAllHref="/riders/road/men" />
-            <RiderTable title="Road — Women" icon="🚴" riders={roadWomen} viewAllHref="/riders/road/women" />
+            <RiderTable title="Road — Men" icon="🚴" riders={roadMen} viewAllHref="/riders/category/road/men" />
+            <RiderTable title="Road — Women" icon="🚴" riders={roadWomen} viewAllHref="/riders/category/road/women" />
           </div>
           <div>
-            <RiderTable title="MTB — Men" icon="🚵" riders={mtbMen} viewAllHref="/riders/mtb/men" />
-            <RiderTable title="MTB — Women" icon="🚵" riders={mtbWomen} viewAllHref="/riders/mtb/women" />
+            <RiderTable title="MTB — Men" icon="🚵" riders={mtbMen} viewAllHref="/riders/category/mtb/men" />
+            <RiderTable title="MTB — Women" icon="🚵" riders={mtbWomen} viewAllHref="/riders/category/mtb/women" />
           </div>
         </div>
       </main>
