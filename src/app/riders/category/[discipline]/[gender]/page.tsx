@@ -40,6 +40,7 @@ async function getCountries(discipline: Discipline, gender: Gender): Promise<str
         and(
           eq(riderDisciplineStats.discipline, discipline),
           eq(riderDisciplineStats.gender, gender),
+          eq(riderDisciplineStats.ageCategory, "elite"),
           sql`${riders.nationality} IS NOT NULL`
         )
       )
@@ -60,6 +61,7 @@ async function getRiders(
     const conditions = [
       eq(riderDisciplineStats.discipline, discipline),
       eq(riderDisciplineStats.gender, gender),
+      eq(riderDisciplineStats.ageCategory, "elite"),
     ];
     if (country) {
       conditions.push(eq(riders.nationality, country.toUpperCase()));
