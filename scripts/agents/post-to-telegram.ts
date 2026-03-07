@@ -3,7 +3,7 @@ config({ path: ".env.local" });
 
 import { execSync } from "child_process";
 import { readFileSync } from "fs";
-import { db, races, predictions, riders, raceResults, raceStartlist, riderRumours, teams, riderDisciplineStats } from "./lib/db";
+import { db, races, raceEvents, predictions, riders, raceResults, raceStartlist, riderRumours, teams, riderDisciplineStats } from "./lib/db";
 import { eq, and, asc, desc } from "drizzle-orm";
 
 // ─── Intel file ─────────────────────────────────────────────────────────────
@@ -212,7 +212,22 @@ async function sendPhoto(botToken: string, chatId: string, photoPath: string, ca
   console.log("Successfully posted to Telegram");
 }
 
+async function getEventSlug(raceEventId: string | null): Promise<string | null> {
+  if (!raceEventId) return null;
+  const [ev] = await db.select({ slug: raceEvents.slug }).from(raceEvents).where(eq(raceEvents.id, raceEventId)).limit(1);
+  return ev?.slug ?? null;
+}
+
+function buildRaceUrl(discipline: string | null, slug: string | null): string {
+  const base = "https://procyclingpredictor.com";
+  if (!slug) return base;
+  const disc = (discipline ?? "road").toLowerCase();
+  return `${base}/races/${disc}/${slug}`;
+}
+
 async function buildPreviewCaption(race: typeof races.$inferSelect, raceId: string): Promise<string> {
+  const eventSlug = await getEventSlug(race.raceEventId ?? null);
+  const raceUrl = buildRaceUrl(race.discipline, eventSlug);
   const top3 = await getTop3Predictions(raceId, race.discipline);
   const riderCount = await getStartlistCount(raceId);
   const intel = top3.length > 0 ? await getIntelSnippet(raceId, top3[0].name) : null;
@@ -258,13 +273,14 @@ ${p3}
 
 ${intelSection}
 
-🔮 Full predictions & startlist:
-procyclingpredictor\\.com
+🔮 [Full predictions & startlist](${raceUrl})
 
 \\#cycling \\#roadcycling \\#procycling \\#${escapeMd(hashtag)}`;
 }
 
 async function buildResultCaption(race: typeof races.$inferSelect, raceId: string): Promise<string> {
+  const eventSlug = await getEventSlug(race.raceEventId ?? null);
+  const raceUrl = buildRaceUrl(race.discipline, eventSlug);
   const top3 = await getTop3Results(raceId);
   const flag = getFlag(race.country);
   const dateStr = formatDateDisplay(race.date);
@@ -312,8 +328,7 @@ ${p3Line}
 
 ${callItLine}
 
-📊 Updated rankings & ELO:
-procyclingpredictor\\.com
+📊 [Updated rankings & results](${raceUrl})
 
 \\#cycling \\#roadcycling \\#procycling`;
 }
