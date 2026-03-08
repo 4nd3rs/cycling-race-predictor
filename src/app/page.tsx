@@ -286,6 +286,72 @@ async function getRecentResults(): Promise<EventPodium[]> {
   }
 }
 
+/** Stage progress info for hero display */
+interface StageProgress {
+  totalStages: number;
+  completedStages: number;
+  todayStage: { number: number; name: string } | null;
+  gcLeader: { name: string; nationality: string | null; photoUrl: string | null } | null;
+}
+
+async function getHeroStageProgress(event: HomepageEvent): Promise<StageProgress | null> {
+  // Find the elite-men parent race to look up child stages
+  const eliteMen = event.categories.find(c => c.ageCategory === "elite" && c.gender === "men");
+  if (!eliteMen) return null;
+
+  try {
+    // Check if this race is a stage race
+    const [parentRace] = await db.select({ raceType: races.raceType, id: races.id })
+      .from(races).where(eq(races.id, eliteMen.id)).limit(1);
+    if (!parentRace || parentRace.raceType !== "stage_race") return null;
+
+    // Get all child stages
+    const stages = await db.select({
+      id: races.id,
+      stageNumber: races.stageNumber,
+      name: races.name,
+      date: races.date,
+      status: races.status,
+    })
+      .from(races)
+      .where(eq(races.parentRaceId, parentRace.id))
+      .orderBy(asc(races.stageNumber));
+
+    if (stages.length === 0) return null;
+
+    const today = todayStr();
+    const completedStages = stages.filter(s => s.status === "completed" || (s.date && s.date < today)).length;
+    const todayStage = stages.find(s => s.date === today);
+
+    // Get GC leader from latest completed stage results (position 1 from parent race)
+    let gcLeader: StageProgress["gcLeader"] = null;
+    const lastCompleted = [...stages].reverse().find(s => s.status === "completed");
+    if (lastCompleted) {
+      const [leader] = await db.select({
+        name: riders.name,
+        nationality: riders.nationality,
+        photoUrl: riders.photoUrl,
+      })
+        .from(raceResults)
+        .innerJoin(riders, eq(raceResults.riderId, riders.id))
+        .where(and(eq(raceResults.raceId, parentRace.id), eq(raceResults.position, 1)))
+        .limit(1);
+      if (leader) {
+        gcLeader = { name: leader.name, nationality: leader.nationality, photoUrl: leader.photoUrl ?? null };
+      }
+    }
+
+    return {
+      totalStages: stages.length,
+      completedStages,
+      todayStage: todayStage ? { number: todayStage.stageNumber ?? 0, name: todayStage.name } : null,
+      gcLeader,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** Fetch top 5 predictions per elite race category for the hero event */
 async function getHeroPredictions(event: HomepageEvent): Promise<Map<string, Array<{ name: string; winPct: number; photoUrl: string | null }>>> {
   const eliteCategories = event.categories.filter(c => c.ageCategory === "elite");
@@ -432,7 +498,10 @@ export default async function Home({ searchParams }: HomePageProps) {
     getUpcomingCountries(),
   ]);
   const upcomingRaces = hasFilters ? filteredRaces : highHypeRaces;
-  const heroPredictions = nextRace ? await getHeroPredictions(nextRace) : new Map();
+  const [heroPredictions, heroStageProgress] = await Promise.all([
+    nextRace ? getHeroPredictions(nextRace) : Promise.resolve(new Map()),
+    nextRace ? getHeroStageProgress(nextRace) : Promise.resolve(null),
+  ]);
 
   return (
     <div className="min-h-screen flex flex-col overflow-x-hidden">
@@ -481,7 +550,7 @@ export default async function Home({ searchParams }: HomePageProps) {
               )}
               <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-10 md:py-16">
                 {nextRace ? (
-                  <NextRaceHero event={nextRace} genderFilter={filterGender} heroPredictions={heroPredictions} />
+                  <NextRaceHero event={nextRace} genderFilter={filterGender} heroPredictions={heroPredictions} stageProgress={heroStageProgress} />
                 ) : (
                   <div className="text-center py-12">
                     <p className="text-xl text-muted-foreground">No upcoming races — check back soon</p>
@@ -635,10 +704,12 @@ function NextRaceHero({
   event: ev,
   genderFilter,
   heroPredictions,
+  stageProgress,
 }: {
   event: HomepageEvent;
   genderFilter?: string | null;
   heroPredictions: Map<string, HeroPick[]>;
+  stageProgress?: StageProgress | null;
 }) {
   const raceDate = toRaceDate(ev.date);
   const daysUntil = calendarDaysUntil(ev.date);
@@ -696,6 +767,41 @@ function NextRaceHero({
           )}
         </div>
       </div>
+
+      {/* Stage race progress */}
+      {stageProgress && (
+        <div className="mb-6 rounded-lg border border-border/40 bg-black/20 backdrop-blur-sm p-4 max-w-md">
+          <div className="flex items-center gap-3 mb-3">
+            <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Stage Race</span>
+            <span className="text-xs text-muted-foreground">
+              {stageProgress.completedStages} of {stageProgress.totalStages} stages completed
+            </span>
+          </div>
+
+          {/* Progress bar */}
+          <div className="h-1.5 rounded-full bg-muted/30 mb-3 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-primary transition-all"
+              style={{ width: `${(stageProgress.completedStages / stageProgress.totalStages) * 100}%` }}
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+            {stageProgress.todayStage && (
+              <span className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                <span className="font-semibold text-foreground">Stage {stageProgress.todayStage.number} today</span>
+              </span>
+            )}
+            {stageProgress.gcLeader && (
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                <span className="text-yellow-500">&#9679;</span>
+                <span>GC Leader: <span className="text-foreground font-medium">{stageProgress.gcLeader.name}</span></span>
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Predictions panel */}
       {hasPredictions && (
