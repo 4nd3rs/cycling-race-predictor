@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { db, races, raceEvents, riderRumours, riders, raceResults, predictions } from "@/lib/db";
-import { desc, eq, gte, lt, and, sql, isNotNull, asc } from "drizzle-orm";
+import { desc, eq, gte, lt, and, sql, isNotNull, isNull, asc } from "drizzle-orm";
 import { format, formatDistanceToNow } from "date-fns";
 import { toRaceDate, toDateStr, calendarDaysUntil, todayStr } from "@/lib/utils";
 import { getFlag } from "@/lib/country-flags";
@@ -73,7 +73,7 @@ function getBuzzScore(hypeScore: number, newsCount: number, daysUntil: number): 
 async function getHighHypeRaces(discipline?: string | null, gender?: string | null): Promise<{ hero: HomepageEvent | null; calendar: HomepageEvent[] }> {
   const today = todayStr();
   try {
-    const conditions: Parameters<typeof and>[0][] = [gte(raceEvents.date, today), eq(races.status, "active")];
+    const conditions: Parameters<typeof and>[0][] = [gte(raceEvents.date, today), eq(races.status, "active"), isNull(races.parentRaceId)];
     if (discipline && discipline !== "all") conditions.push(eq(raceEvents.discipline, discipline as any));
     if (gender && gender !== "all") conditions.push(eq(races.gender, gender));
     const result = await db
@@ -352,7 +352,7 @@ async function getFilteredCalendarEvents(
 ) {
   const today = todayStr();
   try {
-    const conditions: Parameters<typeof and>[0][] = [gte(raceEvents.date, today)];
+    const conditions: Parameters<typeof and>[0][] = [gte(raceEvents.date, today), isNull(races.parentRaceId)];
     if (discipline && discipline !== "all") conditions.push(eq(raceEvents.discipline, discipline as any));
     if (country) conditions.push(eq(raceEvents.country, country));
 

@@ -116,6 +116,8 @@ async function getEventCategories(eventId: string, eventDate: string) {
         eq(races.raceEventId, eventId),
         // Exclude stale races from different years (e.g. 2025 data attached to 2026 event)
         sqlFn`extract(year from ${races.date}::date)::text = ${eventYear}`,
+        // Exclude child stage records — only show parent/top-level race categories
+        isNull(races.parentRaceId),
       ))
       .orderBy(asc(races.ageCategory), asc(races.gender));
 

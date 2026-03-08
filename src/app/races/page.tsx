@@ -3,7 +3,7 @@ import { Header } from "@/components/header";
 import { EventListView } from "@/components/event-card";
 import { RaceFilters } from "@/components/race-filters";
 import { db, races, raceEvents, userFollows, users } from "@/lib/db";
-import { desc, eq, gte, lt, and, sql, inArray } from "drizzle-orm";
+import { desc, eq, gte, lt, and, sql, inArray, isNull } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -85,6 +85,7 @@ async function getEvents(
   try {
     const conditions = [
       upcoming ? gte(raceEvents.date, today) : lt(raceEvents.date, today),
+      isNull(races.parentRaceId),
       ...(discipline && discipline !== "all" ? [eq(raceEvents.discipline, discipline as Discipline)] : []),
       ...(country ? [eq(raceEvents.country, country)] : []),
     ];
