@@ -1,35 +1,22 @@
-# PCP Cron Jobs — Disabled (2026-03-08)
+# PCP Cron Jobs — Migrated to Vercel (2026-03-08)
 
-All jobs ran against `~/cycling-race-predictor` on the Mac mini.
-Timezone: `Europe/Stockholm`. Session: `isolated`.
-
----
-
-## WhatsApp Road Agents
-
-All road agent jobs run: `cd ~/cycling-race-predictor && node_modules/.bin/tsx scripts/agents/whatsapp-road-agent.ts <mode>`
-
-| Name | Schedule | Mode | Notes |
-|------|----------|------|-------|
-| 📱 WA Road — Breaking News | Every 2h, 08:00–22:00 (`0 */2 8-22 * * *`) | `breaking` | Posts only if urgent news (injuries, withdrawals) |
-| 📱 WA Road — Race Day | Daily 08:00 | `raceday` | Hype post for races happening today |
-| 📱 WA Road — Daily News | Daily 12:00 | `news` | Today's most interesting road intel |
-| 📱 WA Road — Race Preview | Daily 18:00 | `preview` | Preview for races in next 48h |
-| 📱 WA Road — Results | Daily 19:00 | `results` | Podium results for races today/yesterday |
+All Mac mini cron jobs have been migrated to Vercel cron routes.
+Gateway: Fly.io WhatsApp gateway (`OPENCLAW_GATEWAY_URL`).
 
 ---
 
-## WhatsApp MTB Agents
+## WhatsApp Groups — Vercel Cron
 
-All MTB agent jobs run: `cd ~/cycling-race-predictor && node_modules/.bin/tsx scripts/agents/whatsapp-mtb-agent.ts --mode <mode>`
+**Route:** `/api/cron/whatsapp-groups` — runs every 2h (`:15`)
+**Covers both Road and MTB groups.**
 
-| Name | Schedule | Mode | Notes |
-|------|----------|------|-------|
-| 🚵 MTB WA — Weekly News | Monday 10:00 | `news` | Weekly MTB news digest |
-| 🚵 MTB WA — Race Preview (Fri) | Friday 18:00 | `preview` | Weekend race preview |
-| 🚵 MTB WA — Race Preview (Sat) | Saturday 18:00 | `preview` | Saturday race preview |
-| 🚵 MTB WA — Race Day | Saturday + Sunday 09:00 | `raceday` | Race day hype |
-| 🚵 MTB WA — Results | Saturday + Sunday 20:00 | `results` | Podium results |
+| Type | Road | MTB | Dedup key |
+|------|------|-----|-----------|
+| Preview (1-2 days ahead) | ✅ WorldTour + followed | ✅ Elite WC/C1/HC | `wa-preview` per race |
+| Raceday (today) | ✅ | ✅ | `wa-raceday` per race |
+| Results (last 2 days) | ✅ | ✅ | `wa-result` per race |
+| News digest | ✅ Daily ~12:00 UTC | ✅ Mondays ~10:00 UTC | `wa-news` per day |
+| Breaking news | ✅ From riderRumours DB | — | `wa-breaking` per rider per day |
 
 **WA Groups:**
 - Road: `120363425402092416@g.us`
@@ -37,15 +24,12 @@ All MTB agent jobs run: `cd ~/cycling-race-predictor && node_modules/.bin/tsx sc
 
 ---
 
-## WA Group Admin
+## WA Group Admin — Vercel Cron
 
-```
-cd ~/cycling-race-predictor && node_modules/.bin/tsx scripts/agents/wa-group-admin.ts
-```
-
-| Name | Schedule | Notes |
-|------|----------|-------|
-| 🛡️ WA Group Admin Check | Daily 10:00 | Warns/kicks non-cycling members from WA groups |
+**Route:** `/api/cron/wa-group-admin` — runs daily at 10:00 UTC
+- Checks group members against registered users
+- Sends DM warnings to unregistered members (max 1/day)
+- Sends admin report to Anders via WA DM
 
 ---
 

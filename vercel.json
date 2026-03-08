@@ -64,6 +64,10 @@
     {
       "path": "/api/cron/whatsapp-groups",
       "schedule": "15 */2 * * *"
+    },
+    {
+      "path": "/api/cron/wa-group-admin",
+      "schedule": "0 10 * * *"
     }
   ]
 }

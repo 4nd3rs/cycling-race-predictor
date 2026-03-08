@@ -1,6 +1,7 @@
 /**
  * POST/GET /api/cron/whatsapp-groups
- * Posts race previews, raceday hype, and results to WhatsApp groups via the Fly.io gateway.
+ * Posts race previews, raceday hype, results, news digests, and breaking alerts
+ * to WhatsApp groups via the Fly.io gateway.
  * Covers both Road and MTB disciplines.
  * Runs every 2 hours — each run checks all windows and posts what's needed.
  */
@@ -18,6 +19,7 @@ import {
   userFollows,
   userWhatsapp,
   notificationLog,
+  riderRumours,
 } from "@/lib/db";
 import { eq, and, gte, lte, desc, asc, inArray, isNotNull, sql } from "drizzle-orm";
 
@@ -98,7 +100,7 @@ async function generate(prompt: string): Promise<string | null> {
 
 // ── Dedup via notificationLog ─────────────────────────────────────────────────
 
-type PostType = "wa-preview" | "wa-raceday" | "wa-result";
+type PostType = "wa-preview" | "wa-raceday" | "wa-result" | "wa-news" | "wa-breaking";
 
 async function hasBeenPosted(raceId: string, type: PostType, channel: string): Promise<boolean> {
   const [row] = await db
@@ -343,6 +345,137 @@ End with updated rankings link: ${url}
 No hashtags.`;
 }
 
+// ── News prompt builders ─────────────────────────────────────────────────────
+
+async function buildRoadNewsPrompt(): Promise<string | null> {
+  // Get upcoming road races in next 7 days
+  const upcoming = await getRaces("road", 0, 7);
+  const deduped = deduplicateByEvent(upcoming);
+  if (deduped.length === 0) return null;
+
+  const racesText = deduped.slice(0, 5).map(r =>
+    `- ${r.eventName ?? r.name}: ${parseDate(r.date)} (${r.uciCategory ?? "UCI"})`
+  ).join("\n");
+
+  const raceLinks = deduped.filter(r => r.eventSlug).slice(0, 3).map(r =>
+    `${r.eventName ?? r.name} → ${APP_URL}/races/road/${r.eventSlug}`
+  );
+
+  // Get recent rumours for breaking-style intel
+  const recentRumours = await db.select({
+    riderName: riders.name,
+    summary: riderRumours.summary,
+    sentiment: riderRumours.aggregateScore,
+  })
+    .from(riderRumours)
+    .innerJoin(riders, eq(riderRumours.riderId, riders.id))
+    .where(gte(riderRumours.lastUpdated, new Date(Date.now() - 48 * 60 * 60 * 1000)))
+    .orderBy(desc(riderRumours.lastUpdated))
+    .limit(5);
+
+  const intelText = recentRumours.length > 0
+    ? recentRumours.map(r => `- ${r.riderName}: ${r.summary}`).join("\n")
+    : "No recent rider news";
+
+  return `You write punchy WhatsApp messages for a pro cycling predictions app called Pro Cycling Predictor.
+Write a short, engaging WhatsApp message (max 130 words) about what's happening in road cycling this week.
+Use *bold* for names and race names. No hashtags. Max 2-3 emojis.
+
+Upcoming races this week:
+${racesText}
+
+Latest rider intel:
+${intelText}
+
+Race pages you can link to (ONLY link races you actually mention):
+${raceLinks.length > 0 ? raceLinks.join("\n") : "No race pages available — do NOT add any link."}
+
+Rules:
+- Conversational, like a knowledgeable cycling fan
+- Lead with the most interesting thing
+- If a race is today or tomorrow, make that the focus
+- End with 👉 link to the most relevant race you mentioned (only if it has a page above)`;
+}
+
+async function buildMtbNewsPrompt(): Promise<string | null> {
+  const upcoming = await getRaces("mtb", 0, 14);
+  const deduped = deduplicateByEvent(upcoming);
+  const eligible = deduped.filter(r => isMtbEligible(r));
+  if (eligible.length === 0) return null;
+
+  const racesText = eligible.slice(0, 3).map(r =>
+    `- ${r.eventName ?? r.name} (${r.country ?? "?"}, ${parseDate(r.date)}, ${r.uciCategory ?? "UCI"})`
+  ).join("\n");
+
+  const raceLinks = eligible.filter(r => r.eventSlug).slice(0, 3).map(r =>
+    `${r.eventName ?? r.name} → ${APP_URL}/races/mtb/${r.eventSlug}`
+  ).join("\n");
+
+  return `You write punchy WhatsApp messages for a pro cycling predictions app called Pro Cycling Predictor.
+Write a short, engaging MTB weekly roundup (max 120 words).
+Use *bold* for names and race names. No hashtags. Max 2 emojis. No markdown headers.
+
+Upcoming MTB races:
+${racesText}
+
+Race links (ONLY link races you mention):
+${raceLinks || "No links — do NOT add any."}
+
+Rules:
+- Conversational, like a knowledgeable MTB fan
+- Focus on the biggest upcoming race
+- If WorldCup or Continental Champs — highlight it
+- End with 👉 link to most relevant race (only if available above)`;
+}
+
+// ── Breaking news detection ──────────────────────────────────────────────────
+
+const BREAKING_KEYWORDS = [
+  "withdraw", "abandon", "sick", "ill", "injur", "crash", "surgery",
+  "out of", "scratched", "DNS", "DNF", "not start", "pulled out", "forced to",
+  "fracture", "broken", "hospital", "sidelined",
+];
+
+function isBreakingRumour(summary: string | null, sentiment: string | null): boolean {
+  if (!summary) return false;
+  const text = summary.toLowerCase();
+  if (BREAKING_KEYWORDS.some(k => text.includes(k))) return true;
+  if (sentiment !== null && parseFloat(sentiment) < -0.3) return true;
+  return false;
+}
+
+async function getBreakingRumours(): Promise<Array<{ riderId: string; riderName: string; summary: string }>> {
+  // Get rumours updated in last 4 hours with negative/breaking content
+  const cutoff = new Date(Date.now() - 4 * 60 * 60 * 1000);
+  const rumours = await db.select({
+    riderId: riderRumours.riderId,
+    riderName: riders.name,
+    summary: riderRumours.summary,
+    sentiment: riderRumours.aggregateScore,
+  })
+    .from(riderRumours)
+    .innerJoin(riders, eq(riderRumours.riderId, riders.id))
+    .where(gte(riderRumours.lastUpdated, cutoff))
+    .orderBy(desc(riderRumours.lastUpdated))
+    .limit(10);
+
+  return rumours
+    .filter(r => isBreakingRumour(r.summary, r.sentiment))
+    .map(r => ({ riderId: r.riderId, riderName: r.riderName ?? "Unknown", summary: r.summary ?? "" }));
+}
+
+async function buildBreakingPrompt(riderName: string, summary: string, raceLink: string): Promise<string> {
+  return `You write urgent cycling news alerts for WhatsApp (Pro Cycling Predictor group).
+Write a short, punchy breaking news message (max 80 words) about this:
+
+Rider: ${riderName}
+Intel: ${summary}
+
+Use ⚠️ emoji to open. *Bold* the rider name. Say what it means for upcoming races if relevant.
+${raceLink ? `End with: ${raceLink}` : "Do NOT add any link."}
+No hashtags.`;
+}
+
 // ── MTB priority filter ───────────────────────────────────────────────────────
 
 const MTB_HIGH_PRIORITY = new Set(["WorldCup", "World Cup", "WHOOP UCI MTB World Series", "CC"]);
@@ -455,6 +588,68 @@ async function processAllGroups(): Promise<PostResult[]> {
       const sent = await sendToWA(groupJid, text);
       if (sent) await markPosted(race.id, "wa-result", channel);
       results.push({ race: race.eventName ?? race.name, discipline, type: "result", status: sent ? "posted" : "send_failed" });
+    }
+
+    // ── NEWS DIGEST: once per day per discipline ─────────────────
+    // Road: post around midday UTC (10-14). MTB: Mondays only.
+    const utcHour = new Date().getUTCHours();
+    const dayOfWeek = new Date().getUTCDay(); // 0=Sun, 1=Mon
+    const newsKey = `news-${dayStr(0)}`;
+    const shouldPostNews =
+      discipline === "road" ? (utcHour >= 10 && utcHour <= 14) :
+      discipline === "mtb" ? (dayOfWeek === 1 && utcHour >= 8 && utcHour <= 12) :
+      false;
+
+    if (shouldPostNews && !(await hasBeenPosted(newsKey, "wa-news", channel))) {
+      const newsPrompt = discipline === "road"
+        ? await buildRoadNewsPrompt()
+        : await buildMtbNewsPrompt();
+
+      if (newsPrompt) {
+        const text = await generate(newsPrompt);
+        if (text) {
+          const sent = await sendToWA(groupJid, text);
+          if (sent) await markPosted(newsKey, "wa-news", channel);
+          results.push({ race: `${discipline}-news`, discipline, type: "news", status: sent ? "posted" : "send_failed" });
+        }
+      } else {
+        results.push({ race: `${discipline}-news`, discipline, type: "news", status: "no_content" });
+      }
+    }
+
+    // ── BREAKING NEWS: urgent rider alerts ───────────────────────
+    if (discipline === "road") {
+      const breaking = await getBreakingRumours();
+      for (const item of breaking.slice(0, 2)) {
+        const breakingKey = `breaking-${item.riderId}-${dayStr(0)}`;
+        if (await hasBeenPosted(breakingKey, "wa-breaking", channel)) continue;
+
+        // Find if rider is on an upcoming startlist to link to that race
+        const startlistRace = await db.select({
+          eventSlug: raceEvents.slug,
+        })
+          .from(raceStartlist)
+          .innerJoin(races, eq(raceStartlist.raceId, races.id))
+          .leftJoin(raceEvents, eq(races.raceEventId, raceEvents.id))
+          .where(and(
+            eq(raceStartlist.riderId, item.riderId),
+            gte(races.date, dayStr(-1)),
+            lte(races.date, dayStr(14)),
+          ))
+          .limit(1);
+
+        const raceLink = startlistRace[0]?.eventSlug
+          ? `👉 ${APP_URL}/races/road/${startlistRace[0].eventSlug}`
+          : "";
+
+        const prompt = await buildBreakingPrompt(item.riderName, item.summary, raceLink);
+        const text = await generate(prompt);
+        if (!text) continue;
+
+        const sent = await sendToWA(groupJid, text);
+        if (sent) await markPosted(breakingKey, "wa-breaking", channel);
+        results.push({ race: `breaking-${item.riderName}`, discipline, type: "breaking", status: sent ? "posted" : "send_failed" });
+      }
     }
   }
 
