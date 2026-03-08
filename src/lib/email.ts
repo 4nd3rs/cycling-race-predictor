@@ -1,10 +1,7 @@
 /**
  * email.ts — Transactional email via Resend
- * Falls back gracefully if RESEND_API_KEY is not set.
+ * Falls back gracefully if RESEND_API_KEY is not set or resend is not installed.
  */
-import { Resend } from "resend";
-
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 const FROM = process.env.RESEND_FROM ?? "Pro Cycling Predictor <noreply@procyclingpredictor.com>";
 
@@ -17,11 +14,15 @@ export async function sendEmail({
   subject: string;
   html: string;
 }): Promise<boolean> {
-  if (!resend) {
+  if (!process.env.RESEND_API_KEY) {
     console.warn("[email] RESEND_API_KEY not set — skipping email to", to);
     return false;
   }
   try {
+    // Dynamic import — resend package must be installed when RESEND_API_KEY is set
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { Resend } = require("resend") as { Resend: new (key: string) => { emails: { send: (opts: Record<string, string>) => Promise<{ error?: unknown }> } } };
+    const resend = new Resend(process.env.RESEND_API_KEY!);
     const { error } = await resend.emails.send({ from: FROM, to, subject, html });
     if (error) { console.error("[email] Resend error:", error); return false; }
     return true;
