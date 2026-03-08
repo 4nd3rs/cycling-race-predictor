@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import {
   db, races, raceEvents, raceStartlist, riderDisciplineStats, predictions,
-  riders, riderRumours, raceNews
+  riders, riderRumours, raceNews, raceResults
 } from "@/lib/db";
-import { and, eq, gte, lte, desc, sql, ne } from "drizzle-orm";
+import { and, eq, gte, lte, desc, sql, ne, inArray } from "drizzle-orm";
 import { calculateElo, calculateAllProbabilities, type RiderSkill } from "@/lib/prediction/trueskill";
+import { calculateForm, formMultiplier, RACE_CATEGORY_WEIGHTS, type RecentResult } from "@/lib/prediction/form";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { neon } from "@neondatabase/serverless";
 
@@ -44,7 +45,7 @@ async function postToDiscord(message: string): Promise<void> {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function norm(s: string): string {
-  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z ]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z ]/g, "").replace(/\s+/g, " ").trim();
 }
 
 function matchRiderName(aiName: string, riderNames: Map<string, string>): string | null {
@@ -93,7 +94,7 @@ Riders in startlist: ${riderList}
 Return ONLY valid JSON: {"tier1":["name"],"tier2":["name"],"tier3":["name"],"injuries":["name"],"withdrawals":["name"]}
 Use exact names from the startlist only.`;
 
-    const model = genai.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genai.getGenerativeModel({ model: "gemini-2.5-flash" });
     const response = await model.generateContent(prompt);
     const text = response.response.text();
     const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -108,7 +109,9 @@ Use exact names from the startlist only.`;
         if (riderId && !adjustments.has(riderId)) adjustments.set(riderId, multiplier);
       }
     }
-  } catch {}
+  } catch (err) {
+    console.error("[predictions] News adjustments failed:", err);
+  }
 
   return adjustments;
 }
@@ -173,7 +176,9 @@ Return ONLY valid JSON: {"ExactName": percentage, ...}`;
       const riderId = matchRiderName(aiName, riderNames);
       if (riderId) probMap.set(riderId, pct / 100);
     }
-  } catch {}
+  } catch (err) {
+    console.error("[predictions] AI probabilities failed:", err);
+  }
 
   return probMap;
 }
@@ -196,7 +201,52 @@ async function generateForRace(raceId: string): Promise<{ name: string; count: n
   if (startlistEntries.length < MIN_STARTLIST) return null;
 
   const skillsMap = new Map<string, RiderSkill>();
-  const riderMeta = new Map<string, { name: string; racesTotal: number; uciPoints: number; rumourModifier: number }>();
+  const riderMeta = new Map<string, { name: string; racesTotal: number; uciPoints: number; rumourModifier: number; formScoreValue: number }>();
+
+  // Pre-fetch recent results for all startlist riders (last 90 days) for form calculation
+  const riderIds = startlistEntries.map(e => e.rider?.id).filter(Boolean) as string[];
+  const ninetyDaysAgo = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
+
+  const recentResults = riderIds.length > 0
+    ? await db
+        .select({
+          riderId: raceResults.riderId,
+          position: raceResults.position,
+          dnf: raceResults.dnf,
+          raceId: raceResults.raceId,
+          raceDate: races.date,
+          uciCategory: races.uciCategory,
+          profileType: races.profileType,
+        })
+        .from(raceResults)
+        .innerJoin(races, eq(raceResults.raceId, races.id))
+        .where(and(
+          inArray(raceResults.riderId, riderIds),
+          gte(races.date, ninetyDaysAgo),
+        ))
+    : [];
+
+  // Get field sizes (count of results per race) for form calculation
+  const fieldSizes = new Map<string, number>();
+  if (recentResults.length > 0) {
+    const fieldSizeRows = await db
+      .select({ raceId: raceResults.raceId, count: sql<number>`count(*)::int` })
+      .from(raceResults)
+      .innerJoin(races, eq(raceResults.raceId, races.id))
+      .where(gte(races.date, ninetyDaysAgo))
+      .groupBy(raceResults.raceId);
+    for (const row of fieldSizeRows) {
+      fieldSizes.set(row.raceId, row.count);
+    }
+  }
+
+  // Group results by rider
+  const resultsByRider = new Map<string, typeof recentResults>();
+  for (const r of recentResults) {
+    const existing = resultsByRider.get(r.riderId) ?? [];
+    existing.push(r);
+    resultsByRider.set(r.riderId, existing);
+  }
 
   for (const entry of startlistEntries) {
     const rider = entry.rider;
@@ -239,6 +289,22 @@ async function generateForRace(raceId: string): Promise<{ name: string; count: n
       };
     }
 
+    // Form calculation from recent results
+    const riderResults = resultsByRider.get(rider.id) ?? [];
+    const formInput: RecentResult[] = riderResults.map(r => ({
+      date: new Date(r.raceDate),
+      position: r.position,
+      fieldSize: fieldSizes.get(r.raceId) ?? 100,
+      raceWeight: RACE_CATEGORY_WEIGHTS[r.uciCategory ?? ""] ?? RACE_CATEGORY_WEIGHTS.default,
+      profileType: r.profileType ?? "hilly",
+      dnf: r.dnf ?? false,
+    }));
+    const formScore = calculateForm(formInput);
+    const formMult = formMultiplier(formScore.overall);
+
+    // Apply form multiplier to skill mean
+    skill = { ...skill, mean: skill.mean * formMult };
+
     // Rumour adjustment
     const rumour = await db.query.riderRumours.findFirst({
       where: and(eq(riderRumours.riderId, rider.id), eq(riderRumours.raceId, raceId)),
@@ -250,7 +316,7 @@ async function generateForRace(raceId: string): Promise<{ name: string; count: n
     if (sentiment !== 0) skill = { ...skill, mean: skill.mean * (1 + sentiment * 0.05) };
 
     skillsMap.set(rider.id, skill);
-    riderMeta.set(rider.id, { name: rider.name, racesTotal, uciPoints, rumourModifier: sentiment * 0.05 });
+    riderMeta.set(rider.id, { name: rider.name, racesTotal, uciPoints, rumourModifier: sentiment * 0.05, formScoreValue: formScore.overall });
   }
 
   const riderNamesMap = new Map([...riderMeta.entries()].map(([id, m]) => [id, m.name]));
@@ -290,6 +356,7 @@ async function generateForRace(raceId: string): Promise<{ name: string; count: n
     podiumProbability: r.podiumProb.toFixed(4),
     top10Probability: r.top10Prob.toFixed(4),
     eloScore: calculateElo(r.skill.mean, r.skill.variance).toFixed(4),
+    formScore: r.meta.formScoreValue.toFixed(4),
     rumourModifier: r.meta.rumourModifier.toFixed(4),
     confidenceScore: r.meta.racesTotal > 0
       ? r.meta.uciPoints > 0 ? "0.7000" : "0.5000"
