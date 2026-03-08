@@ -283,7 +283,18 @@ export default async function EventPage({ params }: PageProps) {
   });
 
   const eliteRaces = sorted.filter(c => c.race.ageCategory === "elite");
-  const otherRaces = sorted.filter(c => c.race.ageCategory !== "elite");
+  // Hide U23 races that have no results when the corresponding Elite race is completed
+  // (timing platforms often combine U23+Elite into one race)
+  const otherRaces = sorted.filter(c => {
+    if (c.race.ageCategory !== "elite") {
+      if (c.race.ageCategory === "u23" && c.resultCount === 0) {
+        const eliteSameGender = eliteRaces.find(e => e.race.gender === c.race.gender);
+        if (eliteSameGender && eliteSameGender.race.status === "completed") return false;
+      }
+      return true;
+    }
+    return false;
+  });
   // Fetch predictions + results + intel + per-race news for elite races
   const [predictionsPerRace, resultsPerRace, intelPerRace, newsPerRace, otherResultsPerRace, otherPredictionsPerRace] = await Promise.all([
     Promise.all(eliteRaces.map(c => getTopPredictions(c.race.id, 10))),

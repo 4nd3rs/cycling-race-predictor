@@ -154,6 +154,19 @@ export async function GET() {
       const toImport = catResults.length > 0 ? catResults : (uniqueCats.size === 1 ? allResults : []);
 
       if (!toImport.length || toImport.filter(r => !r.dnf && !r.dns).length < 3) {
+        // If U23 race has no matching results, check if elite race is already completed
+        // (timing platforms often combine U23+Elite into one category)
+        if (ageCategory === "u23" && catResults.length === 0 && race.raceEventId) {
+          const [eliteSibling] = await db.select({ status: races.status }).from(races).where(and(
+            eq(races.raceEventId, race.raceEventId),
+            eq(races.ageCategory, "elite"),
+            eq(races.gender, gender),
+          )).limit(1);
+          if (eliteSibling?.status === "completed") {
+            report.push(`⏭️ ${race.name} — U23 merged with elite`);
+            continue;
+          }
+        }
         report.push(`⏳ ${race.name} — incomplete results`);
         continue;
       }

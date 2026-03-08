@@ -279,7 +279,7 @@ export async function sportstimingStartlist(stId: string): Promise<StartlistEntr
 interface RaceResultConfig {
   key: string;
   contests: Record<string, string>;
-  lists: Array<{ Name: string; Contest: string; ID: string }>;
+  lists: Array<{ Name: string; Contest: string; ID: string; Mode?: string }>;
   server?: string;
 }
 
@@ -348,10 +348,16 @@ export async function raceresultResults(rrId: string): Promise<TimingRaceResult[
   if (!cfg.key) throw new Error("No API key in RaceResult config");
   const base = rrBaseUrl(cfg, rrId);
 
-  // Find "Classement Scratch" lists per contest — these have the actual results
-  const scratchLists = cfg.lists.filter(l =>
+  // Prefer "Classement Scratch" lists — they have clean per-contest results.
+  // Avoid "Catégories FFC" or other category breakdowns which can have nested
+  // data structures or cross-gender sub-categories within a single contest.
+  const scratchOnly = cfg.lists.filter(l =>
+    /scratch/i.test(l.Name) && l.Mode !== "hidden"
+  );
+  const scratchOrResult = cfg.lists.filter(l =>
     /scratch|result/i.test(l.Name) && l.Mode !== "hidden"
   );
+  const scratchLists = scratchOnly.length > 0 ? scratchOnly : scratchOrResult;
   const listsToTry = scratchLists.length > 0 ? scratchLists : cfg.lists.filter(l => l.Mode !== "hidden");
   if (listsToTry.length === 0) throw new Error("No visible lists in RaceResult config");
 
@@ -367,6 +373,8 @@ export async function raceresultResults(rrId: string): Promise<TimingRaceResult[
       if (!data?.data) continue;
 
       for (const [key, rows] of Object.entries(data.data)) {
+        // Skip nested dict structures (e.g. FFC category breakdowns)
+        if (!Array.isArray(rows)) continue;
         const catName = key.replace(/^#\d+_/, "").trim();
         // Use contest name for category since catName is often empty or generic
         const displayName = contestName;
