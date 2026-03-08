@@ -305,6 +305,7 @@ async function getHeroPredictions(event: HomepageEvent): Promise<Map<string, Arr
           gender: cat.gender,
           picks: rows.filter(r => { if (seen.has(r.rider.id)) return false; seen.add(r.rider.id); return true; })
             .map(r => ({
+              riderId: r.rider.id,
               name: r.rider.name,
               winPct: r.prediction.winProbability ? Number(r.prediction.winProbability) * 100 : 0,
               photoUrl: r.rider.photoUrl ?? null,
@@ -628,7 +629,7 @@ export default async function Home({ searchParams }: HomePageProps) {
 // SUB-COMPONENTS
 // ---------------------------------------------------------------------------
 
-type HeroPick = { name: string; winPct: number; photoUrl: string | null };
+type HeroPick = { riderId: string; name: string; winPct: number; photoUrl: string | null };
 
 function NextRaceHero({
   event: ev,
@@ -713,7 +714,7 @@ function NextRaceHero({
                         ) : (
                           <div className="w-6 h-6 rounded-full bg-muted/40 shrink-0" />
                         )}
-                        <span className="text-sm font-semibold flex-1 leading-tight truncate">{pick.name}</span>
+                        <Link href={`/riders/${pick.riderId}`} prefetch={false} className="text-sm font-semibold flex-1 leading-tight truncate hover:text-primary transition-colors">{pick.name}</Link>
                         {pick.winPct > 0 && (
                           <span className="text-xs font-bold tabular-nums text-primary shrink-0">{pick.winPct.toFixed(1)}%</span>
                         )}
