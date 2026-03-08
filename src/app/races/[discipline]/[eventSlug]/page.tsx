@@ -106,12 +106,17 @@ async function getEventBySlug(discipline: string, slug: string) {
   } catch { return null; }
 }
 
-async function getEventCategories(eventId: string) {
+async function getEventCategories(eventId: string, eventDate: string) {
   try {
+    const eventYear = eventDate.substring(0, 4);
     const eventRaces = await db
       .select()
       .from(races)
-      .where(eq(races.raceEventId, eventId))
+      .where(and(
+        eq(races.raceEventId, eventId),
+        // Exclude stale races from different years (e.g. 2025 data attached to 2026 event)
+        sqlFn`extract(year from ${races.date}::date)::text = ${eventYear}`,
+      ))
       .orderBy(asc(races.ageCategory), asc(races.gender));
 
     return Promise.all(
@@ -268,7 +273,7 @@ export default async function EventPage({ params }: PageProps) {
 
   // All data in parallel
   const [categories, latestNews, weather] = await Promise.all([
-    getEventCategories(event.id),
+    getEventCategories(event.id, String(event.date)),
     getEventNews(event.id),
     getRaceWeather(event.country, event.date),
   ]);
