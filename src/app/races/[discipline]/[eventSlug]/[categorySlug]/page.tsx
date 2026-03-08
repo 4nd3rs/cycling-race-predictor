@@ -559,6 +559,29 @@ function calculateAge(birthDate: string | null | undefined): number | null {
   return new Date().getFullYear() - new Date(birthDate).getFullYear();
 }
 
+// ── Stage queries ────────────────────────────────────────────────────────────
+
+async function getStages(parentRaceId: string) {
+  try {
+    const stages = await db
+      .select({
+        id: races.id,
+        stageNumber: races.stageNumber,
+        name: races.name,
+        date: races.date,
+        profileType: races.profileType,
+        status: races.status,
+        distanceKm: races.distanceKm,
+      })
+      .from(races)
+      .where(eq(races.parentRaceId, parentRaceId))
+      .orderBy(races.stageNumber);
+    return stages;
+  } catch {
+    return [];
+  }
+}
+
 function getProfileIcon(profile?: string | null) {
   const icons: Record<string, string> = {
     flat: "\u2796",
@@ -605,8 +628,12 @@ export default async function CategoryPage({ params }: PageProps) {
   // Get startlist (with stats for point-based sorting)
   const startlist = await getRaceStartlist(race.id, race);
 
-  // Get sibling races
-  const siblingRaces = await getSiblingRaces(event.id, race.id, discipline, eventSlug);
+  // Get sibling races + stages
+  const isStageRace = race.raceType === "stage_race" || (race.endDate !== null && race.endDate !== race.date);
+  const [siblingRaces, stages] = await Promise.all([
+    getSiblingRaces(event.id, race.id, discipline, eventSlug),
+    isStageRace ? getStages(race.id) : Promise.resolve([]),
+  ]);
 
   // Generate ELO predictions only if no AI predictions exist
   if (startlist.length > 0 && !isCompleted) {
@@ -748,7 +775,15 @@ export default async function CategoryPage({ params }: PageProps) {
                 <div className="flex flex-wrap items-center gap-3 text-muted-foreground">
                   <span>
                     {event.country && countryToFlag(event.country)}{" "}
-                    {format(raceDate, "EEEE, MMMM d, yyyy")}
+                    {isStageRace && race.endDate && race.endDate !== race.date
+                      ? (() => {
+                          const startD = new Date(race.date);
+                          const endD = new Date(race.endDate);
+                          return startD.getMonth() === endD.getMonth()
+                            ? `${format(startD, "MMMM d")} - ${format(endD, "d, yyyy")}`
+                            : `${format(startD, "MMMM d")} - ${format(endD, "MMMM d, yyyy")}`;
+                        })()
+                      : format(raceDate, "EEEE, MMMM d, yyyy")}
                   </span>
                   {race.country && race.country !== event.country && (
                     <span className="flex items-center gap-1">{countryToFlag(race.country)} {race.country}</span>
@@ -836,6 +871,67 @@ export default async function CategoryPage({ params }: PageProps) {
             </div>{/* /flex row */}
           </div>
         </section>
+
+        {/* ── Stage List (stage races only) ────────────────────────────── */}
+        {stages.length > 0 && (
+          <section className="border-b border-border/50">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-6">
+              <h2 className="text-lg font-bold mb-4">Stages</h2>
+              <div className="rounded-lg border border-border/50 overflow-hidden">
+                {/* Header */}
+                <div className="grid grid-cols-[2.5rem_1fr_auto] sm:grid-cols-[2.5rem_5rem_1fr_5rem_5rem_4rem] gap-2 px-3 py-2 bg-muted/30 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  <span>#</span>
+                  <span className="hidden sm:block">Date</span>
+                  <span>Stage</span>
+                  <span className="hidden sm:block">Profile</span>
+                  <span className="hidden sm:block text-right">Dist.</span>
+                  <span className="text-right">Status</span>
+                </div>
+                {/* Rows */}
+                {stages.map((s) => {
+                  const stageDate = new Date(s.date);
+                  const today = new Date().toISOString().split("T")[0];
+                  const isToday = s.date === today;
+                  const isStageCompleted = s.status === "completed";
+                  const stageName = s.name.replace(new RegExp(`^${event.name}\\s*[-–]\\s*`, "i"), "");
+                  return (
+                    <Link
+                      key={s.id}
+                      href={`/races/${discipline}/${eventSlug}/${categorySlug}/stage-${s.stageNumber}`}
+                      className={`grid grid-cols-[2.5rem_1fr_auto] sm:grid-cols-[2.5rem_5rem_1fr_5rem_5rem_4rem] gap-2 px-3 py-2.5 border-t border-border/30 hover:bg-muted/20 transition-colors text-sm ${
+                        isToday ? "bg-primary/5 border-l-2 border-l-primary" : ""
+                      } ${isStageCompleted ? "text-muted-foreground" : ""}`}
+                    >
+                      <span className="font-bold tabular-nums">{s.stageNumber}</span>
+                      <span className="hidden sm:block text-xs text-muted-foreground tabular-nums">
+                        {format(stageDate, "MMM d")}
+                      </span>
+                      <span className={`truncate ${isToday ? "font-semibold text-primary" : ""}`}>
+                        {stageName}
+                        {isToday && <span className="ml-2 text-xs font-bold text-primary">TODAY</span>}
+                      </span>
+                      <span className="hidden sm:block text-xs capitalize">
+                        {s.profileType ? `${getProfileIcon(s.profileType)} ${s.profileType}` : ""}
+                      </span>
+                      <span className="hidden sm:block text-xs text-right tabular-nums">
+                        {s.distanceKm ? `${parseFloat(String(s.distanceKm)).toFixed(0)} km` : ""}
+                      </span>
+                      <span className="text-right text-xs">
+                        {isStageCompleted ? (
+                          <span className="text-muted-foreground">Done</span>
+                        ) : isToday ? (
+                          <span className="text-primary font-semibold">Live</span>
+                        ) : (
+                          <span className="text-muted-foreground/50">-</span>
+                        )}
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* ── Race Pulse: Latest News ─────────────────────────────────── */}
         {latestNews.length > 0 && (
@@ -989,7 +1085,7 @@ export default async function CategoryPage({ params }: PageProps) {
           <TabsList>
             {isCompleted && (
               <TabsTrigger value="results">
-                Results ({results.length})
+                {stages.length > 0 ? `GC Results (${results.length})` : `Results (${results.length})`}
               </TabsTrigger>
             )}
             <TabsTrigger value="startlist">
@@ -1005,6 +1101,11 @@ export default async function CategoryPage({ params }: PageProps) {
           {/* Results Tab */}
           {isCompleted && (
             <TabsContent value="results">
+              {stages.length > 0 && (
+                <p className="text-sm text-muted-foreground mb-3">
+                  General Classification standings. See individual stage results in the stage list above.
+                </p>
+              )}
               {results.length > 0 ? (
                 <div className="border rounded-lg divide-y">
                   {results.map(({ result, rider, team }) => (

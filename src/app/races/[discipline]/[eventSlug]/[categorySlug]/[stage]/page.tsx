@@ -251,6 +251,11 @@ export default async function StagePage({ params }: PageProps) {
             )}
             <Badge variant="outline">{categoryDisplay}</Badge>
             <Badge>Stage {stageNumber}</Badge>
+            {stageRace.profileType && (
+              <Badge variant="outline" className="capitalize">
+                {stageRace.profileType}
+              </Badge>
+            )}
           </div>
           <h1 className="text-3xl font-bold mb-2">
             {stageRace.name || `Stage ${stageNumber}`}
@@ -268,26 +273,54 @@ export default async function StagePage({ params }: PageProps) {
             )}
             {stageRace.elevationM && <span>• {stageRace.elevationM}m ↑</span>}
           </div>
+          {/* GC link */}
+          <div className="mt-3">
+            <Link
+              href={buildCategoryUrl(discipline, eventSlug, categorySlug)}
+              className="text-sm text-primary hover:underline"
+            >
+              ← View GC standings
+            </Link>
+          </div>
         </div>
 
-        {/* Stage Navigation */}
+        {/* Prev/Next Stage Navigation */}
         {allStages.length > 1 && (
-          <div className="mb-6 p-3 bg-muted/50 rounded-lg">
-            <p className="text-sm text-muted-foreground mb-2">Stages:</p>
-            <div className="flex flex-wrap gap-2">
+          <div className="mb-6 flex items-center justify-between gap-3">
+            <div>
+              {stageNumber > 1 && (
+                <Link
+                  href={`/races/${discipline}/${eventSlug}/${categorySlug}/stage-${stageNumber - 1}`}
+                  className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  ← Stage {stageNumber - 1}
+                </Link>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-1.5 justify-center">
               {allStages.map((s) => (
                 <Link
                   key={s.id}
                   href={`/races/${discipline}/${eventSlug}/${categorySlug}/stage-${s.stageNumber}`}
-                  className={`px-3 py-1 rounded text-sm ${
+                  className={`w-8 h-8 flex items-center justify-center rounded text-xs font-medium ${
                     s.stageNumber === stageNumber
                       ? "bg-primary text-primary-foreground"
-                      : "bg-background hover:bg-muted transition-colors"
+                      : "bg-muted/50 hover:bg-muted transition-colors"
                   }`}
                 >
-                  Stage {s.stageNumber}
+                  {s.stageNumber}
                 </Link>
               ))}
+            </div>
+            <div>
+              {stageNumber < allStages.length && (
+                <Link
+                  href={`/races/${discipline}/${eventSlug}/${categorySlug}/stage-${stageNumber + 1}`}
+                  className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Stage {stageNumber + 1} →
+                </Link>
+              )}
             </div>
           </div>
         )}

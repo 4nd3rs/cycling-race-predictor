@@ -677,7 +677,16 @@ function NextRaceHero({
 
         <div className="flex flex-wrap items-center gap-3 text-muted-foreground">
           <span className="flex items-center gap-1.5">
-            {getFlag(ev.country)} {format(raceDate, "EEEE, MMMM d")}
+            {getFlag(ev.country)}{" "}
+            {ev.endDate && ev.endDate !== ev.date
+              ? (() => {
+                  const startD = toRaceDate(ev.date);
+                  const endD = toRaceDate(ev.endDate);
+                  return startD.getMonth() === endD.getMonth()
+                    ? `${format(startD, "MMMM d")} - ${format(endD, "d")}`
+                    : `${format(startD, "MMMM d")} - ${format(endD, "MMMM d")}`;
+                })()
+              : format(raceDate, "EEEE, MMMM d")}
           </span>
           <Badge variant="outline" className={getDisciplineColor(ev.discipline)}>
             {getDisciplineLabel(ev.discipline)}{subLabel ? ` ${subLabel}` : ""}

@@ -301,10 +301,14 @@ export function EventListRow({
   const eventUrl = slug ? buildEventUrl(discipline, slug) : `/races/${id}`;
 
   const isTomorrowEvent = isTomorrow(startDate);
+  const eventEndDate = endDate ? toRaceDate(endDate) : null;
+  const isMultiDay = eventEndDate && endDate !== date;
   const dateStr = isEventToday
     ? "Today"
     : isTomorrowEvent
     ? "Tomorrow"
+    : isMultiDay
+    ? `${format(startDate, "MMM d")}-${format(eventEndDate, "d")}`
     : format(startDate, "MMM d");
   const discColor = DISC_COLORS[discipline] ?? "bg-zinc-500/20 text-zinc-400";
   const discLabel = { road: "Road", mtb: "MTB", gravel: "Gravel", cyclocross: "CX" }[discipline] ?? discipline;
