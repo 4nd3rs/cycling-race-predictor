@@ -16,7 +16,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const APP_URL = "https://procyclingpredictor.com";
 const MTB_WA_GROUP = "120363405998540593@g.us";
-const OPENCLAW_GATEWAY = "http://127.0.0.1:18789";
+const OPENCLAW_GATEWAY = process.env.OPENCLAW_GATEWAY_URL ?? "http://127.0.0.1:18789";
 const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN!;
 
 const MTB_HIGH_PRIORITY = new Set(["WorldCup", "World Cup", "WHOOP UCI MTB World Series", "CC"]);
@@ -62,13 +62,10 @@ async function sendToGroup(text: string): Promise<void> {
     console.log("─────────────────────────────────────────");
     return;
   }
-  const res = await fetch(`${OPENCLAW_GATEWAY}/tools/invoke`, {
+  const res = await fetch(`${OPENCLAW_GATEWAY}/send`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GATEWAY_TOKEN}` },
-    body: JSON.stringify({
-      tool: "message",
-      args: { action: "send", channel: "whatsapp", target: MTB_WA_GROUP, message: text },
-    }),
+    body: JSON.stringify({ to: MTB_WA_GROUP, text }),
   });
   if (!res.ok) throw new Error(`Gateway send failed: ${res.status} ${await res.text()}`);
   console.log("✅ Sent to MTB WA group");

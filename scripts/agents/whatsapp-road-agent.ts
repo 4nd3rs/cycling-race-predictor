@@ -12,7 +12,7 @@ import { readFileSync, existsSync } from "fs";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const WA_GROUP = "120363425402092416@g.us";
-const OPENCLAW_GATEWAY = "http://127.0.0.1:18789";
+const OPENCLAW_GATEWAY = process.env.OPENCLAW_GATEWAY_URL ?? "http://127.0.0.1:18789";
 const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN!;
 const CRON_SECRET = process.env.CRON_SECRET!;
 const APP_URL = "https://procyclingpredictor.com";
@@ -48,13 +48,10 @@ async function markRacePosted(raceId: string, postType: string, channel: string)
 
 async function sendToWA(text: string) {
   if (dryRun) { console.log("DRY RUN:\n" + text); return; }
-  const res = await fetch(`${OPENCLAW_GATEWAY}/tools/invoke`, {
+  const res = await fetch(`${OPENCLAW_GATEWAY}/send`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GATEWAY_TOKEN}` },
-    body: JSON.stringify({
-      tool: "message",
-      args: { action: "send", channel: "whatsapp", target: WA_GROUP, message: text },
-    }),
+    body: JSON.stringify({ to: WA_GROUP, text }),
   });
   if (!res.ok) throw new Error(`Gateway send failed: ${res.status} ${await res.text()}`);
   console.log("✅ Sent to WA group");

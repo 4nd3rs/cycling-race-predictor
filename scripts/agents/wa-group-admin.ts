@@ -45,13 +45,10 @@ async function sendDm(phone: string, message: string): Promise<boolean> {
     return true;
   }
   try {
-    const res = await fetch(`${OPENCLAW_GATEWAY}/tools/invoke`, {
+    const res = await fetch(`${OPENCLAW_GATEWAY}/send`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${GATEWAY_TOKEN}` },
-      body: JSON.stringify({
-        tool: "message",
-        args: { action: "send", channel: "whatsapp", target: phone, message },
-      }),
+      body: JSON.stringify({ to: phone, text: message }),
     });
     return res.ok;
   } catch { return false; }

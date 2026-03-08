@@ -56,6 +56,14 @@
     {
       "path": "/api/cron/send-notifications",
       "schedule": "5 */2 * * *"
+    },
+    {
+      "path": "/api/cron/enrich-rider-photos",
+      "schedule": "25 */6 * * *"
+    },
+    {
+      "path": "/api/cron/whatsapp-groups",
+      "schedule": "15 */2 * * *"
     }
   ]
 }
