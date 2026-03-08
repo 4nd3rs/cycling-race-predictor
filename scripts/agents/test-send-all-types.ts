@@ -5,27 +5,13 @@ import { generateRaceMessage, MessageType, RaceContext, UserContext } from './ra
 
 const sql = neon(process.env.DATABASE_URL!);
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
-const TWILIO_SID = process.env.TWILIO_ACCOUNT_SID!;
-const TWILIO_TOKEN = process.env.TWILIO_AUTH_TOKEN!;
-const TWILIO_FROM = process.env.TWILIO_WHATSAPP_NUMBER!;
 const TG_CHAT = '8107517782';
-const WA_PHONE = '+46707961967';
 
 async function sendTelegram(text: string) {
   const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ chat_id: TG_CHAT, text, parse_mode: 'HTML', disable_web_page_preview: true }),
-  });
-  return res.ok;
-}
-
-async function sendWhatsApp(text: string) {
-  const body = new URLSearchParams({ From: `whatsapp:${TWILIO_FROM}`, To: `whatsapp:${WA_PHONE}`, Body: text });
-  const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${TWILIO_SID}/Messages.json`, {
-    method: 'POST',
-    headers: { Authorization: 'Basic ' + Buffer.from(`${TWILIO_SID}:${TWILIO_TOKEN}`).toString('base64'), 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: body.toString(),
   });
   return res.ok;
 }
@@ -89,15 +75,6 @@ async function main() {
     console.log(`  TG: ${tgOk ? '✓' : '✗'}`);
 
     await new Promise(r => setTimeout(r, 2000)); // space them out
-  }
-
-  // Send one WhatsApp (the preview) to test that channel too
-  console.log('\nSending preview to WhatsApp...');
-  const waCtx: RaceContext = { ...baseCtx, messageType: 'preview', followedRiders: baseCtx.followedRiders };
-  const waCopy = await generateRaceMessage(user, waCtx);
-  if (waCopy) {
-    const ok = await sendWhatsApp(waCopy.plainText);
-    console.log(`  WA: ${ok ? '✓' : '✗'}`);
   }
 
   console.log('\nDone!');

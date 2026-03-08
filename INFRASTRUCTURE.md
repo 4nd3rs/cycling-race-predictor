@@ -96,7 +96,6 @@ Background tasks that are lower priority or require more compute. If the Mac is 
 | Channel | What | How |
 |---|---|---|
 | Telegram DM | Personal race alerts to followers | Bot API via `TELEGRAM_BOT_TOKEN` |
-| WhatsApp DM | Personal race alerts to followers | Twilio via `TWILIO_ACCOUNT_SID` + `TWILIO_AUTH_TOKEN` |
 | Telegram channel | Broadcast previews + results | `@procyclingpredictions` |
 | Instagram | Race graphics | `@procyclingpredictor` via Meta Graph API |
 | WhatsApp channels | Broadcast (road men/women, MTB) | Free broadcast channels |
@@ -111,8 +110,6 @@ Background tasks that are lower priority or require more compute. If the Mac is 
 | `CRON_SECRET` | Vercel cron auth |
 | `SCRAPE_DO_TOKEN` | PCS scraping |
 | `TELEGRAM_BOT_TOKEN` | Telegram notifications |
-| `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` | WhatsApp |
-| `TWILIO_WHATSAPP_NUMBER` | WhatsApp sender |
 | `INSTAGRAM_ACCESS_TOKEN` | Instagram posting |
 | `GEMINI_API_KEY` | Message generation (Gemini 2.5 Flash) |
 | `OPENAI_API_KEY` | Predictions + AI features |

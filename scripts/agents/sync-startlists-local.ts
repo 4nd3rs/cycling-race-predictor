@@ -59,10 +59,16 @@ async function syncRace(race: { id: string; name: string; pcsUrl: string; discip
   console.log(`\nSyncing: ${race.name}`);
   console.log(`  URL: ${startlistUrl}`);
 
-  const scrapeUrl = `https://api.scrape.do?token=${TOKEN}&url=${encodeURIComponent(startlistUrl)}&render=true`;
-  const res = await fetch(scrapeUrl, { signal: AbortSignal.timeout(30000) });
-  if (!res.ok) { console.log(`  scrape.do error: ${res.status}`); return; }
-  const html = await res.text();
+  let html: string;
+  try {
+    const scrapeUrl = `https://api.scrape.do?token=${TOKEN}&url=${encodeURIComponent(startlistUrl)}&render=true`;
+    const res = await fetch(scrapeUrl, { signal: AbortSignal.timeout(45000) });
+    if (!res.ok) { console.log(`  scrape.do error: ${res.status}`); return; }
+    html = await res.text();
+  } catch (err: any) {
+    console.log(`  Fetch failed: ${err.message}`);
+    return;
+  }
   const $ = cheerio.load(html);
 
   type RawEntry = { riderName: string; riderPcsId: string; teamName: string | null; bibNumber: number | null };

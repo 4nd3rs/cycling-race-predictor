@@ -1,6 +1,6 @@
 # SCRAPE_STATUS.md — Pipeline Status
 
-_Last updated: 2026-03-07 21:43:40 (Stockholm)_
+_Last updated: 2026-03-08 21:00:39 (Stockholm)_
 
 ## 📅 Race Calendar
 - **Last run:** 2026-03-01 23:21:41
@@ -17,13 +17,13 @@ _Last updated: 2026-03-07 21:43:40 (Stockholm)_
 | Tirreno-Adriatico | 2026-03-09 | 83 | ✅ +83 new | 2026-03-06 14:54:42 |
 
 ## 🏁 Results
-- **Last run:** 2026-03-07 19:05:01
+- **Last run:** 2026-03-08 21:00:39
 - **Status:** ✅ OK
-- 175 results imported across 1 race(s). 0 race(s) missing pcsUrl.
+- 154 results imported across 1 race(s). 0 race(s) missing pcsUrl.
 
 | Race | Date | Results | Status | Scraped |
 |------|------|---------|--------|---------|
-| Strade Bianche - Elite Men | 2026-03-07 | 175 | ✅ imported | 2026-03-07 19:03:54 |
+| Paris-Nice | 2026-03-08 | 154 | ✅ imported | 2026-03-08 20:58:54 |
 
 ---
 <!-- STATUS_JSON
@@ -46,17 +46,17 @@ _Last updated: 2026-03-07 21:43:40 (Stockholm)_
   "results": {
     "component": "results",
     "status": "ok",
-    "summary": "175 results imported across 1 race(s). 0 race(s) missing pcsUrl.",
+    "summary": "154 results imported across 1 race(s). 0 race(s) missing pcsUrl.",
     "raceRows": [
       {
-        "name": "Strade Bianche - Elite Men",
-        "date": "2026-03-07",
-        "count": 175,
+        "name": "Paris-Nice",
+        "date": "2026-03-08",
+        "count": 154,
         "status": "✅ imported",
-        "scrapedAt": "2026-03-07 19:03:54"
+        "scrapedAt": "2026-03-08 20:58:54"
       }
     ],
-    "updatedAt": "2026-03-07 19:05:01"
+    "updatedAt": "2026-03-08 21:00:39"
   },
   "calendar": {
     "component": "calendar",

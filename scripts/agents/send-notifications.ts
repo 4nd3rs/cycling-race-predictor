@@ -16,9 +16,6 @@ config({ path: ".env.local" });
 
 const sql = neon(process.env.DATABASE_URL as string);
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const TWILIO_SID = process.env.TWILIO_ACCOUNT_SID;
-const TWILIO_TOKEN = process.env.TWILIO_AUTH_TOKEN;
-const TWILIO_FROM = process.env.TWILIO_WHATSAPP_NUMBER || "+16812710565";
 
 const args = process.argv.slice(2);
 const DRY_RUN = args.includes("--dry-run");
@@ -52,31 +49,6 @@ async function sendTelegram(chatId: string, text: string, imagePath?: string): P
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML", disable_web_page_preview: true }),
-  });
-  return res.ok;
-}
-
-async function sendWhatsApp(to: string, text: string, imagePath?: string): Promise<boolean> {
-  if (!TWILIO_SID || !TWILIO_TOKEN) return false;
-  const normalized = to.startsWith("+") ? to : `+${to}`;
-
-  if (imagePath && existsSync(imagePath)) {
-    // For WhatsApp images, we need a public URL — for now fall back to text with URL
-    // TODO: upload to CDN first when template is available
-  }
-
-  const body = new URLSearchParams({
-    From: `whatsapp:${TWILIO_FROM}`,
-    To: `whatsapp:${normalized}`,
-    Body: text,
-  });
-  const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${TWILIO_SID}/Messages.json`, {
-    method: "POST",
-    headers: {
-      Authorization: "Basic " + Buffer.from(`${TWILIO_SID}:${TWILIO_TOKEN}`).toString("base64"),
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: body.toString(),
   });
   return res.ok;
 }
@@ -198,8 +170,7 @@ async function main() {
       }
 
       const hasTelegram = !!userRow.telegram_chat_id;
-      const hasWhatsApp = !!userRow.whatsapp_phone;
-      if (!hasTelegram && !hasWhatsApp) { skipped++; continue; }
+      if (!hasTelegram) { skipped++; continue; }
 
       // Get followed rider predictions
       const followedRiderData = data.riderIds.length > 0 ? await sql`
@@ -255,17 +226,6 @@ async function main() {
         }
       }
 
-      // Send WhatsApp
-      if (hasWhatsApp) {
-        const phone = userRow.whatsapp_phone as string;
-        const dupe = await alreadySent(userId, race.race_id as string, MESSAGE_TYPE, "whatsapp");
-        if (dupe) { console.log(`  WhatsApp: already sent`); dupes++; }
-        else {
-          const ok = await sendWhatsApp(phone, copy.plainText);
-          console.log(`  ${ok ? "✓" : "✗"} WhatsApp → ${phone}`);
-          if (ok) { await logSent(userId, race.race_id as string, MESSAGE_TYPE, "whatsapp", copy.plainText); sent++; }
-        }
-      }
     }
   }
 

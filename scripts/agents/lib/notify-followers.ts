@@ -3,7 +3,7 @@
  * Sends Telegram DMs to users who follow a rider or race_event.
  */
 
-import { db, userFollows, userTelegram, userWhatsapp, notificationLog, riders, raceEvents, races } from "./db";
+import { db, userFollows, userTelegram, notificationLog, riders, raceEvents, races } from "./db";
 import { eq, and, inArray, or } from "drizzle-orm";
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -21,21 +21,6 @@ async function sendTg(chatId: string, html: string): Promise<void> {
   }
 }
 
-/** Get all connected Telegram chat IDs for users following a given entity */
-async function sendWhatsApp(phone: string, text: string): Promise<void> {
-  const sid = process.env.TWILIO_ACCOUNT_SID;
-  const token = process.env.TWILIO_AUTH_TOKEN;
-  const from = process.env.TWILIO_WHATSAPP_NUMBER;
-  if (!sid || !token || !from) return;
-  const to = phone.startsWith("+") ? phone : `+${phone}`;
-  const body = new URLSearchParams({ From: `whatsapp:${from}`, To: `whatsapp:${to}`, Body: text });
-  const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
-    method: "POST",
-    headers: { Authorization: "Basic " + Buffer.from(`${sid}:${token}`).toString("base64"), "Content-Type": "application/x-www-form-urlencoded" },
-    body: body.toString(),
-  });
-  if (!res.ok) console.error(`WhatsApp send failed (${to}): ${res.status}`);
-}
 
 // ── Dedup log ────────────────────────────────────────────────────────────────
 async function hasNotified(userId: string, channel: string, eventType: string, entityId: string): Promise<boolean> {
@@ -57,31 +42,23 @@ async function logNotification(userId: string, channel: string, eventType: strin
   await db.insert(notificationLog).values({ userId, channel, eventType, entityId }).catch(() => {});
 }
 
-async function getContactsForFollowers(
+async function getTelegramContactsForFollowers(
   followType: "rider" | "race_event" | "race",
   entityId: string
-): Promise<{ telegram: string[]; whatsapp: string[] }> {
+): Promise<string[]> {
   const follows = await db
     .select({ userId: userFollows.userId })
     .from(userFollows)
     .where(and(eq(userFollows.followType, followType), eq(userFollows.entityId, entityId)));
 
-  if (follows.length === 0) return { telegram: [], whatsapp: [] };
+  if (follows.length === 0) return [];
   const userIds = follows.map((f) => f.userId);
 
-  const [tgRows, waRows] = await Promise.all([
-    db.select({ telegramChatId: userTelegram.telegramChatId })
-      .from(userTelegram)
-      .where(and(inArray(userTelegram.userId, userIds), eq(userTelegram.connectedAt, userTelegram.connectedAt))),
-    db.select({ phoneNumber: userWhatsapp.phoneNumber })
-      .from(userWhatsapp)
-      .where(and(inArray(userWhatsapp.userId, userIds), eq(userWhatsapp.connectedAt, userWhatsapp.connectedAt))),
-  ]);
+  const tgRows = await db.select({ telegramChatId: userTelegram.telegramChatId })
+    .from(userTelegram)
+    .where(and(inArray(userTelegram.userId, userIds), eq(userTelegram.connectedAt, userTelegram.connectedAt)));
 
-  return {
-    telegram: tgRows.map((r) => r.telegramChatId).filter((id): id is string => !!id),
-    whatsapp: waRows.map((r) => r.phoneNumber).filter((p): p is string => !!p),
-  };
+  return tgRows.map((r) => r.telegramChatId).filter((id): id is string => !!id);
 }
 
 async function getChatIdsForFollowers(
@@ -112,8 +89,8 @@ async function getChatIdsForFollowers(
     .filter((id): id is string => !!id);
 }
 
-/** Send to all channels for a set of user IDs */
-async function notifyContacts(followType: "rider" | "race_event" | "race", entityId: string, tgMessage: string, waMessage?: string, eventType = "general"): Promise<number> {
+/** Send Telegram notifications to all followers of an entity */
+async function notifyContacts(followType: "rider" | "race_event" | "race", entityId: string, tgMessage: string, _waMessage?: string, eventType = "general"): Promise<number> {
   const follows = await db
     .select({ userId: userFollows.userId })
     .from(userFollows)
@@ -121,14 +98,9 @@ async function notifyContacts(followType: "rider" | "race_event" | "race", entit
 
   if (follows.length === 0) return 0;
   const userIds = follows.map((f) => f.userId);
-  const [tgRows, waRows] = await Promise.all([
-    db.select({ userId: userTelegram.userId, telegramChatId: userTelegram.telegramChatId })
-      .from(userTelegram).where(and(inArray(userTelegram.userId, userIds), eq(userTelegram.connectedAt, userTelegram.connectedAt))),
-    db.select({ userId: userWhatsapp.userId, phoneNumber: userWhatsapp.phoneNumber })
-      .from(userWhatsapp).where(and(inArray(userWhatsapp.userId, userIds), eq(userWhatsapp.connectedAt, userWhatsapp.connectedAt))),
-  ]);
+  const tgRows = await db.select({ userId: userTelegram.userId, telegramChatId: userTelegram.telegramChatId })
+    .from(userTelegram).where(and(inArray(userTelegram.userId, userIds), eq(userTelegram.connectedAt, userTelegram.connectedAt)));
 
-  const waText = waMessage ?? tgMessage.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&");
   let sent = 0;
 
   for (const row of tgRows) {
@@ -136,13 +108,6 @@ async function notifyContacts(followType: "rider" | "race_event" | "race", entit
     if (await hasNotified(row.userId, "telegram", eventType, entityId)) continue;
     await sendTg(row.telegramChatId, tgMessage);
     await logNotification(row.userId, "telegram", eventType, entityId);
-    sent++;
-  }
-  for (const row of waRows) {
-    if (!row.phoneNumber) continue;
-    if (await hasNotified(row.userId, "whatsapp", eventType, entityId)) continue;
-    await sendWhatsApp(row.phoneNumber, waText);
-    await logNotification(row.userId, "whatsapp", eventType, entityId);
     sent++;
   }
   return sent;
@@ -182,17 +147,15 @@ export async function notifyRaceEventCombined(
   raceEventId: string,
   races: RaceSection[],
   headerTg: string,
-  headerWa: string,
+  _headerWa: string,
   footerTg: string,
-  footerWa: string,
+  _footerWa: string,
   eventType = "race_event"
 ): Promise<number> {
   if (races.length === 0) return 0;
 
-  // Collect all user→channels, noting which races they follow
   const raceIds = races.map((r) => r.raceId);
 
-  // All follows: race_event + individual races
   const allFollows = await db
     .select({ userId: userFollows.userId, followType: userFollows.followType, entityId: userFollows.entityId })
     .from(userFollows)
@@ -205,7 +168,6 @@ export async function notifyRaceEventCombined(
 
   if (allFollows.length === 0) return 0;
 
-  // Group by userId → which raceIds they follow (race_event = all)
   const userMap = new Map<string, Set<string>>();
   for (const f of allFollows) {
     if (!userMap.has(f.userId)) userMap.set(f.userId, new Set());
@@ -217,47 +179,27 @@ export async function notifyRaceEventCombined(
   }
 
   const userIds = Array.from(userMap.keys());
-  const [tgRows, waRows] = await Promise.all([
-    db.select({ userId: userTelegram.userId, telegramChatId: userTelegram.telegramChatId })
-      .from(userTelegram).where(and(inArray(userTelegram.userId, userIds), eq(userTelegram.connectedAt, userTelegram.connectedAt))),
-    db.select({ userId: userWhatsapp.userId, phoneNumber: userWhatsapp.phoneNumber })
-      .from(userWhatsapp).where(and(inArray(userWhatsapp.userId, userIds), eq(userWhatsapp.connectedAt, userWhatsapp.connectedAt))),
-  ]);
+  const tgRows = await db.select({ userId: userTelegram.userId, telegramChatId: userTelegram.telegramChatId })
+    .from(userTelegram).where(and(inArray(userTelegram.userId, userIds), eq(userTelegram.connectedAt, userTelegram.connectedAt)));
 
   const tgByUser = new Map(tgRows.map((r) => [r.userId, r.telegramChatId]));
-  const waByUser = new Map(waRows.map((r) => [r.userId, r.phoneNumber]));
 
   let sent = 0;
 
   for (const [userId, followedRaceIds] of userMap) {
-    if (await hasNotified(userId, "telegram", eventType, raceEventId) &&
-        await hasNotified(userId, "whatsapp", eventType, raceEventId)) continue;
+    if (await hasNotified(userId, "telegram", eventType, raceEventId)) continue;
 
-    // Build sections relevant to this user
     const userRaces = races.filter((r) => followedRaceIds.has(r.raceId));
     if (userRaces.length === 0) continue;
 
-    // Telegram
     const chatId = tgByUser.get(userId);
-    if (chatId && !(await hasNotified(userId, "telegram", eventType, raceEventId))) {
+    if (chatId) {
       const tgBody = userRaces.length > 1
         ? userRaces.map((r) => `<b>${r.categoryLabel}</b>\n${r.tgSection}`).join("\n\n")
         : userRaces[0].tgSection;
       const tgMsg = [headerTg, "", tgBody, "", footerTg].filter(Boolean).join("\n");
       await sendTg(chatId, tgMsg);
       await logNotification(userId, "telegram", eventType, raceEventId);
-      sent++;
-    }
-
-    // WhatsApp
-    const phone = waByUser.get(userId);
-    if (phone && !(await hasNotified(userId, "whatsapp", eventType, raceEventId))) {
-      const waBody = userRaces.length > 1
-        ? userRaces.map((r) => `*${r.categoryLabel}*\n${r.waSection}`).join("\n\n")
-        : userRaces[0].waSection;
-      const waMsg = [headerWa, "", waBody, "", footerWa].filter(Boolean).join("\n");
-      await sendWhatsApp(phone, waMsg);
-      await logNotification(userId, "whatsapp", eventType, raceEventId);
       sent++;
     }
   }
