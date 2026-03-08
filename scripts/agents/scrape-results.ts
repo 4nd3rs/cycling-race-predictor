@@ -248,12 +248,14 @@ async function scrapeStageMetadata(pcsUrl: string, stageCount: number): Promise<
       const row = $(el).closest("tr, li, div.stage");
       const text = row.length ? row.text() : $(el).text();
 
-      // Try to extract date from row text (e.g. "08/03" or "March 8")
+      // Try to extract date from row text — PCS uses DD/MM format (e.g. "13/03" = March 13)
       const dateMatch = text.match(/(\d{2})\/(\d{2})/);
       let dateStr: string | null = null;
       if (dateMatch) {
         const year = pcsUrl.match(/\/(\d{4})/)?.[1] ?? new Date().getFullYear().toString();
-        dateStr = `${year}-${dateMatch[1]}-${dateMatch[2]}`;
+        const day = dateMatch[1];
+        const month = dateMatch[2];
+        dateStr = `${year}-${month}-${day}`;
       }
 
       // Try to extract distance
