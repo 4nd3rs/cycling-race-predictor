@@ -137,9 +137,12 @@ async function importResults(
 
 /** Ensure child stage records exist for a stage race */
 async function ensureStageRecords(
-  race: { id: string; name: string; date: string; endDate: string | null; discipline: string; ageCategory: string | null; gender: string | null; pcsUrl: string },
+  race: { id: string; name: string; date: string; endDate: string | null; discipline: string; ageCategory: string | null; gender: string | null; pcsUrl: string | null },
   stageCount: number,
 ): Promise<void> {
+  if (!race.pcsUrl) return;
+  const pcsUrl = race.pcsUrl;
+
   const existingStages = await db
     .select({ stageNumber: races.stageNumber })
     .from(races)
@@ -158,7 +161,7 @@ async function ensureStageRecords(
 
   console.log(`[results-hunter] Creating ${missingStages.length} stage records for ${race.name}`);
 
-  const metadata = await scrapeStageMetadata(race.pcsUrl, stageCount);
+  const metadata = await scrapeStageMetadata(pcsUrl, stageCount);
 
   const startDate = new Date(race.date);
   const endDate = race.endDate ? new Date(race.endDate) : new Date(startDate.getTime() + stageCount * 86400000);
@@ -199,7 +202,7 @@ async function ensureStageRecords(
       raceEventId: parentRow?.raceEventId ?? null,
       uciCategory: parentRow?.uciCategory ?? null,
       country: parentRow?.country ?? null,
-      pcsUrl: `${race.pcsUrl}/stage-${stageNum}`,
+      pcsUrl: `${pcsUrl}/stage-${stageNum}`,
       status: "active",
     });
   }
