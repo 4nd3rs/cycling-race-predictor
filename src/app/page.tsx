@@ -74,7 +74,9 @@ function getBuzzScore(hypeScore: number, newsCount: number, daysUntil: number): 
 async function getHighHypeRaces(discipline?: string | null, gender?: string | null): Promise<{ heroes: HomepageEvent[]; calendar: HomepageEvent[] }> {
   const today = todayStr();
   try {
-    const conditions: Parameters<typeof and>[0][] = [gte(raceEvents.date, today), eq(races.status, "active"), isNull(races.parentRaceId)];
+    // Include upcoming races AND ongoing stage races (start date passed but end date not yet)
+    const dateCondition = sql`(${raceEvents.date} >= ${today} OR ${races.endDate} >= ${today})`;
+    const conditions: Parameters<typeof and>[0][] = [dateCondition, eq(races.status, "active"), isNull(races.parentRaceId)];
     if (discipline && discipline !== "all") conditions.push(eq(raceEvents.discipline, discipline as any));
     if (gender && gender !== "all") conditions.push(eq(races.gender, gender));
     const result = await db
@@ -100,7 +102,7 @@ async function getHighHypeRaces(discipline?: string | null, gender?: string | nu
           name: event.name,
           slug: event.slug,
           date: event.date,
-          endDate: event.endDate,
+          endDate: event.endDate ?? race.endDate,
           country: event.country,
           discipline: event.discipline,
           subDiscipline: event.subDiscipline,
@@ -119,7 +121,8 @@ async function getHighHypeRaces(discipline?: string | null, gender?: string | nu
           ev.uciCategory = race.uciCategory ?? null;
           ev.hypeScore = getHypeScore(race.uciCategory);
         }
-
+        // Update endDate from race if event doesn't have one
+        if (!ev.endDate && race.endDate) ev.endDate = race.endDate;
       }
       const ev = eventsMap.get(event.id)!;
       ev.totalRiders += riderCount;
