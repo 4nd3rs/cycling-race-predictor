@@ -11,6 +11,7 @@ import {
   userTelegram,
   userWhatsapp,
   notificationLog,
+  teams,
 } from "@/lib/db";
 import { eq, and, gte, lte, inArray, asc, desc } from "drizzle-orm";
 
@@ -136,7 +137,7 @@ function normalizeName(name: string): string {
 function buildPrompt(
   race: RaceCandidate,
   topPreds: Array<{ riderName: string; position: number | null; winProb: number }>,
-  followedRiders: Array<{ name: string; predictedPosition: number | null }>,
+  followedRiders: Array<{ name: string; predictedPosition: number | null; teamName: string | null }>,
   raceUrl: string,
 ): string {
   const isMTB = ["mtb", "xco"].includes(race.discipline);
@@ -149,53 +150,70 @@ function buildPrompt(
     .join("\n");
 
   const followedText = followedRiders.length > 0
-    ? followedRiders.map(r =>
-        r.predictedPosition ? `${normalizeName(r.name)} — predicted ${r.predictedPosition}` : normalizeName(r.name)
-      ).join("\n")
+    ? followedRiders.map(r => {
+        const parts = [normalizeName(r.name)];
+        if (r.teamName) parts.push(`(${r.teamName})`);
+        if (r.predictedPosition) parts.push(`— predicted #${r.predictedPosition}`);
+        return parts.join(" ");
+      }).join("\n")
     : "None";
 
   const typeInstructions: Record<MessageType, string> = {
     preview: `Write a race PREVIEW message (T-2 days).
-- One opening sentence on what makes this race special
-- Numbered predictions list. Format: 1. Firstname Lastname — X% — one short distinctive phrase
-- If a followed rider is NOT in the top 5, add one sentence mentioning where they sit
+- Start with a bold header line: the race name and stage
+- One sentence on what makes this race/stage special
+- List the top 5 predictions with a short phrase per rider
+- IMPORTANT: Dedicate a personal section to EACH of the user's followed riders who are racing:
+  - Mention each by name with their predicted position and team
+  - Add one sentence of context: their form, role in the race, what to expect
+  - If a rider is predicted outside top 20, still mention them positively (e.g. breakaway potential, domestique role, gaining experience)
 - End with the URL on its own line
-- Length: 80-130 words`,
+- Length: 100-180 words`,
     raceday: `Write a RACE DAY morning message.
+- Bold header with race name
 - Short and punchy — this is race morning
-- One key insight or angle for today
-- Max 50 words
-- End with the URL`,
+- Mention each of the user's followed riders and what to watch for them today
+- One key tactical insight
+- End with the URL
+- Length: 60-100 words`,
     result: `Write a RESULTS message after the race.
 - One sentence on who won and how
 - Numbered results list (up to 5)
-- One line on followed riders: how they finished vs predicted
+- For EACH followed rider: how they finished vs their predicted position
 - End with the URL
-- Length: 60-100 words`,
+- Length: 80-120 words`,
   };
 
-  return `You are a passionate cycling expert writing personalized race updates for a fan.
+  return `You are a passionate cycling expert writing a personalized race update for a specific fan. This message should feel like it's written FOR them — their riders are the main story.
 
-RACE: ${race.eventName}
+RACE: ${race.eventName} — ${race.raceName}
 DATE: ${dateStr}
 ${race.country ? `COUNTRY: ${race.country}` : ""}
 ${race.uciCategory ? `CATEGORY: ${race.uciCategory}` : ""}
 DISCIPLINE: ${isMTB ? "Mountain Bike" : "Road"}
 URL: ${raceUrl}
 
-TOP PREDICTIONS (our model):
+TOP 5 PREDICTIONS (all confirmed on the startlist):
 ${predictionsText || "No predictions yet"}
 
-USER'S FOLLOWED RIDERS:
+USER'S FOLLOWED RIDERS IN THIS RACE (confirmed on startlist):
 ${followedText}
+${followedRiders.length === 0 ? "(User follows this race event but none of their specific riders are on the startlist)" : ""}
+
+CRITICAL RULES:
+- ONLY mention riders who are listed above. Do NOT invent or assume any rider is racing.
+- Every followed rider listed above MUST be mentioned by name in the message.
+- This is personalized — the followed riders section is the most important part of the message.
 
 TONE GUIDE:
-- Write like a knowledgeable cycling analyst — authoritative, fan-oriented
+- Write like a knowledgeable cycling analyst talking directly to a fan about their riders
 - Use cycling vocabulary naturally (rouleur, puncheur, parcours, bergs, cobbles)
 - Use "I predict", "I have X here" — first person singular
 - Dry, understated European tone — confident but not breathless
-- No corporate language. No "Hi!" openers. No excessive emoji.
+- No corporate language. No "Hi!" openers. No excessive emoji. No hashtags.
 - ${isMTB ? "For MTB: emphasise course conditions, first lap importance, top 3 only" : "For road: emphasise terrain suitability, tactics, weather impact"}
+
+FORMAT: Plain text. Use *bold* (asterisks) for emphasis. No markdown headers.
 
 MESSAGE TYPE: ${typeInstructions[race.messageType]}
 
@@ -306,60 +324,85 @@ async function findRaceCandidates(): Promise<RaceCandidate[]> {
 async function processRace(race: RaceCandidate): Promise<{ sent: number; skipped: number; dupes: number }> {
   let sent = 0, skipped = 0, dupes = 0;
 
-  // Get startlist rider IDs
+  // Get startlist with rider info and team
   const startlist = await db
-    .select({ riderId: raceStartlist.riderId })
+    .select({
+      riderId: raceStartlist.riderId,
+      teamId: raceStartlist.teamId,
+    })
     .from(raceStartlist)
     .where(eq(raceStartlist.raceId, race.raceId));
-  const startlistIds = startlist.map(s => s.riderId);
+  const startlistIds = new Set(startlist.map(s => s.riderId));
+  const startlistTeamIds = new Set(startlist.map(s => s.teamId).filter(Boolean) as string[]);
 
-  // Find followers (race_event followers + rider followers on startlist)
-  const followFilter = startlistIds.length > 0
-    ? and(
-        eq(userFollows.followType, "race_event"),
-        eq(userFollows.entityId, race.raceEventId)
-      )
-    : and(
-        eq(userFollows.followType, "race_event"),
-        eq(userFollows.entityId, race.raceEventId)
-      );
-
+  // Find followers: race_event follows + rider follows (only riders on startlist) + team follows (only teams on startlist)
   let followRows = await db
     .select({ userId: userFollows.userId, followType: userFollows.followType, entityId: userFollows.entityId })
     .from(userFollows)
     .where(and(eq(userFollows.followType, "race_event"), eq(userFollows.entityId, race.raceEventId)));
 
-  if (startlistIds.length > 0) {
+  if (startlistIds.size > 0) {
     const riderFollows = await db
       .select({ userId: userFollows.userId, followType: userFollows.followType, entityId: userFollows.entityId })
       .from(userFollows)
-      .where(and(eq(userFollows.followType, "rider"), inArray(userFollows.entityId, startlistIds)));
+      .where(and(eq(userFollows.followType, "rider"), inArray(userFollows.entityId, [...startlistIds])));
     followRows = [...followRows, ...riderFollows];
+  }
+
+  if (startlistTeamIds.size > 0) {
+    const teamFollows = await db
+      .select({ userId: userFollows.userId, followType: userFollows.followType, entityId: userFollows.entityId })
+      .from(userFollows)
+      .where(and(eq(userFollows.followType, "team"), inArray(userFollows.entityId, [...startlistTeamIds])));
+    followRows = [...followRows, ...teamFollows];
   }
 
   if (followRows.length === 0) return { sent: 0, skipped: 0, dupes: 0 };
 
-  // Group by user
-  const userMap = new Map<string, { riderIds: string[]; followsEvent: boolean }>();
-  for (const row of followRows) {
-    if (!userMap.has(row.userId)) userMap.set(row.userId, { riderIds: [], followsEvent: false });
-    const e = userMap.get(row.userId)!;
-    if (row.followType === "rider") e.riderIds.push(row.entityId);
-    else e.followsEvent = true;
+  // Resolve team follows → rider IDs on this startlist
+  const teamToRiders = new Map<string, string[]>();
+  for (const s of startlist) {
+    if (s.teamId) {
+      if (!teamToRiders.has(s.teamId)) teamToRiders.set(s.teamId, []);
+      teamToRiders.get(s.teamId)!.push(s.riderId);
+    }
   }
 
-  // Top 5 predictions
-  const topPreds = await db
-    .select({
-      position: predictions.predictedPosition,
-      winProb: predictions.winProbability,
-      riderName: riders.name,
-    })
-    .from(predictions)
-    .innerJoin(riders, eq(predictions.riderId, riders.id))
-    .where(eq(predictions.raceId, race.raceId))
-    .orderBy(asc(predictions.predictedPosition))
-    .limit(5);
+  // Group by user
+  const userMap = new Map<string, { riderIds: Set<string>; teamIds: string[]; followsEvent: boolean }>();
+  for (const row of followRows) {
+    if (!userMap.has(row.userId)) userMap.set(row.userId, { riderIds: new Set(), teamIds: [], followsEvent: false });
+    const e = userMap.get(row.userId)!;
+    if (row.followType === "rider") {
+      e.riderIds.add(row.entityId);
+    } else if (row.followType === "team") {
+      e.teamIds.push(row.entityId);
+      // Also add the team's riders from the startlist as followed
+      const teamRiders = teamToRiders.get(row.entityId) || [];
+      for (const rid of teamRiders) e.riderIds.add(rid);
+    } else {
+      e.followsEvent = true;
+    }
+  }
+
+  // Top 5 predictions — only riders actually on the startlist
+  const topPreds = startlistIds.size > 0
+    ? await db
+        .select({
+          position: predictions.predictedPosition,
+          winProb: predictions.winProbability,
+          riderName: riders.name,
+          riderId: predictions.riderId,
+        })
+        .from(predictions)
+        .innerJoin(riders, eq(predictions.riderId, riders.id))
+        .where(and(
+          eq(predictions.raceId, race.raceId),
+          inArray(predictions.riderId, [...startlistIds]),
+        ))
+        .orderBy(asc(predictions.predictedPosition))
+        .limit(5)
+    : [];
 
   const raceUrl = race.eventSlug
     ? `https://procyclingpredictor.com/races/${race.discipline}/${race.eventSlug}${race.categorySlug ? `/${race.categorySlug}` : ""}`
@@ -393,15 +436,21 @@ async function processRace(race: RaceCandidate): Promise<{ sent: number; skipped
       FREQUENCY_GATES[race.messageType].includes(waContact.frequency!);
     if (!hasTg && !hasWa) { skipped++; continue; }
 
-    // Get followed rider predictions for this user
-    let followedRiders: Array<{ name: string; predictedPosition: number | null }> = [];
-    if (data.riderIds.length > 0) {
+    // Get followed rider predictions — only riders actually on the startlist
+    const followedRiderIds = [...data.riderIds].filter(id => startlistIds.has(id));
+    let followedRiders: Array<{ name: string; predictedPosition: number | null; teamName: string | null }> = [];
+    if (followedRiderIds.length > 0) {
       const riderPreds = await db
-        .select({ name: riders.name, pos: predictions.predictedPosition })
+        .select({
+          name: riders.name,
+          pos: predictions.predictedPosition,
+          teamName: teams.name,
+        })
         .from(riders)
         .leftJoin(predictions, and(eq(predictions.raceId, race.raceId), eq(predictions.riderId, riders.id)))
-        .where(inArray(riders.id, data.riderIds));
-      followedRiders = riderPreds.map(r => ({ name: r.name, predictedPosition: r.pos }));
+        .leftJoin(teams, eq(riders.teamId, teams.id))
+        .where(inArray(riders.id, followedRiderIds));
+      followedRiders = riderPreds.map(r => ({ name: r.name, predictedPosition: r.pos, teamName: r.teamName }));
     }
 
     const prompt = buildPrompt(
