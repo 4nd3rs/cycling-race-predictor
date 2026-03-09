@@ -5,6 +5,7 @@ import {
   races,
   raceEvents,
   raceStartlist,
+  raceResults,
   riders,
   predictions,
   userFollows,
@@ -12,14 +13,15 @@ import {
   userWhatsapp,
   notificationLog,
   teams,
+  riderRumours,
 } from "@/lib/db";
-import { eq, and, gte, lte, inArray, asc, desc } from "drizzle-orm";
+import { eq, and, gte, lte, inArray, asc, desc, isNotNull, sql } from "drizzle-orm";
 
 export const maxDuration = 60;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type MessageType = "preview" | "raceday" | "result";
+type MessageType = "preview" | "raceday" | "result" | "news";
 
 interface RaceCandidate {
   raceId: string;
@@ -41,6 +43,7 @@ const FREQUENCY_GATES: Record<MessageType, string[]> = {
   preview: ["all", "key-moments"],
   raceday: ["all"],
   result: ["all", "key-moments", "race-day-only"],
+  news: ["all", "key-moments"],
 };
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -137,9 +140,10 @@ function normalizeName(name: string): string {
 function buildPrompt(
   race: RaceCandidate,
   topPreds: Array<{ riderName: string; position: number | null; winProb: number }>,
-  followedRiders: Array<{ name: string; predictedPosition: number | null; teamName: string | null }>,
+  followedRiders: Array<{ name: string; predictedPosition: number | null; actualPosition: number | null; teamName: string | null }>,
   followedTeams: Array<{ teamName: string; riderCount: number; raceUrl: string }>,
   raceUrl: string,
+  actualResults: Array<{ position: number | null; riderName: string; teamName: string | null }> = [],
 ): string {
   const isMTB = ["mtb", "xco"].includes(race.discipline);
   const dateStr = new Date(new Date(race.date).getTime() + 12 * 60 * 60 * 1000).toLocaleDateString("en-GB", {
@@ -150,11 +154,16 @@ function buildPrompt(
     .map((p, i) => `${i + 1}. ${normalizeName(p.riderName)} — ${(p.winProb * 100).toFixed(0)}%`)
     .join("\n");
 
+  const resultsText = actualResults.slice(0, 5)
+    .map(r => `${r.position}. ${normalizeName(r.riderName)}${r.teamName ? ` (${r.teamName})` : ""}`)
+    .join("\n");
+
   const followedText = followedRiders.length > 0
     ? followedRiders.map(r => {
         const parts = [normalizeName(r.name)];
         if (r.teamName) parts.push(`(${r.teamName})`);
-        if (r.predictedPosition) parts.push(`— predicted #${r.predictedPosition}`);
+        if (r.actualPosition) parts.push(`— finished #${r.actualPosition}`);
+        if (r.predictedPosition) parts.push(`(predicted #${r.predictedPosition})`);
         return parts.join(" ");
       }).join("\n")
     : "None";
@@ -178,11 +187,14 @@ function buildPrompt(
 - End with the URL
 - Length: 60-100 words`,
     result: `Write a RESULTS message after the race.
+- Bold header with race name + "Result"
 - One sentence on who won and how
-- Numbered results list (up to 5)
-- For EACH followed rider: how they finished vs their predicted position
+- Numbered results list (top 5)
+- For EACH followed rider: how they actually finished vs their predicted position. Celebrate good results, commiserate bad ones.
 - End with the URL
 - Length: 80-120 words`,
+    news: `Write a brief NEWS/INTEL update.
+- This is handled separately — not used in buildPrompt.`,
   };
 
   return `You are a passionate cycling expert writing a personalized race update for a specific fan. This message should feel like it's written FOR them — their riders are the main story.
@@ -194,8 +206,12 @@ ${race.uciCategory ? `CATEGORY: ${race.uciCategory}` : ""}
 DISCIPLINE: ${isMTB ? "Mountain Bike" : "Road"}
 URL: ${raceUrl}
 
-TOP 5 PREDICTIONS (all confirmed on the startlist):
-${predictionsText || "No predictions yet"}
+${race.messageType === "result" ? `ACTUAL RESULTS (top 5):
+${resultsText || "No results yet"}
+
+OUR PREDICTIONS WERE:
+${predictionsText || "No predictions"}` : `TOP 5 PREDICTIONS (all confirmed on the startlist):
+${predictionsText || "No predictions yet"}`}
 
 USER'S FOLLOWED RIDERS IN THIS RACE (confirmed on startlist):
 ${followedText}
@@ -290,10 +306,8 @@ async function findRaceCandidates(): Promise<RaceCandidate[]> {
   for (const r of raceRows) {
     if (!r.date || !r.raceEventId) continue;
 
-    // Race datetime assumed to be noon UTC on race day
-    const raceTime = new Date(r.date).getTime() + 12 * 60 * 60 * 1000; // midnight local + 12h ≈ noon race time
+    const raceTime = new Date(r.date).getTime() + 12 * 60 * 60 * 1000;
     const hoursUntilRace = (raceTime - now) / (60 * 60 * 1000);
-    const hoursSinceRace = -hoursUntilRace;
 
     let messageType: MessageType | null = null;
 
@@ -302,7 +316,6 @@ async function findRaceCandidates(): Promise<RaceCandidate[]> {
     } else if (hoursUntilRace >= 0 && hoursUntilRace <= 6) {
       messageType = "raceday";
     }
-    // Note: "result" type is handled by results-hunter cron (uses real data, not AI predictions)
 
     if (messageType) {
       candidates.push({
@@ -319,6 +332,53 @@ async function findRaceCandidates(): Promise<RaceCandidate[]> {
         messageType,
       });
     }
+  }
+
+  // ── Result candidates: completed races with 3+ results in last 48h ──────
+  const resultWindowStart = new Date(now - 48 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const completedRows = await db
+    .select({
+      raceId: races.id,
+      raceName: races.name,
+      date: races.date,
+      discipline: races.discipline,
+      uciCategory: races.uciCategory,
+      raceEventId: races.raceEventId,
+      categorySlug: races.categorySlug,
+      eventName: raceEvents.name,
+      country: raceEvents.country,
+      eventSlug: raceEvents.slug,
+      eventDiscipline: raceEvents.discipline,
+    })
+    .from(races)
+    .innerJoin(raceEvents, eq(races.raceEventId, raceEvents.id))
+    .where(and(
+      eq(races.status, "completed"),
+      gte(races.date, resultWindowStart),
+    ))
+    .orderBy(desc(races.date));
+
+  for (const r of completedRows) {
+    if (!r.date || !r.raceEventId) continue;
+    // Check it has enough results
+    const resultCount = await db.select({ count: sql<number>`count(*)` })
+      .from(raceResults)
+      .where(and(eq(raceResults.raceId, r.raceId), isNotNull(raceResults.position)));
+    if (Number(resultCount[0]?.count ?? 0) < 3) continue;
+
+    candidates.push({
+      raceId: r.raceId,
+      raceName: r.raceName,
+      eventName: r.eventName,
+      discipline: r.eventDiscipline || r.discipline || "road",
+      uciCategory: r.uciCategory,
+      country: r.country,
+      date: r.date,
+      raceEventId: r.raceEventId,
+      eventSlug: r.eventSlug,
+      categorySlug: r.categorySlug,
+      messageType: "result",
+    });
   }
 
   return candidates;
@@ -397,6 +457,24 @@ async function processRace(race: RaceCandidate): Promise<{ sent: number; skipped
         .limit(5)
     : [];
 
+  // For result messages: fetch actual results
+  let actualResults: Array<{ position: number | null; riderName: string; riderId: string; teamName: string | null }> = [];
+  if (race.messageType === "result") {
+    actualResults = await db
+      .select({
+        position: raceResults.position,
+        riderName: riders.name,
+        riderId: raceResults.riderId,
+        teamName: teams.name,
+      })
+      .from(raceResults)
+      .innerJoin(riders, eq(raceResults.riderId, riders.id))
+      .leftJoin(teams, eq(raceResults.teamId, teams.id))
+      .where(and(eq(raceResults.raceId, race.raceId), isNotNull(raceResults.position)))
+      .orderBy(asc(raceResults.position))
+      .limit(10);
+  }
+
   const raceUrl = race.eventSlug
     ? `https://procyclingpredictor.com/races/${race.discipline}/${race.eventSlug}${race.categorySlug ? `/${race.categorySlug}` : ""}`
     : "https://procyclingpredictor.com";
@@ -429,12 +507,15 @@ async function processRace(race: RaceCandidate): Promise<{ sent: number; skipped
       FREQUENCY_GATES[race.messageType].includes(waContact.frequency!);
     if (!hasTg && !hasWa) { skipped++; continue; }
 
-    // Get followed rider predictions — only riders actually on the startlist
-    const followedRiderIds = [...data.riderIds].filter(id => startlistIds.has(id));
-    let followedRiders: Array<{ name: string; predictedPosition: number | null; teamName: string | null }> = [];
-    if (followedRiderIds.length > 0) {
+    // Get followed rider info — only riders actually on the startlist (or in results)
+    const relevantRiderIds = race.messageType === "result"
+      ? [...data.riderIds].filter(id => actualResults.some(r => r.riderId === id) || startlistIds.has(id))
+      : [...data.riderIds].filter(id => startlistIds.has(id));
+    let followedRiders: Array<{ name: string; predictedPosition: number | null; actualPosition: number | null; teamName: string | null }> = [];
+    if (relevantRiderIds.length > 0) {
       const riderPreds = await db
         .select({
+          id: riders.id,
           name: riders.name,
           pos: predictions.predictedPosition,
           teamName: teams.name,
@@ -442,8 +523,11 @@ async function processRace(race: RaceCandidate): Promise<{ sent: number; skipped
         .from(riders)
         .leftJoin(predictions, and(eq(predictions.raceId, race.raceId), eq(predictions.riderId, riders.id)))
         .leftJoin(teams, eq(riders.teamId, teams.id))
-        .where(inArray(riders.id, followedRiderIds));
-      followedRiders = riderPreds.map(r => ({ name: r.name, predictedPosition: r.pos, teamName: r.teamName }));
+        .where(inArray(riders.id, relevantRiderIds));
+      followedRiders = riderPreds.map(r => {
+        const actual = actualResults.find(a => a.riderId === r.id);
+        return { name: r.name, predictedPosition: r.pos, actualPosition: actual?.position ?? null, teamName: r.teamName };
+      });
     }
 
     // Get followed team info — team name + number of riders on startlist
@@ -468,6 +552,7 @@ async function processRace(race: RaceCandidate): Promise<{ sent: number; skipped
       followedRiders,
       followedTeams,
       raceUrl,
+      actualResults.map(r => ({ position: r.position, riderName: r.riderName, teamName: r.teamName })),
     );
 
     // Telegram send task
@@ -514,6 +599,152 @@ async function processRace(race: RaceCandidate): Promise<{ sent: number; skipped
   return { sent, skipped, dupes };
 }
 
+// ── News/Intel notifications ──────────────────────────────────────────────
+
+async function processNews(): Promise<{ sent: number; skipped: number; dupes: number }> {
+  let sent = 0, skipped = 0, dupes = 0;
+
+  // Find recent rumours (last 24h) with strong sentiment
+  const recentRumours = await db
+    .select({
+      riderId: riderRumours.riderId,
+      riderName: riders.name,
+      summary: riderRumours.summary,
+      sentiment: riderRumours.aggregateScore,
+      lastUpdated: riderRumours.lastUpdated,
+    })
+    .from(riderRumours)
+    .innerJoin(riders, eq(riderRumours.riderId, riders.id))
+    .where(gte(riderRumours.lastUpdated, new Date(Date.now() - 24 * 60 * 60 * 1000)))
+    .orderBy(desc(riderRumours.lastUpdated))
+    .limit(20);
+
+  if (recentRumours.length === 0) return { sent: 0, skipped: 0, dupes: 0 };
+
+  const riderIdsWithNews = recentRumours.map(r => r.riderId);
+
+  // Find users who follow these riders
+  const followRows = await db
+    .select({ userId: userFollows.userId, entityId: userFollows.entityId })
+    .from(userFollows)
+    .where(and(eq(userFollows.followType, "rider"), inArray(userFollows.entityId, riderIdsWithNews)));
+
+  if (followRows.length === 0) return { sent: 0, skipped: 0, dupes: 0 };
+
+  // Also find users who follow teams of these riders
+  const riderTeams = await db
+    .select({ id: riders.id, teamId: riders.teamId })
+    .from(riders)
+    .where(inArray(riders.id, riderIdsWithNews));
+  const riderTeamMap = new Map(riderTeams.filter(r => r.teamId).map(r => [r.teamId!, r.id]));
+
+  if (riderTeamMap.size > 0) {
+    const teamFollows = await db
+      .select({ userId: userFollows.userId, entityId: userFollows.entityId })
+      .from(userFollows)
+      .where(and(eq(userFollows.followType, "team"), inArray(userFollows.entityId, [...riderTeamMap.keys()])));
+    // Map team follows back to the rider with news
+    for (const tf of teamFollows) {
+      const riderId = riderTeamMap.get(tf.entityId);
+      if (riderId) followRows.push({ userId: tf.userId, entityId: riderId });
+    }
+  }
+
+  // Group: user → rider IDs with news
+  const userRiders = new Map<string, Set<string>>();
+  for (const f of followRows) {
+    if (!userRiders.has(f.userId)) userRiders.set(f.userId, new Set());
+    userRiders.get(f.userId)!.add(f.entityId);
+  }
+
+  // Get contacts
+  const userIds = [...userRiders.keys()];
+  const tgRows = await db.select({ userId: userTelegram.userId, chatId: userTelegram.telegramChatId })
+    .from(userTelegram).where(inArray(userTelegram.userId, userIds));
+  const tgByUser = new Map(tgRows.filter(r => r.chatId).map(r => [r.userId, r.chatId!]));
+
+  const waRows = await db.select({
+    userId: userWhatsapp.userId, phone: userWhatsapp.phoneNumber, frequency: userWhatsapp.notificationFrequency,
+  }).from(userWhatsapp).where(inArray(userWhatsapp.userId, userIds));
+  const waByUser = new Map(waRows.filter(r => r.phone).map(r => [r.userId, r]));
+
+  const tgTasks: Array<() => Promise<void>> = [];
+  const waTasks: Array<() => Promise<void>> = [];
+
+  for (const [userId, riderIds] of userRiders) {
+    const hasTg = tgByUser.has(userId);
+    const waContact = waByUser.get(userId);
+    const hasWa = waContact && waContact.frequency !== "off" && FREQUENCY_GATES.news.includes(waContact.frequency!);
+    if (!hasTg && !hasWa) { skipped++; continue; }
+
+    // Build news items for this user
+    const userNews = recentRumours.filter(r => riderIds.has(r.riderId));
+    if (userNews.length === 0) { skipped++; continue; }
+
+    // Dedup key: combine rider IDs to avoid re-sending same news batch
+    const dedupKey = `news-${new Date().toISOString().slice(0, 10)}-${[...riderIds].sort().join(",")}`;
+
+    const newsText = userNews.map(r => {
+      const sentiment = parseFloat(String(r.sentiment || "0"));
+      const icon = sentiment >= 0.3 ? "📈" : sentiment <= -0.3 ? "⚠️" : "📰";
+      return `${icon} *${normalizeName(r.riderName)}*: ${r.summary || "New intel available"}`;
+    }).join("\n\n");
+
+    const prompt = `You are a cycling news analyst writing a brief, personalized intel update for a fan.
+
+The user follows these riders and there is fresh news about them:
+
+${newsText}
+
+Write a SHORT WhatsApp message (60-100 words max) that:
+- Leads with the most impactful news item
+- Covers each rider mentioned above
+- Adds brief context on what this means for upcoming races
+- Uses *bold* for rider names
+- Dry, knowledgeable tone — like a trusted insider
+- No "Hi!" openers, no corporate language, no hashtags
+- End with: procyclingpredictor.com
+
+Write ONLY the message text. No preamble.`;
+
+    if (hasTg) {
+      tgTasks.push(async () => {
+        if (await alreadySent(userId, dedupKey, "news", "telegram")) { dupes++; return; }
+        const msg = await generateMessage(prompt);
+        if (!msg) { skipped++; return; }
+        const ok = await sendTelegram(tgByUser.get(userId)!, msg.html);
+        if (ok) { await logSent(userId, dedupKey, "news", "telegram"); sent++; }
+        else { skipped++; }
+      });
+    }
+
+    if (hasWa) {
+      waTasks.push(async () => {
+        if (await alreadySent(userId, dedupKey, "news", "whatsapp")) { dupes++; return; }
+        const msg = await generateMessage(prompt);
+        if (!msg) { skipped++; return; }
+        const ok = await sendWhatsApp(waContact!.phone!, toWhatsAppFormat(msg.plain));
+        if (ok) { await logSent(userId, dedupKey, "news", "whatsapp"); sent++; }
+        else { skipped++; }
+      });
+    }
+  }
+
+  // Execute TG in parallel batches
+  for (let i = 0; i < tgTasks.length; i += 20) {
+    await Promise.allSettled(tgTasks.slice(i, i + 20).map(fn => fn()));
+  }
+  // Execute WA sequentially
+  const waStart = Date.now();
+  for (const task of waTasks) {
+    if (Date.now() - waStart > 30_000) { skipped++; break; }
+    await task();
+    await sleep(1500);
+  }
+
+  return { sent, skipped, dupes };
+}
+
 // ── Main handler ──────────────────────────────────────────────────────────────
 
 export async function GET(request: Request) {
@@ -532,10 +763,6 @@ export async function GET(request: Request) {
   try {
     const candidates = await findRaceCandidates();
 
-    if (candidates.length === 0) {
-      return NextResponse.json({ success: true, message: "No races to notify about" });
-    }
-
     let totalSent = 0, totalSkipped = 0, totalDupes = 0;
     const raceSummaries: Array<{ race: string; type: string; sent: number }> = [];
 
@@ -545,6 +772,15 @@ export async function GET(request: Request) {
       totalSkipped += result.skipped;
       totalDupes += result.dupes;
       raceSummaries.push({ race: race.eventName, type: race.messageType, sent: result.sent });
+    }
+
+    // Process news/intel for followed riders
+    const newsResult = await processNews();
+    totalSent += newsResult.sent;
+    totalSkipped += newsResult.skipped;
+    totalDupes += newsResult.dupes;
+    if (newsResult.sent > 0) {
+      raceSummaries.push({ race: "rider-news", type: "news", sent: newsResult.sent });
     }
 
     return NextResponse.json({
