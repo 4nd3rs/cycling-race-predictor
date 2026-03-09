@@ -387,6 +387,21 @@ async function getHeroPredictions(event: HomepageEvent): Promise<Map<string, Arr
   } catch { return new Map(); }
 }
 
+async function getHeroAiPreview(event: HomepageEvent): Promise<string | null> {
+  // Get the AI preview from the elite men's race (or first elite category)
+  const eliteCat = event.categories.find(c => c.ageCategory === "elite" && c.gender === "men")
+    ?? event.categories.find(c => c.ageCategory === "elite");
+  if (!eliteCat) return null;
+  try {
+    const [row] = await db
+      .select({ aiPreview: races.aiPreview })
+      .from(races)
+      .where(eq(races.id, eliteCat.id))
+      .limit(1);
+    return row?.aiPreview ?? null;
+  } catch { return null; }
+}
+
 // ---------------------------------------------------------------------------
 // HELPERS
 // ---------------------------------------------------------------------------
@@ -498,9 +513,10 @@ export default async function Home({ searchParams }: HomePageProps) {
     getUpcomingCountries(),
   ]);
   const upcomingRaces = hasFilters ? filteredRaces : highHypeRaces;
-  const [heroPredictions, heroStageProgress] = await Promise.all([
+  const [heroPredictions, heroStageProgress, heroAiPreview] = await Promise.all([
     nextRace ? getHeroPredictions(nextRace) : Promise.resolve(new Map()),
     nextRace ? getHeroStageProgress(nextRace) : Promise.resolve(null),
+    nextRace ? getHeroAiPreview(nextRace) : Promise.resolve(null),
   ]);
 
   return (
@@ -550,7 +566,7 @@ export default async function Home({ searchParams }: HomePageProps) {
               )}
               <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-10 md:py-16">
                 {nextRace ? (
-                  <NextRaceHero event={nextRace} genderFilter={filterGender} heroPredictions={heroPredictions} stageProgress={heroStageProgress} />
+                  <NextRaceHero event={nextRace} genderFilter={filterGender} heroPredictions={heroPredictions} stageProgress={heroStageProgress} aiPreview={heroAiPreview} />
                 ) : (
                   <div className="text-center py-12">
                     <p className="text-xl text-muted-foreground">No upcoming races — check back soon</p>
@@ -705,11 +721,13 @@ function NextRaceHero({
   genderFilter,
   heroPredictions,
   stageProgress,
+  aiPreview,
 }: {
   event: HomepageEvent;
   genderFilter?: string | null;
   heroPredictions: Map<string, HeroPick[]>;
   stageProgress?: StageProgress | null;
+  aiPreview?: string | null;
 }) {
   const raceDate = toRaceDate(ev.date);
   const daysUntil = calendarDaysUntil(ev.date);
@@ -814,42 +832,59 @@ function NextRaceHero({
         </div>
       )}
 
-      {/* Predictions panel */}
-      {hasPredictions && (
-        <div className={`grid gap-4 mb-6 ${bothGenders ? "sm:grid-cols-2" : "max-w-xs"}`}>
-          {[
-            { gender: "men", picks: menPicks, label: "Men's Favourites" },
-            { gender: "women", picks: womenPicks, label: "Women's Favourites" },
-          ]
-            .filter(({ picks }) => picks.length > 0)
-            .map(({ gender, picks, label }) => {
-              const catSlug = ev.categories.find(c => c.gender === gender && c.ageCategory === "elite")?.categorySlug;
-              const catUrl = catSlug ? `${url}/${catSlug}` : url;
-              return (
-                <div key={gender} className="rounded-lg border border-border/40 bg-black/20 backdrop-blur-sm overflow-hidden">
-                  <div className="px-3 py-2 border-b border-border/30 flex items-center justify-between">
-                    <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">{label}</span>
-                    <Link href={catUrl} className="text-[10px] text-primary hover:underline">Full predictions →</Link>
-                  </div>
-                  <ol className="divide-y divide-border/20">
-                    {picks.map((pick, i) => (
-                      <li key={pick.name} className="flex items-center gap-3 px-3 py-2">
-                        <span className="text-xs font-bold tabular-nums text-muted-foreground w-4 shrink-0">{i + 1}</span>
-                        {pick.photoUrl ? (
-                          <img src={pick.photoUrl} alt={pick.name} className="w-6 h-6 rounded-full object-cover shrink-0 opacity-90" />
-                        ) : (
-                          <div className="w-6 h-6 rounded-full bg-muted/40 shrink-0" />
-                        )}
-                        <Link href={`/riders/${pick.riderId}`} prefetch={false} className="text-sm font-semibold flex-1 leading-tight truncate hover:text-primary transition-colors">{pick.name}</Link>
-                        {pick.winPct > 0 && (
-                          <span className="text-xs font-bold tabular-nums text-primary shrink-0">{pick.winPct.toFixed(1)}%</span>
-                        )}
-                      </li>
-                    ))}
-                  </ol>
-                </div>
-              );
-            })}
+      {/* Predictions + AI Preview */}
+      {(hasPredictions || aiPreview) && (
+        <div className={`flex flex-col ${aiPreview && hasPredictions ? "lg:flex-row" : ""} gap-4 mb-6`}>
+          {/* Predictions panel */}
+          {hasPredictions && (
+            <div className={`grid gap-4 ${bothGenders ? "sm:grid-cols-2" : "max-w-xs"} ${aiPreview ? "lg:w-1/2 lg:max-w-none" : ""}`}>
+              {[
+                { gender: "men", picks: menPicks, label: "Men's Favourites" },
+                { gender: "women", picks: womenPicks, label: "Women's Favourites" },
+              ]
+                .filter(({ picks }) => picks.length > 0)
+                .map(({ gender, picks, label }) => {
+                  const catSlug = ev.categories.find(c => c.gender === gender && c.ageCategory === "elite")?.categorySlug;
+                  const catUrl = catSlug ? `${url}/${catSlug}` : url;
+                  return (
+                    <div key={gender} className="rounded-lg border border-border/40 bg-black/20 backdrop-blur-sm overflow-hidden">
+                      <div className="px-3 py-2 border-b border-border/30 flex items-center justify-between">
+                        <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">{label}</span>
+                        <Link href={catUrl} className="text-[10px] text-primary hover:underline">Full predictions →</Link>
+                      </div>
+                      <ol className="divide-y divide-border/20">
+                        {picks.map((pick, i) => (
+                          <li key={pick.name} className="flex items-center gap-3 px-3 py-2">
+                            <span className="text-xs font-bold tabular-nums text-muted-foreground w-4 shrink-0">{i + 1}</span>
+                            {pick.photoUrl ? (
+                              <img src={pick.photoUrl} alt={pick.name} className="w-6 h-6 rounded-full object-cover shrink-0 opacity-90" />
+                            ) : (
+                              <div className="w-6 h-6 rounded-full bg-muted/40 shrink-0" />
+                            )}
+                            <Link href={`/riders/${pick.riderId}`} prefetch={false} className="text-sm font-semibold flex-1 leading-tight truncate hover:text-primary transition-colors">{pick.name}</Link>
+                            {pick.winPct > 0 && (
+                              <span className="text-xs font-bold tabular-nums text-primary shrink-0">{pick.winPct.toFixed(1)}%</span>
+                            )}
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  );
+                })}
+            </div>
+          )}
+
+          {/* AI Preview */}
+          {aiPreview && (
+            <div className={`rounded-lg border border-border/40 bg-black/20 backdrop-blur-sm overflow-hidden ${hasPredictions ? "lg:w-1/2" : "max-w-lg"}`}>
+              <div className="px-3 py-2 border-b border-border/30 flex items-center gap-2">
+                <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">AI Race Preview</span>
+              </div>
+              <div className="px-3 py-3">
+                <p className="text-xs text-foreground/80 leading-relaxed line-clamp-[12]">{aiPreview}</p>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
