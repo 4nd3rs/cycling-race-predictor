@@ -276,73 +276,80 @@ function raceUrl(discipline: string, eventSlug: string | null): string {
   return `${APP_URL}/races/${discipline}/${eventSlug}`;
 }
 
-async function buildPreviewPrompt(race: RaceRow, discipline: string): Promise<string | null> {
-  const preds = await getTopPredictions(race.id, 5);
-  if (preds.length === 0) return null;
-
-  const predText = preds.map((p, i) => `${i + 1}. ${p.name} (${p.team ?? "?"})`).join("\n");
-  const url = raceUrl(discipline, race.eventSlug);
-  const isMtb = discipline === "mtb";
-  const emoji = isMtb ? "🚵" : "🏁";
-
-  return `You write punchy WhatsApp race preview messages for Pro Cycling Predictor.
-Write a sharp ${isMtb ? "MTB" : "road"} race preview for ${race.eventName ?? race.name} (${parseDate(race.date)}).
-
-Our top predictions:
-${predText}
-
-Format:
-${emoji} *${race.eventName ?? race.name}* — ${parseDate(race.date)}
-[2-3 sentences about the race, what to look for, who to watch]
-
-🔮 *Our top picks:*
-1. Name
-2. Name
-3. Name
-
-👉 Full preview: ${url}
-
-Rules:
-- Max 150 words total
-- *bold* for rider and race names
-- Sound like a knowledgeable cycling fan, not a press release
-- 1-2 emojis max
-- No hashtags`;
-}
-
-async function buildRacedayPrompt(race: RaceRow, discipline: string): Promise<string | null> {
+async function buildPreviewPost(race: RaceRow, discipline: string): Promise<string | null> {
   const preds = await getTopPredictions(race.id, 3);
   if (preds.length === 0) return null;
 
   const url = raceUrl(discipline, race.eventSlug);
-  const topPick = preds[0]?.name ?? "unknown";
   const isMtb = discipline === "mtb";
-  const emoji = isMtb ? "🚵" : "🚴";
+  const emoji = isMtb ? "🚵" : "🏁";
+  const dateStr = parseDate(race.date);
+  const picks = preds.map((p, i) => `${i + 1}. *${p.name}*${p.team ? ` (${p.team})` : ""}`).join("\n");
 
-  return `Short race-day WhatsApp hype message for ${isMtb ? "MTB race" : ""} ${race.eventName ?? race.name}.
-Our top pick: ${topPick}${preds[1] ? ` (chased by ${preds[1].name})` : ""}.
+  const prompt = `You write punchy WhatsApp race preview messages for Pro Cycling Predictor.
+Write ONLY a 2-3 sentence race preview blurb for ${race.eventName ?? race.name} (${dateStr}).
+Focus on what makes this race interesting and what to watch for.
+Sound like a knowledgeable cycling fan, not a press release. No hashtags. Max 60 words.
+Do NOT mention any rider names or predictions — those will be added separately.`;
 
-Max 80 words. Start with a ${emoji} emoji and the race name in bold. End with a link.
-Sound excited. One key tactical insight.
-Link: ${url}
-No hashtags.`;
+  const blurb = await generate(prompt);
+  if (!blurb) return null;
+
+  return `${emoji} *${race.eventName ?? race.name}* — ${dateStr}
+${blurb}
+
+🔮 *Our top picks:*
+${picks}
+
+👉 Full preview: ${url}`;
 }
 
-async function buildResultPrompt(race: RaceRow, discipline: string): Promise<string | null> {
+async function buildRacedayPost(race: RaceRow, discipline: string): Promise<string | null> {
+  const preds = await getTopPredictions(race.id, 3);
+  if (preds.length === 0) return null;
+
+  const url = raceUrl(discipline, race.eventSlug);
+  const isMtb = discipline === "mtb";
+  const emoji = isMtb ? "🚵" : "🚴";
+  const picks = preds.map((p, i) => `${i + 1}. *${p.name}*`).join("\n");
+
+  const prompt = `Write a single punchy race-day hype sentence (max 30 words) for ${race.eventName ?? race.name}.
+Sound like a knowledgeable cycling fan. No hashtags. Do NOT mention any rider names — those will be added separately.`;
+
+  const blurb = await generate(prompt);
+
+  return `${emoji} *${race.eventName ?? race.name}* — Race day!
+${blurb ?? "It's go time."}
+
+🔮 *Our picks:*
+${picks}
+
+👉 ${url}`;
+}
+
+async function buildResultPost(race: RaceRow, discipline: string): Promise<string | null> {
   const results = await getRecentResults(race.id);
   if (results.length < 3) return null;
 
-  const podium = results.slice(0, 3).map((r, i) => `${i + 1}. *${r.riderName}* (${r.teamName ?? "?"})`).join("\n");
+  const podium = results.slice(0, 3).map((r, i) => {
+    const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉";
+    return `${medal} *${r.riderName}*${r.teamName ? ` (${r.teamName})` : ""}`;
+  }).join("\n");
   const url = raceUrl(discipline, race.eventSlug);
+  const winner = results[0]?.riderName ?? "unknown";
 
-  return `Short WhatsApp results post for ${race.eventName ?? race.name}.
+  const prompt = `Write a single punchy sentence (max 30 words) about *${winner}* winning ${race.eventName ?? race.name}.
+Sound like a knowledgeable cycling fan. No hashtags. Do NOT list any rider names or results — those will be added separately.`;
 
-Podium:
+  const blurb = await generate(prompt);
+
+  return `🏆 *${race.eventName ?? race.name}* — Result
+
 ${podium}
 
-Max 100 words. Lead with winner's name in bold + 🏆. Add one punchy insight about the race.
-End with updated rankings link: ${url}
-No hashtags.`;
+${blurb ?? ""}
+
+📊 Updated rankings: ${url}`;
 }
 
 // ── News prompt builders ─────────────────────────────────────────────────────
@@ -524,15 +531,9 @@ async function processAllGroups(): Promise<PostResult[]> {
         continue;
       }
 
-      const prompt = await buildPreviewPrompt(race, discipline);
-      if (!prompt) {
-        results.push({ race: race.eventName ?? race.name, discipline, type: "preview", status: "no_predictions" });
-        continue;
-      }
-
-      const text = await generate(prompt);
+      const text = await buildPreviewPost(race, discipline);
       if (!text) {
-        results.push({ race: race.eventName ?? race.name, discipline, type: "preview", status: "gen_failed" });
+        results.push({ race: race.eventName ?? race.name, discipline, type: "preview", status: "no_predictions" });
         continue;
       }
 
@@ -553,10 +554,7 @@ async function processAllGroups(): Promise<PostResult[]> {
         if (!(await isRoadRaceOfInterest(race.raceEventId, race.uciCategory))) continue;
       } else if (!isMtbEligible(race)) continue;
 
-      const prompt = await buildRacedayPrompt(race, discipline);
-      if (!prompt) continue;
-
-      const text = await generate(prompt);
+      const text = await buildRacedayPost(race, discipline);
       if (!text) continue;
 
       const sent = await sendToWA(groupJid, text);
@@ -576,14 +574,11 @@ async function processAllGroups(): Promise<PostResult[]> {
         if (!(await isRoadRaceOfInterest(race.raceEventId, race.uciCategory))) continue;
       } else if (!isMtbEligible(race)) continue;
 
-      const prompt = await buildResultPrompt(race, discipline);
-      if (!prompt) {
+      const text = await buildResultPost(race, discipline);
+      if (!text) {
         results.push({ race: race.eventName ?? race.name, discipline, type: "result", status: "not_enough_results" });
         continue;
       }
-
-      const text = await generate(prompt);
-      if (!text) continue;
 
       const sent = await sendToWA(groupJid, text);
       if (sent) await markPosted(race.id, "wa-result", channel);

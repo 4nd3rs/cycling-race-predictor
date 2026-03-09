@@ -30,10 +30,6 @@
       "schedule": "0 */6 * * *"
     },
     {
-      "path": "/api/cron/marketing-agent",
-      "schedule": "10 */2 * * *"
-    },
-    {
       "path": "/api/cron/gossip-hunter",
       "schedule": "30 */2 * * *"
     },
@@ -52,10 +48,6 @@
     {
       "path": "/api/cron/sync-race-calendar",
       "schedule": "0 5 * * *"
-    },
-    {
-      "path": "/api/cron/send-notifications",
-      "schedule": "5 */2 * * *"
     },
     {
       "path": "/api/cron/enrich-rider-photos",
