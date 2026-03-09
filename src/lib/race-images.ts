@@ -33,6 +33,12 @@ const RACE_IMAGES: Record<string, RaceImageMeta> = {
     license: "CC0",
     commonsUrl: "https://commons.wikimedia.org/wiki/File:Tim_Merlier_vainqueur_%C3%A9tape_1_Paris-Nice_2025.jpg",
   },
+  "tirreno-adriatico": {
+    src: "/races/tirreno-adriatico.jpg",
+    credit: "Ferenc Stubán",
+    license: "Public domain",
+    commonsUrl: "https://commons.wikimedia.org/wiki/File:Fabian_Cancellara_Tirreno.jpg",
+  },
   "kuurne-brussel-kuurne": {
     src: "/races/kuurne-brussel-kuurne.jpg",
     credit: "filip bossuyt",

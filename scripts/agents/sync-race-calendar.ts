@@ -16,7 +16,7 @@ config({ path: ".env.local" });
 
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
-import { and, eq, gte, lte, ilike } from "drizzle-orm";
+import { and, eq, gte, lte, ilike, isNull } from "drizzle-orm";
 import * as schema from "../../src/lib/db/schema";
 import {
   generateEventSlug,
@@ -111,9 +111,8 @@ interface SyncStats {
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
-function parsePcsDate(raw: string): string | null {
-  // PCS dates: "01.03", "01.03 - 07.03", "2026.03.01", etc.
-  const cleaned = raw.trim().split("-")[0].trim().split("»")[0].trim();
+function parsePcsDateSingle(raw: string): string | null {
+  const cleaned = raw.trim();
 
   // Format: DD.MM or DD/MM
   const shortMatch = cleaned.match(/^(\d{1,2})[./](\d{1,2})$/);
@@ -145,6 +144,20 @@ function parsePcsDate(raw: string): string | null {
   }
 
   return null;
+}
+
+/** Parse PCS date range. Returns { start, end } where end is null for one-day races. */
+function parsePcsDateRange(raw: string): { start: string | null; end: string | null } {
+  // PCS dates: "01.03", "01.03 - 07.03", "2026.03.01", etc.
+  const cleaned = raw.trim().split("»")[0].trim();
+  const parts = cleaned.split(/\s*-\s*/);
+  const start = parsePcsDateSingle(parts[0]);
+  const end = parts.length > 1 ? parsePcsDateSingle(parts[parts.length - 1]) : null;
+  return { start, end: end && end !== start ? end : null };
+}
+
+function parsePcsDate(raw: string): string | null {
+  return parsePcsDateRange(raw).start;
 }
 
 function isInDateRange(dateStr: string): boolean {
@@ -286,11 +299,34 @@ async function upsertRace(race: ScrapedRace): Promise<"inserted" | "existed" | "
           );
 
         for (const r of matchingRaces) {
-          if (!r.pcsUrl && race.pcsUrl) {
-            await db
-              .update(schema.races)
-              .set({ pcsUrl: race.pcsUrl })
-              .where(eq(schema.races.id, r.id));
+          const updates: Record<string, any> = {};
+          if (!r.pcsUrl && race.pcsUrl) updates.pcsUrl = race.pcsUrl;
+          if (Object.keys(updates).length > 0) {
+            await db.update(schema.races).set(updates).where(eq(schema.races.id, r.id));
+          }
+        }
+
+        // Also update event-level endDate if we have one and it's missing
+        if (race.endDate) {
+          const matchingEvents = await db
+            .select({ id: schema.raceEvents.id, endDate: schema.raceEvents.endDate })
+            .from(schema.raceEvents)
+            .where(
+              and(
+                ilike(schema.raceEvents.name, `%${race.name}%`),
+                gte(schema.raceEvents.date, dayBeforeStr),
+                lte(schema.raceEvents.date, dayAfterStr)
+              )
+            );
+          for (const ev of matchingEvents) {
+            if (!ev.endDate) {
+              await db.update(schema.raceEvents).set({ endDate: race.endDate }).where(eq(schema.raceEvents.id, ev.id));
+              // Also update child races
+              await db.update(schema.races)
+                .set({ endDate: race.endDate, raceType: "stage_race" })
+                .where(and(eq(schema.races.raceEventId, ev.id), isNull(schema.races.parentRaceId)));
+              console.log(`  ✓ Updated endDate + raceType for ${race.name}`);
+            }
           }
         }
       }
@@ -452,7 +488,7 @@ async function scrapePcsCalendar(): Promise<ScrapedRace[]> {
 
     for (const row of rowsToParse) {
       try {
-        const dateStr = parsePcsDate(row.startDate || row.dateRange);
+        const { start: dateStr, end: endDateStr } = parsePcsDateRange(row.startDate || row.dateRange);
         if (!dateStr || !isInDateRange(dateStr)) continue;
 
         const category = normalizePcsCategory(row.category || "") ?? "Unknown";
@@ -473,6 +509,7 @@ async function scrapePcsCalendar(): Promise<ScrapedRace[]> {
         races.push({
           name: row.name,
           date: dateStr,
+          endDate: endDateStr ?? undefined,
           country,
           uciCategory: category,
           pcsUrl,
