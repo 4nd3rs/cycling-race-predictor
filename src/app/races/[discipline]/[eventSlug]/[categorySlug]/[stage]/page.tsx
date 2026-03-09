@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { db, races, raceEvents, raceResults, riders, teams, riderDisciplineStats } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import {
   isValidDiscipline,
   getDisciplineLabel,
@@ -321,6 +321,24 @@ export default async function StagePage({ params }: PageProps) {
                   Stage {stageNumber + 1} →
                 </Link>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* AI Stage Preview */}
+        {stageRace.aiPreview && (
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-base">🔮</span>
+              <h2 className="text-lg font-bold">{results.length > 0 ? "Pre-Stage Preview" : "AI Stage Preview"}</h2>
+              {stageRace.aiPreviewGeneratedAt && (
+                <span className="text-xs text-muted-foreground ml-auto">
+                  Updated {formatDistanceToNow(stageRace.aiPreviewGeneratedAt, { addSuffix: true })}
+                </span>
+              )}
+            </div>
+            <div className="rounded-xl border border-border/50 bg-card/30 p-4 sm:p-5">
+              <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-line">{stageRace.aiPreview}</p>
             </div>
           </div>
         )}

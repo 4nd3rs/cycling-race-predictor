@@ -168,6 +168,9 @@ export const races = pgTable(
     status: varchar("status", { length: 20 }).default("active"), // 'pending' | 'active' | 'completed'
     startTime: time("start_time"), // Local race start time (HH:MM), used to indicate when results are expected
     pcsUrl: varchar("pcs_url", { length: 500 }), // ProCyclingStats URL
+    // AI preview text (pre-race analysis explaining riders, news, and race info)
+    aiPreview: text("ai_preview"),
+    aiPreviewGeneratedAt: timestamp("ai_preview_generated_at"),
     // Post-race analysis
     postRaceAnalysis: text("post_race_analysis"), // AI-generated prediction vs result analysis
     analysisGeneratedAt: timestamp("analysis_generated_at"), // When analysis was last generated

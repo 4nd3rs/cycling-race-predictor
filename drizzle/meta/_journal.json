@@ -50,6 +50,13 @@
       "when": 1772782452229,
       "tag": "0006_last_mephistopheles",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1773059677398,
+      "tag": "0007_add-ai-preview",
+      "breakpoints": true
     }
   ]
 }

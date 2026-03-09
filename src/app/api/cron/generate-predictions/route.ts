@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import {
   db, races, raceEvents, raceStartlist, riderDisciplineStats, predictions,
-  riders, riderRumours, raceNews, raceResults
+  riders, riderRumours, raceNews, raceResults, teams
 } from "@/lib/db";
 import { and, eq, gte, lte, desc, sql, ne, inArray } from "drizzle-orm";
 import { calculateElo, calculateAllProbabilities, type RiderSkill } from "@/lib/prediction/trueskill";
@@ -181,6 +181,127 @@ Return ONLY valid JSON: {"ExactName": percentage, ...}`;
   }
 
   return probMap;
+}
+
+// ── AI Preview generation ────────────────────────────────────────────────────
+
+async function generateAIPreview(raceId: string): Promise<void> {
+  const race = await db.query.races.findFirst({
+    where: eq(races.id, raceId),
+  });
+  if (!race) return;
+
+  // Skip if preview was generated recently (within 12h)
+  if (race.aiPreviewGeneratedAt && new Date(race.aiPreviewGeneratedAt) > new Date(Date.now() - 12 * 3600000)) return;
+
+  // For stages, get parent race to find the event
+  const parentRace = race.parentRaceId
+    ? await db.query.races.findFirst({ where: eq(races.id, race.parentRaceId) })
+    : null;
+  const raceEventId = race.raceEventId ?? parentRace?.raceEventId;
+  const event = raceEventId
+    ? await db.query.raceEvents.findFirst({ where: eq(raceEvents.id, raceEventId) })
+    : null;
+
+  // For stages, use parent's predictions/startlist
+  const predRaceId = race.parentRaceId ?? raceId;
+  const startlistRaceId = race.parentRaceId ?? raceId;
+
+  // Get top predictions
+  const topPreds = await db
+    .select({ name: riders.name, team: teams.name, winProbability: predictions.winProbability })
+    .from(predictions)
+    .leftJoin(riders, eq(predictions.riderId, riders.id))
+    .leftJoin(raceStartlist, and(eq(raceStartlist.raceId, startlistRaceId), eq(raceStartlist.riderId, predictions.riderId)))
+    .leftJoin(teams, eq(raceStartlist.teamId, teams.id))
+    .where(eq(predictions.raceId, predRaceId))
+    .orderBy(desc(predictions.winProbability))
+    .limit(10);
+
+  if (topPreds.length < 3) return;
+
+  // Get news context (use parent's event for stages)
+  const eventId = event?.id ?? race.raceEventId;
+  const news = eventId
+    ? await db
+        .select({ title: raceNews.title, content: raceNews.content })
+        .from(raceNews)
+        .where(eq(raceNews.raceEventId, eventId))
+        .orderBy(desc(raceNews.publishedAt))
+        .limit(5)
+    : [];
+
+  // Get relevant rumours for riders on the startlist
+  const rumours = await db
+    .select({ riderName: riders.name, summary: riderRumours.summary })
+    .from(riderRumours)
+    .innerJoin(riders, eq(riderRumours.riderId, riders.id))
+    .innerJoin(raceStartlist, and(eq(raceStartlist.raceId, startlistRaceId), eq(raceStartlist.riderId, riderRumours.riderId)))
+    .limit(5);
+
+  const raceName = event?.name ?? race.name;
+  const genderLabel = race.gender === "women" ? "Women's" : "Men's";
+  const isStage = race.stageNumber !== null;
+  const stageLabel = isStage ? ` - Stage ${race.stageNumber}` : "";
+
+  const favourites = topPreds.slice(0, 5).map((p, i) =>
+    `${i + 1}. ${p.name} (${p.team ?? "Unknown"}) — ${(parseFloat(p.winProbability ?? "0") * 100).toFixed(1)}% win probability`
+  ).join("\n");
+
+  const newsContext = news.length > 0
+    ? news.map(n => `- ${n.title}${n.content ? `: ${n.content.substring(0, 200)}` : ""}`).join("\n")
+    : "No recent news available";
+
+  const rumourContext = rumours.length > 0
+    ? rumours.map(r => `- ${r.riderName}: ${r.summary}`).join("\n")
+    : "No rider intel available";
+
+  const profileInfo = [
+    race.profileType && `Profile: ${race.profileType}`,
+    race.distanceKm && `Distance: ${parseFloat(String(race.distanceKm)).toFixed(0)} km`,
+    race.elevationM && `Elevation: ${race.elevationM}m`,
+    race.uciCategory && `Category: ${race.uciCategory}`,
+  ].filter(Boolean).join(", ");
+
+  const prompt = `You are Pro Cycling Predictor's AI analyst. Write a concise, insightful race preview for display on the race page.
+
+Race: ${raceName}${stageLabel}
+Date: ${race.date}
+Category: ${genderLabel} Elite
+${profileInfo ? `Course: ${profileInfo}` : ""}
+
+Our model's top favourites:
+${favourites}
+
+Recent news:
+${newsContext}
+
+Rider intel:
+${rumourContext}
+
+Write a 3-4 paragraph preview (150-250 words total) that:
+1. Opens with what makes this race/stage interesting and what the key storyline is
+2. Discusses the top 2-3 favourites and why they're strong picks (form, terrain suitability, team strength)
+3. Mentions a dark horse or surprise contender if relevant
+4. Briefly notes any key absences, injuries, or conditions that could affect the outcome
+
+Style: Knowledgeable cycling analysis. Confident but balanced. No hype language, no hashtags, no emojis.
+Write in plain text (no markdown formatting, no bold, no headers).
+Do NOT start with the race name — the reader already sees it on the page.`;
+
+  try {
+    const model = genai.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const response = await model.generateContent(prompt);
+    const text = response.response.text()?.trim();
+    if (!text || text.length < 100) return;
+
+    await db.update(races).set({
+      aiPreview: text,
+      aiPreviewGeneratedAt: new Date(),
+    }).where(eq(races.id, raceId));
+  } catch (err) {
+    console.error(`[predictions] AI preview generation failed for ${raceId}:`, err);
+  }
 }
 
 // ── Core prediction generator ─────────────────────────────────────────────────
@@ -431,6 +552,20 @@ export async function GET(request: Request) {
         if (result) {
           results.push(`${result.name} (${result.count})`);
           generated++;
+          // Generate AI preview text after predictions
+          await generateAIPreview(id).catch(e =>
+            console.error(`[predictions] AI preview error for ${id}:`, e)
+          );
+          // Also generate previews for stages of this race
+          const stageRows = await db
+            .select({ id: races.id })
+            .from(races)
+            .where(and(eq(races.parentRaceId, id), gte(races.date, today)));
+          for (const stage of stageRows) {
+            await generateAIPreview(stage.id).catch(e =>
+              console.error(`[predictions] AI preview error for stage ${stage.id}:`, e)
+            );
+          }
         }
       } catch (e) {
         console.error(`[predictions] Error for race ${id}:`, e);
