@@ -831,7 +831,16 @@ async function fetchStageOverview(pcsUrl: string): Promise<{ stageCount: number;
       dateStr = `${year}-${dateMatch[2]}-${dateMatch[1]}`;
     }
 
-    const distMatch = text.match(/(\d{2,3}(?:\.\d)?)\s*km/i);
+    // Distance: PCS may show "206" (no unit) or "11.5 km" — extract last number in the row
+    const distMatch = text.match(/(\d{2,3}(?:\.\d)?)\s*(?:km)?/i);
+    // More precise: find the last td content which is typically the distance
+    let distanceKm: string | null = null;
+    if (row.length && row.prop("tagName") === "TR") {
+      const lastTd = row.find("td").last().text().trim();
+      const dMatch = lastTd.match(/^(\d+(?:\.\d+)?)$/);
+      if (dMatch) distanceKm = dMatch[1];
+    }
+    if (!distanceKm && distMatch) distanceKm = distMatch[1];
 
     const stageName = $(el).text().trim() || `Stage ${num}`;
 
@@ -867,7 +876,7 @@ async function fetchStageOverview(pcsUrl: string): Promise<{ stageCount: number;
       name: stageName,
       date: dateStr,
       profileType,
-      distanceKm: distMatch?.[1] ?? null,
+      distanceKm,
     });
   });
 

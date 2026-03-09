@@ -144,7 +144,7 @@ async function ensureStageRecords(
   const pcsUrl = race.pcsUrl;
 
   const existingStages = await db
-    .select({ id: races.id, stageNumber: races.stageNumber, profileType: races.profileType, distanceKm: races.distanceKm })
+    .select({ id: races.id, name: races.name, stageNumber: races.stageNumber, profileType: races.profileType, distanceKm: races.distanceKm })
     .from(races)
     .where(eq(races.parentRaceId, race.id));
 
@@ -156,13 +156,16 @@ async function ensureStageRecords(
 
   const metadata = await scrapeStageMetadata(pcsUrl, stageCount);
 
-  // Enrich existing stages with profile/distance data from PCS
+  // Enrich existing stages with profile/distance/name data from PCS
   for (const existing of existingStages) {
     const meta = metadata.find(m => m.stageNumber === existing.stageNumber);
     if (!meta) continue;
     const updates: Record<string, string | null> = {};
     if (meta.profileType && meta.profileType !== existing.profileType) updates.profileType = meta.profileType;
-    if (meta.distanceKm && !existing.distanceKm) updates.distanceKm = meta.distanceKm;
+    if (meta.distanceKm && meta.distanceKm !== existing.distanceKm) updates.distanceKm = meta.distanceKm;
+    // Update name if PCS has a better one (contains route info like "Stage 1 (ITT) | Lido di Camaiore...")
+    const expectedName = `${race.name} - ${meta.name}`;
+    if (meta.name && expectedName !== existing.name) updates.name = expectedName;
     if (Object.keys(updates).length > 0) {
       await db.update(races).set(updates).where(eq(races.id, existing.id));
       console.log(`[results-hunter] Enriched stage ${existing.stageNumber} with ${Object.keys(updates).join(", ")}`);
