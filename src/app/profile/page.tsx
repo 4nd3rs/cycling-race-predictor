@@ -224,8 +224,8 @@ export default async function ProfilePage() {
 
           {/* WhatsApp Group */}
           <section>
-            <h2 className="text-lg font-bold mb-3">WhatsApp — Road Cycling Group</h2>
-            <WhatsAppGroupWidget initialPhone={whatsapp?.phoneNumber ?? null} />
+            <h2 className="text-lg font-bold mb-3">WhatsApp Notifications</h2>
+            <WhatsAppGroupWidget initialPhone={whatsapp?.phoneNumber ?? null} initialFrequency={whatsapp?.notificationFrequency ?? "key-moments"} />
           </section>
 
 

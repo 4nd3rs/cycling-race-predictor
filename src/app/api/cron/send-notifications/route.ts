@@ -9,6 +9,7 @@ import {
   predictions,
   userFollows,
   userTelegram,
+  userWhatsapp,
   notificationLog,
 } from "@/lib/db";
 import { eq, and, gte, lte, inArray, asc, desc } from "drizzle-orm";
@@ -68,6 +69,31 @@ async function sendTelegram(chatId: string, text: string): Promise<boolean> {
     }),
   });
   return res.ok;
+}
+
+async function sendWhatsApp(phone: string, text: string): Promise<boolean> {
+  const gw = process.env.OPENCLAW_GATEWAY_URL;
+  const token = process.env.OPENCLAW_GATEWAY_TOKEN;
+  if (!gw || !token) return false;
+  try {
+    const res = await fetch(`${gw}/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ to: phone, text }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+function toWhatsAppFormat(text: string): string {
+  // Convert HTML bold to WhatsApp bold
+  return text.replace(/<b>/g, "*").replace(/<\/b>/g, "*");
+}
+
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 // ── Dedup ─────────────────────────────────────────────────────────────────────
@@ -347,13 +373,25 @@ async function processRace(race: RaceCandidate): Promise<{ sent: number; skipped
 
   const tgByUser = new Map(tgRows.filter(r => r.chatId).map(r => [r.userId, r.chatId!]));
 
-  // Build send tasks (max 20 concurrent)
-  type SendTask = () => Promise<void>;
-  const tasks: SendTask[] = [];
+  const waRows = await db.select({
+    userId: userWhatsapp.userId,
+    phone: userWhatsapp.phoneNumber,
+    frequency: userWhatsapp.notificationFrequency,
+  }).from(userWhatsapp).where(inArray(userWhatsapp.userId, userIds));
+
+  const waByUser = new Map(waRows.filter(r => r.phone).map(r => [r.userId, r]));
+
+  // Build send tasks
+  type SendTask = { type: "telegram" | "whatsapp"; fn: () => Promise<void> };
+  const tgTasks: SendTask[] = [];
+  const waTasks: SendTask[] = [];
 
   for (const [userId, data] of userMap) {
     const hasTg = tgByUser.has(userId);
-    if (!hasTg) { skipped++; continue; }
+    const waContact = waByUser.get(userId);
+    const hasWa = waContact && waContact.frequency !== "off" &&
+      FREQUENCY_GATES[race.messageType].includes(waContact.frequency!);
+    if (!hasTg && !hasWa) { skipped++; continue; }
 
     // Get followed rider predictions for this user
     let followedRiders: Array<{ name: string; predictedPosition: number | null }> = [];
@@ -379,7 +417,7 @@ async function processRace(race: RaceCandidate): Promise<{ sent: number; skipped
 
     // Telegram send task
     if (hasTg) {
-      tasks.push(async () => {
+      tgTasks.push({ type: "telegram", fn: async () => {
         const chatId = tgByUser.get(userId)!;
         if (await alreadySent(userId, race.raceId, race.messageType, "telegram")) { dupes++; return; }
         const msg = await generateMessage(prompt);
@@ -387,16 +425,35 @@ async function processRace(race: RaceCandidate): Promise<{ sent: number; skipped
         const ok = await sendTelegram(chatId, msg.html);
         if (ok) { await logSent(userId, race.raceId, race.messageType, "telegram"); sent++; }
         else { skipped++; }
-      });
+      }});
     }
 
-
+    // WhatsApp send task
+    if (hasWa) {
+      waTasks.push({ type: "whatsapp", fn: async () => {
+        if (await alreadySent(userId, race.raceId, race.messageType, "whatsapp")) { dupes++; return; }
+        const msg = await generateMessage(prompt);
+        if (!msg) { skipped++; return; }
+        const waText = toWhatsAppFormat(msg.plain);
+        const ok = await sendWhatsApp(waContact!.phone!, waText);
+        if (ok) { await logSent(userId, race.raceId, race.messageType, "whatsapp"); sent++; }
+        else { skipped++; }
+      }});
+    }
   }
 
-  // Execute in batches of 20
-  for (let i = 0; i < tasks.length; i += 20) {
-    const batch = tasks.slice(i, i + 20);
-    await Promise.allSettled(batch.map(fn => fn()));
+  // Execute Telegram tasks in batches of 20 (parallel, fast)
+  for (let i = 0; i < tgTasks.length; i += 20) {
+    const batch = tgTasks.slice(i, i + 20);
+    await Promise.allSettled(batch.map(t => t.fn()));
+  }
+
+  // Execute WhatsApp tasks sequentially with 1.5s delay, time-boxed at 50s
+  const waStart = Date.now();
+  for (const task of waTasks) {
+    if (Date.now() - waStart > 50_000) { skipped += waTasks.length; break; }
+    await task.fn();
+    await sleep(1500);
   }
 
   return { sent, skipped, dupes };

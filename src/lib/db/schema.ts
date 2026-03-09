@@ -499,6 +499,7 @@ export const userWhatsapp = pgTable("user_whatsapp", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull().unique(),
   phoneNumber: varchar("phone_number", { length: 20 }),
+  notificationFrequency: varchar("notification_frequency", { length: 20 }).default("key-moments"),
   connectToken: varchar("connect_token", { length: 64 }).unique(),
   connectedAt: timestamp("connected_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

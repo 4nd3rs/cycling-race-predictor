@@ -44,7 +44,7 @@ export default async function NotificationsPage() {
             {/* CTA — auth-aware */}
             <div className="max-w-md mx-auto">
               {user ? (
-                <WhatsAppGroupWidget initialPhone={whatsapp?.phoneNumber ?? null} />
+                <WhatsAppGroupWidget initialPhone={whatsapp?.phoneNumber ?? null} initialFrequency={whatsapp?.notificationFrequency ?? "key-moments"} />
               ) : (
                 <div className="rounded-lg border border-border/50 bg-card/20 p-5 space-y-3 text-left">
                   <p className="text-sm font-medium">Create a free account to join</p>

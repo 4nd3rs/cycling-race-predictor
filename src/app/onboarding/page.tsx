@@ -61,7 +61,7 @@ export default async function OnboardingPage() {
 
         {/* Connect section */}
         <div className="mb-6">
-          <WhatsAppGroupWidget initialPhone={whatsapp?.phoneNumber ?? null} />
+          <WhatsAppGroupWidget initialPhone={whatsapp?.phoneNumber ?? null} initialFrequency={whatsapp?.notificationFrequency ?? "key-moments"} />
         </div>
 
         {/* Primary CTA */}

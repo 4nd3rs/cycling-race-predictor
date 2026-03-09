@@ -49,10 +49,12 @@ export async function POST(req: NextRequest) {
   const user = await getAuthUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const { phone } = await req.json();
+  const { phone, frequency } = await req.json();
   if (!phone || typeof phone !== "string") {
     return NextResponse.json({ error: "phone is required" }, { status: 400 });
   }
+  const validFrequencies = ["all", "key-moments", "race-day-only", "off"];
+  const notifFrequency = validFrequencies.includes(frequency) ? frequency : "key-moments";
 
   const normalized = normalizePhone(phone.trim());
   if (!/^\+\d{7,15}$/.test(normalized)) {
@@ -63,12 +65,13 @@ export async function POST(req: NextRequest) {
   const existing = await db.select().from(userWhatsapp).where(eq(userWhatsapp.userId, user.id)).limit(1);
   if (existing.length > 0) {
     await db.update(userWhatsapp)
-      .set({ phoneNumber: normalized, connectedAt: new Date() })
+      .set({ phoneNumber: normalized, notificationFrequency: notifFrequency, connectedAt: new Date() })
       .where(eq(userWhatsapp.userId, user.id));
   } else {
     await db.insert(userWhatsapp).values({
       userId: user.id,
       phoneNumber: normalized,
+      notificationFrequency: notifFrequency,
       connectedAt: new Date(),
     });
   }
@@ -83,16 +86,22 @@ export async function POST(req: NextRequest) {
     });
 
   // Send welcome DM
+  const freqLabels: Record<string, string> = {
+    all: "all updates (previews, race day, results)",
+    "key-moments": "key moments (previews + results)",
+    "race-day-only": "results only",
+    off: "group messages only (no personal DMs)",
+  };
+  const freqNote = freqLabels[notifFrequency] ?? freqLabels["key-moments"];
+
   const welcomeMsg = `👋 Hi! You've registered on *Pro Cycling Predictor*.
 
 Here's your invite to our Road Cycling group — predictions, results, and race intel for every WorldTour race:
 
 👉 ${WA_GROUP_INVITE}
 
-In the group you'll get:
-🔮 Predictions before every WT race
-🏆 Podium posts right after the finish
-📰 Breaking news & rider intel
+Your personal DM notifications are set to: *${freqNote}*
+You can change this anytime on your profile.
 
 See you in there! 🚴
 _procyclingpredictor.com_`;

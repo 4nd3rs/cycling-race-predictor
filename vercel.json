@@ -60,6 +60,10 @@
     {
       "path": "/api/cron/wa-group-admin",
       "schedule": "0 10 * * *"
+    },
+    {
+      "path": "/api/cron/send-notifications",
+      "schedule": "50 */2 * * *"
     }
   ]
 }

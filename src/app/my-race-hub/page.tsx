@@ -434,7 +434,7 @@ export default async function MyRaceHubPage({ searchParams }: { searchParams: Pr
               <h2 className="text-base font-semibold mb-1">Notification Channels</h2>
               <p className="text-sm text-muted-foreground mb-4">Join the WhatsApp group to get race predictions, results and breaking news for every WorldTour race.</p>
               <div className="space-y-3">
-                <WhatsAppGroupWidget initialPhone={data.whatsapp?.phoneNumber ?? null} />
+                <WhatsAppGroupWidget initialPhone={data.whatsapp?.phoneNumber ?? null} initialFrequency={data.whatsapp?.notificationFrequency ?? "key-moments"} />
               </div>
             </section>
 
