@@ -138,6 +138,7 @@ function buildPrompt(
   race: RaceCandidate,
   topPreds: Array<{ riderName: string; position: number | null; winProb: number }>,
   followedRiders: Array<{ name: string; predictedPosition: number | null; teamName: string | null }>,
+  followedTeams: Array<{ teamName: string; riderCount: number; raceUrl: string }>,
   raceUrl: string,
 ): string {
   const isMTB = ["mtb", "xco"].includes(race.discipline);
@@ -198,12 +199,16 @@ ${predictionsText || "No predictions yet"}
 
 USER'S FOLLOWED RIDERS IN THIS RACE (confirmed on startlist):
 ${followedText}
-${followedRiders.length === 0 ? "(User follows this race event but none of their specific riders are on the startlist)" : ""}
-
+${followedRiders.length === 0 && followedTeams.length === 0 ? "(User follows this race event but none of their specific riders or teams are on the startlist)" : ""}
+${followedTeams.length > 0 ? `
+USER'S FOLLOWED TEAMS IN THIS RACE:
+${followedTeams.map(t => `${t.teamName} — ${t.riderCount} riders on the startlist (race link: ${t.raceUrl})`).join("\n")}
+` : ""}
 CRITICAL RULES:
 - ONLY mention riders who are listed above. Do NOT invent or assume any rider is racing.
 - Every followed rider listed above MUST be mentioned by name in the message.
-- This is personalized — the followed riders section is the most important part of the message.
+- If a followed team is listed, mention the team by name and include the race link. Keep it brief — just note they're racing here with X riders.
+- This is personalized — the followed riders and teams sections are the most important parts of the message.
 
 TONE GUIDE:
 - Write like a knowledgeable cycling analyst talking directly to a fan about their riders
@@ -359,16 +364,7 @@ async function processRace(race: RaceCandidate): Promise<{ sent: number; skipped
 
   if (followRows.length === 0) return { sent: 0, skipped: 0, dupes: 0 };
 
-  // Resolve team follows → rider IDs on this startlist
-  const teamToRiders = new Map<string, string[]>();
-  for (const s of startlist) {
-    if (s.teamId) {
-      if (!teamToRiders.has(s.teamId)) teamToRiders.set(s.teamId, []);
-      teamToRiders.get(s.teamId)!.push(s.riderId);
-    }
-  }
-
-  // Group by user
+  // Group by user — keep rider follows and team follows separate
   const userMap = new Map<string, { riderIds: Set<string>; teamIds: string[]; followsEvent: boolean }>();
   for (const row of followRows) {
     if (!userMap.has(row.userId)) userMap.set(row.userId, { riderIds: new Set(), teamIds: [], followsEvent: false });
@@ -377,9 +373,6 @@ async function processRace(race: RaceCandidate): Promise<{ sent: number; skipped
       e.riderIds.add(row.entityId);
     } else if (row.followType === "team") {
       e.teamIds.push(row.entityId);
-      // Also add the team's riders from the startlist as followed
-      const teamRiders = teamToRiders.get(row.entityId) || [];
-      for (const rid of teamRiders) e.riderIds.add(rid);
     } else {
       e.followsEvent = true;
     }
@@ -453,6 +446,18 @@ async function processRace(race: RaceCandidate): Promise<{ sent: number; skipped
       followedRiders = riderPreds.map(r => ({ name: r.name, predictedPosition: r.pos, teamName: r.teamName }));
     }
 
+    // Get followed team info — team name + number of riders on startlist
+    let followedTeams: Array<{ teamName: string; riderCount: number; raceUrl: string }> = [];
+    if (data.teamIds.length > 0) {
+      for (const teamId of data.teamIds) {
+        const teamInfo = await db.select({ name: teams.name }).from(teams).where(eq(teams.id, teamId)).limit(1);
+        const riderCount = startlist.filter(s => s.teamId === teamId).length;
+        if (teamInfo.length > 0 && riderCount > 0) {
+          followedTeams.push({ teamName: teamInfo[0].name, riderCount, raceUrl });
+        }
+      }
+    }
+
     const prompt = buildPrompt(
       race,
       topPreds.map(p => ({
@@ -461,6 +466,7 @@ async function processRace(race: RaceCandidate): Promise<{ sent: number; skipped
         winProb: parseFloat(String(p.winProb || "0")),
       })),
       followedRiders,
+      followedTeams,
       raceUrl,
     );
 
