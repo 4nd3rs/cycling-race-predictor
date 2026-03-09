@@ -9,7 +9,7 @@ import { desc, eq, gte, lt, and, sql, isNotNull, isNull, asc } from "drizzle-orm
 import { format, formatDistanceToNow } from "date-fns";
 import { toRaceDate, toDateStr, calendarDaysUntil, todayStr } from "@/lib/utils";
 import { getFlag } from "@/lib/country-flags";
-import { buildEventUrl, buildRaceUrl, getDisciplineShortLabel, normalizeUciCategory, getDisciplineColor } from "@/lib/url-utils";
+import { buildEventUrl, buildRaceUrl, buildStageUrl, getDisciplineShortLabel, normalizeUciCategory, getDisciplineColor } from "@/lib/url-utils";
 import { EventListView } from "@/components/event-card";
 import { MyFeedWidget } from "@/components/my-feed-widget";
 import { DisciplineFilter, CalendarFilters } from "@/components/race-filters";
@@ -787,12 +787,23 @@ function NextRaceHero({
           </div>
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-            {stageProgress.todayStage && (
-              <span className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                <span className="font-semibold text-foreground">Stage {stageProgress.todayStage.number} today</span>
-              </span>
-            )}
+            {stageProgress.todayStage && (() => {
+              const eliteCat = ev.categories.find(c => c.ageCategory === "elite" && c.categorySlug);
+              const stageUrl = ev.slug && eliteCat?.categorySlug
+                ? buildStageUrl(ev.discipline, ev.slug, eliteCat.categorySlug, stageProgress.todayStage.number)
+                : null;
+              return stageUrl ? (
+                <Link href={stageUrl} prefetch={false} className="flex items-center gap-1.5 hover:text-primary transition-colors">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                  <span className="font-semibold text-foreground">Stage {stageProgress.todayStage.number} today</span>
+                </Link>
+              ) : (
+                <span className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                  <span className="font-semibold text-foreground">Stage {stageProgress.todayStage.number} today</span>
+                </span>
+              );
+            })()}
             {stageProgress.gcLeader && (
               <span className="flex items-center gap-1.5 text-muted-foreground">
                 <span className="text-yellow-500">&#9679;</span>
