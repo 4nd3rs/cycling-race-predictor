@@ -100,7 +100,16 @@ async function searchRiders(query: string): Promise<RiderRow[]> {
       .orderBy(desc(riderDisciplineStats.uciPoints))
       .limit(60);
 
-    return results.map((r) => ({
+    // Deduplicate by rider ID — keep the row with most UCI points
+    const byRider = new Map<string, (typeof results)[number]>();
+    for (const r of results) {
+      const existing = byRider.get(r.id);
+      if (!existing || (r.uciPoints ?? 0) > (existing.uciPoints ?? 0) || (r.racesTotal ?? 0) > (existing.racesTotal ?? 0)) {
+        byRider.set(r.id, r);
+      }
+    }
+
+    return Array.from(byRider.values()).map((r) => ({
       ...r,
       currentElo: parseFloat(r.currentElo || "0"),
       winsTotal: r.winsTotal || 0,
