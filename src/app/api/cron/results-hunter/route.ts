@@ -156,14 +156,13 @@ async function ensureStageRecords(
 
   const metadata = await scrapeStageMetadata(pcsUrl, stageCount);
 
-  // Enrich existing stages missing profile/distance data
+  // Enrich existing stages with profile/distance data from PCS
   for (const existing of existingStages) {
-    if (existing.profileType && existing.distanceKm) continue;
     const meta = metadata.find(m => m.stageNumber === existing.stageNumber);
     if (!meta) continue;
     const updates: Record<string, string | null> = {};
-    if (!existing.profileType && meta.profileType) updates.profileType = meta.profileType;
-    if (!existing.distanceKm && meta.distanceKm) updates.distanceKm = meta.distanceKm;
+    if (meta.profileType && meta.profileType !== existing.profileType) updates.profileType = meta.profileType;
+    if (meta.distanceKm && !existing.distanceKm) updates.distanceKm = meta.distanceKm;
     if (Object.keys(updates).length > 0) {
       await db.update(races).set(updates).where(eq(races.id, existing.id));
       console.log(`[results-hunter] Enriched stage ${existing.stageNumber} with ${Object.keys(updates).join(", ")}`);

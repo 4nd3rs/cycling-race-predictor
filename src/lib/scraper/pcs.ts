@@ -826,23 +826,34 @@ async function fetchStageOverview(pcsUrl: string): Promise<{ stageCount: number;
 
     const distMatch = text.match(/(\d{2,3}(?:\.\d)?)\s*km/i);
 
-    let profileType: string | null = null;
-    const profileText = text.toLowerCase();
-    if (profileText.includes("mountain") || profileText.includes("summit")) profileType = "mountain";
-    else if (profileText.includes("hilly")) profileType = "hilly";
-    else if (profileText.includes("flat")) profileType = "flat";
-    else if (profileText.includes("itt") || profileText.includes("time trial")) profileType = "tt";
-
-    // Check for PCS profile icons (classes like p1-p5)
-    const profileIcon = row.find("[class*='icon profile']").attr("class") || row.find("span[class*='p']").attr("class") || "";
-    if (profileIcon.includes("p4") || profileIcon.includes("p5")) profileType = "mountain";
-    else if (profileIcon.includes("p3")) profileType = "hilly";
-    else if (profileIcon.includes("p2")) profileType = "hilly";
-    else if (profileIcon.includes("p1")) profileType = "flat";
-
-    // Also check for ITT/TTT in stage name
     const stageName = $(el).text().trim() || `Stage ${num}`;
-    if (!profileType && /\bITT\b|\bTTT\b/i.test(stageName)) profileType = "tt";
+
+    // Determine profile type: icons first, then text fallback
+    let profileType: string | null = null;
+
+    // PCS profile icons have classes like "icon profile p2"
+    const profileIcon = row.find("span.icon.profile, .icon.profile").attr("class") || "";
+    const pMatch = profileIcon.match(/\bp([1-5])\b/);
+    if (pMatch) {
+      const pNum = parseInt(pMatch[1], 10);
+      if (pNum === 1) profileType = "flat";
+      else if (pNum <= 3) profileType = "hilly";
+      else profileType = "mountain";
+    }
+
+    // ITT/TTT detection from stage name (overrides profile icon)
+    if (/\bITT\b|\bTTT\b/i.test(stageName) || /\bITT\b|\bTTT\b/i.test(text)) {
+      profileType = "tt";
+    }
+
+    // Text fallback if no icon found
+    if (!profileType) {
+      const profileText = text.toLowerCase();
+      if (profileText.includes("mountain") || profileText.includes("summit")) profileType = "mountain";
+      else if (profileText.includes("hilly")) profileType = "hilly";
+      else if (profileText.includes("flat")) profileType = "flat";
+      else if (profileText.includes("time trial")) profileType = "tt";
+    }
 
     stages.push({
       stageNumber: num,
