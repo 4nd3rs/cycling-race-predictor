@@ -5,10 +5,9 @@ import {
   races,
   riders,
   raceResults,
-  teams,
 } from "@/lib/db";
-import { and, ilike, eq, lt, lte, gte, asc, desc } from "drizzle-orm";
-import { scrapeRaceResults } from "@/lib/scraper/pcs";
+import { and, ilike, eq, lte, gte, asc, desc, isNull, sql } from "drizzle-orm";
+import { scrapeRaceResults, detectStageCount, scrapeStageMetadata } from "@/lib/scraper/pcs";
 import {
   notifyRaceEventCombined,
   notifyRiderFollowers,
@@ -17,7 +16,7 @@ import {
   type RaceSection,
 } from "@/lib/notify-followers";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
@@ -77,9 +76,203 @@ async function findOrCreateRider(name: string): Promise<string> {
   return newRider.id;
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function isStageRace(race: { raceType: string | null; endDate: string | null; date: string }): boolean {
+  return race.raceType === "stage_race" || (race.endDate !== null && race.endDate !== race.date);
+}
+
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+/** Import scraped results into a race record, returns count of inserted results */
+async function importResults(
+  raceId: string,
+  scrapedResults: Awaited<ReturnType<typeof scrapeRaceResults>>
+): Promise<number> {
+  let insertedCount = 0;
+  for (const result of scrapedResults) {
+    // Find rider by pcsId first, then by name
+    let riderId: string | null = null;
+    if (result.riderPcsId) {
+      const [rider] = await db
+        .select({ id: riders.id })
+        .from(riders)
+        .where(eq(riders.pcsId, result.riderPcsId))
+        .limit(1);
+      if (rider) riderId = rider.id;
+    }
+    if (!riderId && result.riderName) {
+      try {
+        riderId = await findOrCreateRider(result.riderName);
+      } catch { continue; }
+    }
+    if (!riderId) continue;
+
+    // Check if result already exists
+    const [existing] = await db
+      .select({ id: raceResults.id })
+      .from(raceResults)
+      .where(and(eq(raceResults.raceId, raceId), eq(raceResults.riderId, riderId)))
+      .limit(1);
+
+    if (existing) continue;
+
+    await db
+      .insert(raceResults)
+      .values({
+        raceId,
+        riderId,
+        position: result.position,
+        dnf: result.dnf,
+        dns: result.dns,
+        pointsUci: result.uciPoints,
+        pointsPcs: result.pcsPoints,
+      })
+      .onConflictDoNothing();
+
+    insertedCount++;
+  }
+  return insertedCount;
+}
+
+/** Ensure child stage records exist for a stage race */
+async function ensureStageRecords(
+  race: { id: string; name: string; date: string; endDate: string | null; discipline: string; ageCategory: string | null; gender: string | null; pcsUrl: string },
+  stageCount: number,
+): Promise<void> {
+  const existingStages = await db
+    .select({ stageNumber: races.stageNumber })
+    .from(races)
+    .where(eq(races.parentRaceId, race.id));
+
+  const existingNumbers = new Set(existingStages.map(s => s.stageNumber).filter(Boolean));
+  const missingStages: number[] = [];
+  for (let i = 1; i <= stageCount; i++) {
+    if (!existingNumbers.has(i)) missingStages.push(i);
+  }
+
+  if (missingStages.length === 0) {
+    console.log(`[results-hunter] All ${stageCount} stage records exist for ${race.name}`);
+    return;
+  }
+
+  console.log(`[results-hunter] Creating ${missingStages.length} stage records for ${race.name}`);
+
+  const metadata = await scrapeStageMetadata(race.pcsUrl, stageCount);
+
+  const startDate = new Date(race.date);
+  const endDate = race.endDate ? new Date(race.endDate) : new Date(startDate.getTime() + stageCount * 86400000);
+  const totalDays = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86400000));
+
+  // Get parent race's raceEventId
+  const [parentRow] = await db
+    .select({ raceEventId: races.raceEventId, uciCategory: races.uciCategory, country: races.country })
+    .from(races)
+    .where(eq(races.id, race.id))
+    .limit(1);
+
+  for (const stageNum of missingStages) {
+    const meta = metadata.find(m => m.stageNumber === stageNum);
+
+    let stageDate: string;
+    if (meta?.date) {
+      stageDate = meta.date;
+    } else {
+      const dayOffset = Math.round(((stageNum - 1) / Math.max(1, stageCount - 1)) * totalDays);
+      const d = new Date(startDate.getTime() + dayOffset * 86400000);
+      stageDate = d.toISOString().split("T")[0];
+    }
+
+    const stageName = meta?.name || `Stage ${stageNum}`;
+
+    await db.insert(races).values({
+      name: `${race.name} - ${stageName}`,
+      date: stageDate,
+      discipline: race.discipline,
+      raceType: "stage",
+      profileType: meta?.profileType ?? null,
+      ageCategory: race.ageCategory ?? "elite",
+      gender: race.gender ?? "men",
+      distanceKm: meta?.distanceKm ?? null,
+      parentRaceId: race.id,
+      stageNumber: stageNum,
+      raceEventId: parentRow?.raceEventId ?? null,
+      uciCategory: parentRow?.uciCategory ?? null,
+      country: parentRow?.country ?? null,
+      pcsUrl: `${race.pcsUrl}/stage-${stageNum}`,
+      status: "active",
+    });
+  }
+
+  console.log(`[results-hunter] Created ${missingStages.length} stage records`);
+}
+
+/** Send notifications for race results */
+async function notifyResults(
+  race: { id: string; name: string; gender: string | null },
+  label?: string,
+): Promise<void> {
+  try {
+    const raceEventId = await getRaceEventId(race.id);
+    if (!raceEventId) return;
+    const eventInfo = await getRaceEventInfo(raceEventId);
+    if (!eventInfo) return;
+
+    const top3 = await db
+      .select({ name: riders.name, riderId: raceResults.riderId, position: raceResults.position })
+      .from(raceResults)
+      .innerJoin(riders, eq(raceResults.riderId, riders.id))
+      .where(eq(raceResults.raceId, race.id))
+      .orderBy(asc(raceResults.position))
+      .limit(3);
+
+    if (top3.length === 0) return;
+
+    const raceUrl = eventInfo.slug
+      ? `https://procyclingpredictor.com/races/${eventInfo.discipline}/${eventInfo.slug}`
+      : `https://procyclingpredictor.com`;
+
+    const podiumLines = top3
+      .map((r, i) => `${["🥇", "🥈", "🥉"][i]} ${r.name}`)
+      .join("\n");
+
+    const displayName = label ?? eventInfo.name;
+    const genderLabel = race.gender === "women" ? "👩 Elite Women" : "👨 Elite Men";
+    const section: RaceSection = {
+      raceId: race.id,
+      categoryLabel: genderLabel,
+      tgSection: podiumLines,
+      waSection: podiumLines.replace(/<[^>]+>/g, ""),
+    };
+
+    await notifyRaceEventCombined(
+      raceEventId,
+      [section],
+      `🏆 <b>Results are in for ${displayName}!</b>`,
+      `🏆 Results are in for ${displayName}!`,
+      `👉 <a href="${raceUrl}">Full results on Pro Cycling Predictor</a>`,
+      `👉 ${raceUrl}`,
+      `result`
+    );
+
+    for (const rider of top3) {
+      const positions = ["won", "finished 2nd in", "finished 3rd in"];
+      const riderMsg = [
+        `🚴 <b>${rider.name} ${positions[rider.position! - 1] ?? `finished P${rider.position} in`} ${displayName}!</b>`,
+        ``,
+        `👉 <a href="${raceUrl}">See full results on Pro Cycling Predictor</a>`,
+      ].join("\n");
+      await notifyRiderFollowers(rider.riderId, riderMsg);
+    }
+  } catch (notifyErr) {
+    console.error(`[results-hunter] Notification error for ${race.name}:`, notifyErr);
+  }
+}
+
 // ── Main handler ──────────────────────────────────────────────────────────────
 
 export async function GET() {
+  const startTime = Date.now();
   const isAuthorized = await verifyCronAuth();
   if (!isAuthorized) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -88,147 +281,163 @@ export async function GET() {
   const results: Array<{ race: string; status: string; count?: number }> = [];
 
   try {
-    // Find active races with dates in the past that still have no results
     const today = new Date().toISOString().split("T")[0];
-    // Only look at races in the last 14 days, newest first
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().split("T")[0];
     const cutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-    const racesWithoutResults = await db
+
+    // Exclude child stage records (they have parentRaceId set)
+    const notChildStage = isNull(races.parentRaceId);
+
+    // Q1: races that started within the lookback window
+    const q1 = await db
       .select()
       .from(races)
       .where(
         and(
           lte(races.date, today),
           gte(races.date, cutoff),
-          eq(races.status, "active")
+          eq(races.status, "active"),
+          notChildStage
         )
       )
       .orderBy(desc(races.date))
-      .limit(20); // Fetch more since many will be skipped (no pcs_url)
+      .limit(20);
 
-    for (const race of racesWithoutResults) {
+    // Q2: stage races started before window but ending within it (ongoing tours)
+    const q2 = await db
+      .select()
+      .from(races)
+      .where(
+        and(
+          sql`(${races.raceType} = 'stage_race' OR ${races.endDate} IS NOT NULL)`,
+          sql`${races.date} < ${cutoff}`,
+          sql`${races.endDate} >= ${cutoff}`,
+          sql`${races.endDate} <= ${tomorrow}`,
+          eq(races.status, "active"),
+          notChildStage
+        )
+      )
+      .orderBy(desc(races.date))
+      .limit(10);
+
+    // Deduplicate
+    const seen = new Set<string>();
+    const racesToProcess = [...q1, ...q2].filter(r => {
+      if (seen.has(r.id)) return false;
+      seen.add(r.id);
+      return true;
+    });
+
+    for (const race of racesToProcess) {
+      // Time safety: stop 30s before maxDuration
+      if (Date.now() - startTime > (maxDuration - 30) * 1000) {
+        console.log(`[results-hunter] Approaching timeout, stopping early`);
+        break;
+      }
+
       if (!race.pcsUrl) {
         results.push({ race: race.name, status: "skipped_no_pcs_url" });
         continue;
       }
 
       try {
-        const resultUrl = race.pcsUrl.endsWith("/result") ? race.pcsUrl : `${race.pcsUrl}/result`;
-        const scrapedResults = await scrapeRaceResults(resultUrl);
+        if (isStageRace(race)) {
+          // ── Stage race handling ──────────────────────────────────────────
+          const stageCount = await detectStageCount(race.pcsUrl);
+          console.log(`[results-hunter] ${race.name}: ${stageCount} stages detected`);
 
-        if (scrapedResults.length === 0) {
-          results.push({ race: race.name, status: "no_results_found" });
-          continue;
-        }
+          if (stageCount === 0) {
+            // Fallback: try as one-day race
+            const scrapedResults = await scrapeRaceResults(`${race.pcsUrl}/result`);
+            if (scrapedResults.length > 0) {
+              const count = await importResults(race.id, scrapedResults);
+              if (count > 0) {
+                await db.update(races).set({ status: "completed", updatedAt: new Date() }).where(eq(races.id, race.id));
+                await notifyResults(race);
+              }
+              results.push({ race: race.name, status: "success", count });
+            } else {
+              results.push({ race: race.name, status: "no_stages_detected" });
+            }
+            continue;
+          }
 
-        let insertedCount = 0;
-        for (const result of scrapedResults) {
-          // Find rider in database
-          const [rider] = await db
-            .select()
-            .from(riders)
-            .where(eq(riders.pcsId, result.riderPcsId))
-            .limit(1);
+          // Create missing child stage records
+          await ensureStageRecords(race, stageCount);
 
-          if (!rider) continue;
+          // Get all child stage records
+          const stageRecords = await db
+            .select({ id: races.id, stageNumber: races.stageNumber, status: races.status, name: races.name })
+            .from(races)
+            .where(eq(races.parentRaceId, race.id))
+            .orderBy(races.stageNumber);
 
-          // Check if result already exists
-          const [existing] = await db
-            .select({ id: raceResults.id })
-            .from(raceResults)
-            .where(
-              and(eq(raceResults.raceId, race.id), eq(raceResults.riderId, rider.id))
-            )
-            .limit(1);
+          let totalStageInserts = 0;
 
-          if (existing) continue;
+          // Scrape per-stage results
+          for (const stageRec of stageRecords) {
+            if (Date.now() - startTime > (maxDuration - 30) * 1000) break;
+            if (!stageRec.stageNumber) continue;
+            if (stageRec.status === "completed") continue;
 
-          await db
-            .insert(raceResults)
-            .values({
-              raceId: race.id,
-              riderId: rider.id,
-              position: result.position,
-              dnf: result.dnf,
-              dns: result.dns,
-              pointsUci: result.uciPoints,
-              pointsPcs: result.pcsPoints,
-            })
-            .onConflictDoNothing();
+            const stageResults = await scrapeRaceResults(
+              `${race.pcsUrl}/stage-${stageRec.stageNumber}/result`
+            );
 
-          insertedCount++;
-        }
+            if (stageResults.length >= 5) {
+              const count = await importResults(stageRec.id, stageResults);
+              totalStageInserts += count;
+              if (count > 0) {
+                await db.update(races)
+                  .set({ status: "completed", updatedAt: new Date() })
+                  .where(eq(races.id, stageRec.id));
+                console.log(`[results-hunter] Stage ${stageRec.stageNumber}: ${count} results imported`);
+              }
+            }
 
-        // Only mark completed if we actually inserted results
-        if (insertedCount > 0) {
-          await db
-            .update(races)
-            .set({ status: "completed", updatedAt: new Date() })
-            .where(eq(races.id, race.id));
-        }
+            await sleep(1500);
+          }
 
-        results.push({
-          race: race.name,
-          status: "success",
-          count: insertedCount,
-        });
-
-        // Notify followers about results
-        try {
-          const raceEventId = await getRaceEventId(race.id);
-          if (raceEventId) {
-            const eventInfo = await getRaceEventInfo(raceEventId);
-            if (eventInfo) {
-              const top3 = await db
-                .select({ name: riders.name, riderId: raceResults.riderId, position: raceResults.position })
-                .from(raceResults)
-                .innerJoin(riders, eq(raceResults.riderId, riders.id))
-                .where(eq(raceResults.raceId, race.id))
-                .orderBy(asc(raceResults.position))
-                .limit(3);
-
-              if (top3.length > 0) {
-                const raceUrl = eventInfo.slug
-                  ? `https://procyclingpredictor.com/races/${eventInfo.discipline}/${eventInfo.slug}`
-                  : `https://procyclingpredictor.com`;
-
-                const podiumLines = top3
-                  .map((r, i) => `${["🥇", "🥈", "🥉"][i]} ${r.name}`)
-                  .join("\n");
-
-                const raceGender = race.gender;
-                const genderLabel = raceGender === "women" ? "👩 Elite Women" : "👨 Elite Men";
-                const section: RaceSection = {
-                  raceId: race.id,
-                  categoryLabel: genderLabel,
-                  tgSection: podiumLines,
-                  waSection: podiumLines.replace(/<[^>]+>/g, ""),
-                };
-
-                await notifyRaceEventCombined(
-                  raceEventId,
-                  [section],
-                  `🏆 <b>Results are in for ${eventInfo.name}!</b>`,
-                  `🏆 Results are in for ${eventInfo.name}!`,
-                  `👉 <a href="${raceUrl}">Full results on Pro Cycling Predictor</a>`,
-                  `👉 ${raceUrl}`,
-                  `result`
-                );
-
-                // Notify individual top-3 rider followers
-                for (const rider of top3) {
-                  const positions = ["won", "finished 2nd in", "finished 3rd in"];
-                  const riderMsg = [
-                    `🚴 <b>${rider.name} ${positions[rider.position! - 1] ?? `finished P${rider.position} in`} ${eventInfo.name}!</b>`,
-                    ``,
-                    `👉 <a href="${raceUrl}">See full results on Pro Cycling Predictor</a>`,
-                  ].join("\n");
-                  await notifyRiderFollowers(rider.riderId, riderMsg);
-                }
+          // Check if race is finished — scrape GC
+          const raceEnd = race.endDate ?? race.date;
+          if (today >= raceEnd) {
+            const gcResults = await scrapeRaceResults(`${race.pcsUrl}/gc`);
+            if (gcResults.length > 0) {
+              const gcCount = await importResults(race.id, gcResults);
+              if (gcCount > 0) {
+                await db.update(races)
+                  .set({ status: "completed", updatedAt: new Date() })
+                  .where(eq(races.id, race.id));
+                await notifyResults(race);
+                console.log(`[results-hunter] GC: ${gcCount} results imported`);
               }
             }
           }
-        } catch (notifyErr) {
-          console.error(`[results-hunter] Notification error for ${race.name}:`, notifyErr);
+
+          results.push({ race: race.name, status: "success", count: totalStageInserts });
+        } else {
+          // ── One-day race handling (unchanged) ──────────────────────────
+          const resultUrl = race.pcsUrl.endsWith("/result") ? race.pcsUrl : `${race.pcsUrl}/result`;
+          const scrapedResults = await scrapeRaceResults(resultUrl);
+
+          if (scrapedResults.length === 0) {
+            results.push({ race: race.name, status: "no_results_found" });
+            continue;
+          }
+
+          const insertedCount = await importResults(race.id, scrapedResults);
+
+          if (insertedCount > 0) {
+            await db.update(races)
+              .set({ status: "completed", updatedAt: new Date() })
+              .where(eq(races.id, race.id));
+          }
+
+          results.push({ race: race.name, status: "success", count: insertedCount });
+
+          if (insertedCount > 0) {
+            await notifyResults(race);
+          }
         }
       } catch (error) {
         console.error(`[results-hunter] Error processing ${race.name}:`, error);
