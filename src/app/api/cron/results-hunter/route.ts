@@ -360,10 +360,22 @@ export async function GET() {
         if (isStageRace(race)) {
           // ── Stage race handling ──────────────────────────────────────────
           const stageCount = await detectStageCount(race.pcsUrl);
-          console.log(`[results-hunter] ${race.name}: ${stageCount} stages detected`);
+          console.log(`[results-hunter] ${race.name}: ${stageCount} stages detected from PCS`);
 
-          if (stageCount === 0) {
-            // Fallback: try as one-day race
+          // Create missing child stage records (if any detected)
+          if (stageCount > 0) {
+            await ensureStageRecords(race, stageCount);
+          }
+
+          // Get all child stage records (may already exist from previous run)
+          const stageRecords = await db
+            .select({ id: races.id, stageNumber: races.stageNumber, status: races.status, name: races.name })
+            .from(races)
+            .where(eq(races.parentRaceId, race.id))
+            .orderBy(races.stageNumber);
+
+          if (stageRecords.length === 0) {
+            // No stages exist and none detected — try as one-day race
             const scrapedResults = await scrapeRaceResults(`${race.pcsUrl}/result`);
             if (scrapedResults.length > 0) {
               const count = await importResults(race.id, scrapedResults);
@@ -377,16 +389,6 @@ export async function GET() {
             }
             continue;
           }
-
-          // Create missing child stage records
-          await ensureStageRecords(race, stageCount);
-
-          // Get all child stage records
-          const stageRecords = await db
-            .select({ id: races.id, stageNumber: races.stageNumber, status: races.status, name: races.name })
-            .from(races)
-            .where(eq(races.parentRaceId, race.id))
-            .orderBy(races.stageNumber);
 
           let totalStageInserts = 0;
 

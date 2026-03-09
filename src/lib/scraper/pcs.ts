@@ -799,7 +799,14 @@ export interface StageMetadata {
 
 /** Fetch and parse the PCS overview page for a stage race (shared by detectStageCount + scrapeStageMetadata) */
 async function fetchStageOverview(pcsUrl: string): Promise<{ stageCount: number; stages: StageMetadata[] }> {
-  const html = await rateLimitedFetch(pcsUrl);
+  // Try rendered fetch first (captures CSS profile icons), fall back to light fetch
+  let html: string;
+  try {
+    html = await rateLimitedFetch(pcsUrl);
+  } catch {
+    console.warn(`[pcs] Rendered fetch failed for ${pcsUrl}, trying light fetch`);
+    html = await lightFetch(pcsUrl);
+  }
   const $ = cheerio.load(html);
 
   const stages: StageMetadata[] = [];
