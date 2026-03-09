@@ -16,6 +16,8 @@ import {
 } from "@/lib/url-utils";
 import { formatCategoryDisplay } from "@/lib/category-utils";
 
+export const revalidate = 300; // revalidate every 5 minutes
+
 interface PageProps {
   params: Promise<{
     discipline: string;
