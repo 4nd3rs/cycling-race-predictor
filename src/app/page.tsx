@@ -71,7 +71,7 @@ function getBuzzScore(hypeScore: number, newsCount: number, daysUntil: number): 
   return hypeScore + (newsCount * 2) + proximityBonus;
 }
 
-async function getHighHypeRaces(discipline?: string | null, gender?: string | null): Promise<{ hero: HomepageEvent | null; calendar: HomepageEvent[] }> {
+async function getHighHypeRaces(discipline?: string | null, gender?: string | null): Promise<{ heroes: HomepageEvent[]; calendar: HomepageEvent[] }> {
   const today = todayStr();
   try {
     const conditions: Parameters<typeof and>[0][] = [gte(raceEvents.date, today), eq(races.status, "active"), isNull(races.parentRaceId)];
@@ -139,25 +139,39 @@ async function getHighHypeRaces(discipline?: string | null, gender?: string | nu
     const highHype = allGrouped.filter(e => e.hypeScore >= HOMEPAGE_HYPE_MIN);
     const pool = highHype.length > 0 ? highHype : allGrouped;
 
-    // Pick hero by buzz score (hype + news + proximity), not just chronological order
-    const now = new Date();
+    // Pick heroes by buzz score — show up to 2 concurrent big races
     const heroPool = pool.filter(e => {
       const d = calendarDaysUntil(e.date);
-      return d >= 0 && d <= 7; // Only consider races in the next 7 days as potential hero
-    });
-    const fallbackPool = pool; // if nothing in 7 days, use soonest high-hype
+      return d >= -1 && d <= 7; // happening now or within 7 days (include endDate overlap)
+    }).concat(
+      // Also include races whose endDate hasn't passed yet (ongoing stage races)
+      pool.filter(e => {
+        if (!e.endDate) return false;
+        const endDays = calendarDaysUntil(e.endDate);
+        const startDays = calendarDaysUntil(e.date);
+        return endDays >= 0 && startDays < 0; // already started, not yet finished
+      })
+    );
+    // Deduplicate
+    const heroPoolDeduped = [...new Map(heroPool.map(e => [e.id, e])).values()];
+    const fallbackPool = pool;
 
-    const scoredPool = (heroPool.length > 0 ? heroPool : fallbackPool).map(e => ({
+    const scoredPool = (heroPoolDeduped.length > 0 ? heroPoolDeduped : fallbackPool).map(e => ({
       event: e,
-      buzzScore: getBuzzScore(e.hypeScore, e.newsCount, calendarDaysUntil(e.date)),
+      buzzScore: getBuzzScore(e.hypeScore, e.newsCount, Math.max(0, calendarDaysUntil(e.date))),
     })).sort((a, b) => b.buzzScore - a.buzzScore);
 
-    const hero = scoredPool[0]?.event ?? null;
-    const calendar = pool.filter(e => e.id !== hero?.id).slice(0, 20);
+    // Take top 2 heroes if the second one is also high-hype (buzz >= 80)
+    const heroes: HomepageEvent[] = [];
+    if (scoredPool[0]) heroes.push(scoredPool[0].event);
+    if (scoredPool[1] && scoredPool[1].buzzScore >= 80) heroes.push(scoredPool[1].event);
 
-    return { hero, calendar };
+    const heroIds = new Set(heroes.map(h => h.id));
+    const calendar = pool.filter(e => !heroIds.has(e.id)).slice(0, 20);
+
+    return { heroes, calendar };
   } catch {
-    return { hero: null, calendar: [] };
+    return { heroes: [], calendar: [] };
   }
 }
 
@@ -354,7 +368,7 @@ async function getHeroStageProgress(event: HomepageEvent): Promise<StageProgress
 }
 
 /** Fetch top 5 predictions per elite race category for the hero event */
-async function getHeroPredictions(event: HomepageEvent): Promise<Map<string, Array<{ name: string; winPct: number; photoUrl: string | null }>>> {
+async function getHeroPredictions(event: HomepageEvent): Promise<Map<string, Array<{ riderId: string; name: string; winPct: number; photoUrl: string | null }>>> {
   const eliteCategories = event.categories.filter(c => c.ageCategory === "elite");
   if (eliteCategories.length === 0) return new Map();
   try {
@@ -380,7 +394,7 @@ async function getHeroPredictions(event: HomepageEvent): Promise<Map<string, Arr
         };
       })
     );
-    const map = new Map<string, Array<{ name: string; winPct: number; photoUrl: string | null }>>();
+    const map = new Map<string, Array<{ riderId: string; name: string; winPct: number; photoUrl: string | null }>>();
     for (const { gender, picks } of results) {
       if (picks.length > 0) map.set(gender, picks);
     }
@@ -517,7 +531,7 @@ export default async function Home({ searchParams }: HomePageProps) {
   const filterCat = catParam && catParam !== "all" ? catParam : null;
   const hasFilters = !!(filterDiscipline || filterGender || filterCountry || filterCat);
 
-  const [{ hero: nextRace, calendar: highHypeRaces }, latestIntel, recentResults, filteredRaces, calendarCountries] = await Promise.all([
+  const [{ heroes: heroRaces, calendar: highHypeRaces }, latestIntel, recentResults, filteredRaces, calendarCountries] = await Promise.all([
     getHighHypeRaces(filterDiscipline, filterGender),
     getLatestIntel(),
     getRecentResults(),
@@ -525,11 +539,16 @@ export default async function Home({ searchParams }: HomePageProps) {
     getUpcomingCountries(),
   ]);
   const upcomingRaces = hasFilters ? filteredRaces : highHypeRaces;
-  const [heroPredictions, heroStageProgress, heroAiPreview] = await Promise.all([
-    nextRace ? getHeroPredictions(nextRace) : Promise.resolve(new Map()),
-    nextRace ? getHeroStageProgress(nextRace) : Promise.resolve(null),
-    nextRace ? getHeroAiPreview(nextRace) : Promise.resolve(null),
-  ]);
+
+  // Fetch predictions, stage progress, and AI preview for each hero race
+  const heroData = await Promise.all(
+    heroRaces.map(async (ev) => ({
+      event: ev,
+      predictions: await getHeroPredictions(ev),
+      stageProgress: await getHeroStageProgress(ev),
+      aiPreview: await getHeroAiPreview(ev),
+    }))
+  );
 
   return (
     <div className="min-h-screen flex flex-col overflow-x-hidden">
@@ -552,11 +571,11 @@ export default async function Home({ searchParams }: HomePageProps) {
           </div>
         </div>
 
-        {/* ---- NEXT RACE SPOTLIGHT ---- */}
-        {(() => {
-          const raceImg = nextRace ? getRaceImage(nextRace.slug) : null;
+        {/* ---- RACE SPOTLIGHT(S) ---- */}
+        {heroData.length > 0 ? heroData.map((hero, idx) => {
+          const raceImg = getRaceImage(hero.event.slug);
           return (
-            <section className="border-b border-border/50 relative overflow-hidden">
+            <section key={hero.event.id} className={`${idx < heroData.length - 1 ? "border-b border-border/30" : "border-b border-border/50"} relative overflow-hidden`}>
               {raceImg && (
                 <>
                   <div
@@ -565,7 +584,6 @@ export default async function Home({ searchParams }: HomePageProps) {
                   />
                   <div className="absolute inset-0 bg-gradient-to-r from-background via-background/85 to-background/40" />
                   <div className="absolute inset-0 bg-gradient-to-t from-background/60 via-transparent to-transparent" />
-                  {/* Photo credit */}
                   <a
                     href={raceImg.commonsUrl}
                     target="_blank"
@@ -576,18 +594,27 @@ export default async function Home({ searchParams }: HomePageProps) {
                   </a>
                 </>
               )}
-              <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-10 md:py-16">
-                {nextRace ? (
-                  <NextRaceHero event={nextRace} genderFilter={filterGender} heroPredictions={heroPredictions} stageProgress={heroStageProgress} aiPreview={heroAiPreview} />
-                ) : (
-                  <div className="text-center py-12">
-                    <p className="text-xl text-muted-foreground">No upcoming races — check back soon</p>
-                  </div>
-                )}
+              <div className={`relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl ${heroData.length === 1 ? "py-10 md:py-16" : "py-8 md:py-10"}`}>
+                <NextRaceHero
+                  event={hero.event}
+                  genderFilter={filterGender}
+                  heroPredictions={hero.predictions}
+                  stageProgress={hero.stageProgress}
+                  aiPreview={hero.aiPreview}
+                  compact={heroData.length > 1}
+                />
               </div>
             </section>
           );
-        })()}
+        }) : (
+          <section className="border-b border-border/50">
+            <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-10 md:py-16">
+              <div className="text-center py-12">
+                <p className="text-xl text-muted-foreground">No upcoming races — check back soon</p>
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* ---- MY FEED (logged in users) ---- */}
         <MyFeedWidget />
@@ -734,12 +761,14 @@ function NextRaceHero({
   heroPredictions,
   stageProgress,
   aiPreview,
+  compact,
 }: {
   event: HomepageEvent;
   genderFilter?: string | null;
   heroPredictions: Map<string, HeroPick[]>;
   stageProgress?: StageProgress | null;
   aiPreview?: HeroAiPreview | null;
+  compact?: boolean;
 }) {
   const raceDate = toRaceDate(ev.date);
   const daysUntil = calendarDaysUntil(ev.date);
@@ -758,7 +787,7 @@ function NextRaceHero({
       <div className="absolute -left-4 top-0 bottom-0 w-1 bg-primary rounded-full hidden md:block" />
 
       {/* Race identity */}
-      <div className="space-y-3 mb-6">
+      <div className={`space-y-3 ${compact ? "mb-4" : "mb-6"}`}>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-bold uppercase tracking-widest text-primary">
             {genderFilter === "men" ? "Next Men's Race" : genderFilter === "women" ? "Next Women's Race" : "Next Race"}
@@ -770,7 +799,7 @@ function NextRaceHero({
           )}
         </div>
 
-        <h1 className="text-3xl font-black tracking-tight sm:text-4xl md:text-5xl">
+        <h1 className={`font-black tracking-tight ${compact ? "text-2xl sm:text-3xl md:text-4xl" : "text-3xl sm:text-4xl md:text-5xl"}`}>
           <Link href={url} prefetch={false} className="hover:text-primary transition-colors">
             {ev.name}
           </Link>
@@ -893,7 +922,7 @@ function NextRaceHero({
                 <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">AI Race Preview</span>
               </div>
               <div className="px-3 py-3">
-                <AiPreviewText text={aiPreview.text} riderLinks={aiPreview.riderLinks} clampLines={10} />
+                <AiPreviewText text={aiPreview.text} riderLinks={aiPreview.riderLinks} clampLines={compact ? 6 : 10} />
               </div>
             </div>
           )}
