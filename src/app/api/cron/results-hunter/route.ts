@@ -144,7 +144,7 @@ async function ensureStageRecords(
   const pcsUrl = race.pcsUrl;
 
   const existingStages = await db
-    .select({ stageNumber: races.stageNumber })
+    .select({ id: races.id, stageNumber: races.stageNumber, profileType: races.profileType, distanceKm: races.distanceKm })
     .from(races)
     .where(eq(races.parentRaceId, race.id));
 
@@ -154,14 +154,28 @@ async function ensureStageRecords(
     if (!existingNumbers.has(i)) missingStages.push(i);
   }
 
+  const metadata = await scrapeStageMetadata(pcsUrl, stageCount);
+
+  // Enrich existing stages missing profile/distance data
+  for (const existing of existingStages) {
+    if (existing.profileType && existing.distanceKm) continue;
+    const meta = metadata.find(m => m.stageNumber === existing.stageNumber);
+    if (!meta) continue;
+    const updates: Record<string, string | null> = {};
+    if (!existing.profileType && meta.profileType) updates.profileType = meta.profileType;
+    if (!existing.distanceKm && meta.distanceKm) updates.distanceKm = meta.distanceKm;
+    if (Object.keys(updates).length > 0) {
+      await db.update(races).set(updates).where(eq(races.id, existing.id));
+      console.log(`[results-hunter] Enriched stage ${existing.stageNumber} with ${Object.keys(updates).join(", ")}`);
+    }
+  }
+
   if (missingStages.length === 0) {
     console.log(`[results-hunter] All ${stageCount} stage records exist for ${race.name}`);
     return;
   }
 
   console.log(`[results-hunter] Creating ${missingStages.length} stage records for ${race.name}`);
-
-  const metadata = await scrapeStageMetadata(pcsUrl, stageCount);
 
   const startDate = new Date(race.date);
   const endDate = race.endDate ? new Date(race.endDate) : new Date(startDate.getTime() + stageCount * 86400000);

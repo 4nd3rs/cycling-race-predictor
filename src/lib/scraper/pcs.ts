@@ -797,23 +797,91 @@ export interface StageMetadata {
   distanceKm: string | null;
 }
 
+/** Fetch and parse the PCS overview page for a stage race (shared by detectStageCount + scrapeStageMetadata) */
+async function fetchStageOverview(pcsUrl: string): Promise<{ stageCount: number; stages: StageMetadata[] }> {
+  const html = await rateLimitedFetch(pcsUrl);
+  const $ = cheerio.load(html);
+
+  const stages: StageMetadata[] = [];
+  const nums: number[] = [];
+
+  $("a[href*='/stage-']").each((_, el) => {
+    const href = $(el).attr("href") ?? "";
+    const m = href.match(/\/stage-(\d+)/);
+    if (!m) return;
+    const num = parseInt(m[1], 10);
+    nums.push(num);
+    if (stages.find(s => s.stageNumber === num)) return;
+
+    const row = $(el).closest("tr, li, div.stage");
+    const text = row.length ? row.text() : $(el).text();
+
+    // Date: PCS uses DD/MM format
+    const dateMatch = text.match(/(\d{2})\/(\d{2})/);
+    let dateStr: string | null = null;
+    if (dateMatch) {
+      const year = pcsUrl.match(/\/(\d{4})/)?.[1] ?? new Date().getFullYear().toString();
+      dateStr = `${year}-${dateMatch[2]}-${dateMatch[1]}`;
+    }
+
+    const distMatch = text.match(/(\d{2,3}(?:\.\d)?)\s*km/i);
+
+    let profileType: string | null = null;
+    const profileText = text.toLowerCase();
+    if (profileText.includes("mountain") || profileText.includes("summit")) profileType = "mountain";
+    else if (profileText.includes("hilly")) profileType = "hilly";
+    else if (profileText.includes("flat")) profileType = "flat";
+    else if (profileText.includes("itt") || profileText.includes("time trial")) profileType = "tt";
+
+    // Check for PCS profile icons (classes like p1-p5)
+    const profileIcon = row.find("[class*='icon profile']").attr("class") || row.find("span[class*='p']").attr("class") || "";
+    if (profileIcon.includes("p4") || profileIcon.includes("p5")) profileType = "mountain";
+    else if (profileIcon.includes("p3")) profileType = "hilly";
+    else if (profileIcon.includes("p2")) profileType = "hilly";
+    else if (profileIcon.includes("p1")) profileType = "flat";
+
+    // Also check for ITT/TTT in stage name
+    const stageName = $(el).text().trim() || `Stage ${num}`;
+    if (!profileType && /\bITT\b|\bTTT\b/i.test(stageName)) profileType = "tt";
+
+    stages.push({
+      stageNumber: num,
+      name: stageName,
+      date: dateStr,
+      profileType,
+      distanceKm: distMatch?.[1] ?? null,
+    });
+  });
+
+  // Also check text-only stage references
+  $("a, li").each((_, el) => {
+    const m = $(el).text().trim().match(/^stage\s+(\d+)$/i);
+    if (m) nums.push(parseInt(m[1], 10));
+  });
+
+  const stageCount = nums.length > 0 ? Math.max(...nums) : 0;
+  return { stageCount, stages };
+}
+
+// Cache to avoid double-fetching overview page
+let _overviewCache: { url: string; result: { stageCount: number; stages: StageMetadata[] }; ts: number } | null = null;
+
+async function getStageOverview(pcsUrl: string): Promise<{ stageCount: number; stages: StageMetadata[] }> {
+  if (_overviewCache && _overviewCache.url === pcsUrl && Date.now() - _overviewCache.ts < 60000) {
+    return _overviewCache.result;
+  }
+  const result = await fetchStageOverview(pcsUrl);
+  _overviewCache = { url: pcsUrl, result, ts: Date.now() };
+  return result;
+}
+
 /**
  * Detect number of stages in a stage race by parsing stage links on PCS overview page
  */
 export async function detectStageCount(pcsUrl: string): Promise<number> {
   try {
-    const html = await lightFetch(pcsUrl);
-    const $ = cheerio.load(html);
-    const nums: number[] = [];
-    $("a[href*='/stage-']").each((_, el) => {
-      const m = ($(el).attr("href") ?? "").match(/\/stage-(\d+)/);
-      if (m) nums.push(parseInt(m[1], 10));
-    });
-    $("a, li").each((_, el) => {
-      const m = $(el).text().trim().match(/^stage\s+(\d+)$/i);
-      if (m) nums.push(parseInt(m[1], 10));
-    });
-    return nums.length > 0 ? Math.max(...nums) : 0;
+    const { stageCount } = await getStageOverview(pcsUrl);
+    return stageCount;
   } catch {
     return 0;
   }
@@ -823,54 +891,10 @@ export async function detectStageCount(pcsUrl: string): Promise<number> {
  * Scrape stage metadata (date, profile, distance) from PCS overview page
  */
 export async function scrapeStageMetadata(pcsUrl: string, stageCount: number): Promise<StageMetadata[]> {
-  const stages: StageMetadata[] = [];
+  let stages: StageMetadata[] = [];
   try {
-    const html = await lightFetch(pcsUrl);
-    const $ = cheerio.load(html);
-
-    $("a[href*='/stage-']").each((_, el) => {
-      const href = $(el).attr("href") ?? "";
-      const m = href.match(/\/stage-(\d+)/);
-      if (!m) return;
-      const num = parseInt(m[1], 10);
-      if (stages.find(s => s.stageNumber === num)) return;
-
-      const row = $(el).closest("tr, li, div.stage");
-      const text = row.length ? row.text() : $(el).text();
-
-      // Date: PCS uses DD/MM format
-      const dateMatch = text.match(/(\d{2})\/(\d{2})/);
-      let dateStr: string | null = null;
-      if (dateMatch) {
-        const year = pcsUrl.match(/\/(\d{4})/)?.[1] ?? new Date().getFullYear().toString();
-        dateStr = `${year}-${dateMatch[2]}-${dateMatch[1]}`;
-      }
-
-      const distMatch = text.match(/(\d{2,3}(?:\.\d)?)\s*km/i);
-
-      let profileType: string | null = null;
-      const profileText = text.toLowerCase();
-      if (profileText.includes("mountain") || profileText.includes("summit")) profileType = "mountain";
-      else if (profileText.includes("hilly")) profileType = "hilly";
-      else if (profileText.includes("flat")) profileType = "flat";
-      else if (profileText.includes("itt") || profileText.includes("time trial")) profileType = "tt";
-
-      const profileIcon = row.find("[class*='icon profile']").attr("class") || row.find("span[class*='p']").attr("class") || "";
-      if (profileIcon.includes("p4") || profileIcon.includes("p5")) profileType = "mountain";
-      else if (profileIcon.includes("p3")) profileType = "hilly";
-      else if (profileIcon.includes("p2")) profileType = "hilly";
-      else if (profileIcon.includes("p1")) profileType = "flat";
-
-      const stageName = $(el).text().trim() || `Stage ${num}`;
-
-      stages.push({
-        stageNumber: num,
-        name: stageName,
-        date: dateStr,
-        profileType,
-        distanceKm: distMatch?.[1] ?? null,
-      });
-    });
+    const overview = await getStageOverview(pcsUrl);
+    stages = [...overview.stages];
   } catch (err: any) {
     console.warn(`[pcs] Could not scrape stage metadata: ${err.message}`);
   }
