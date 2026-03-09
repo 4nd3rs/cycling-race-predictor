@@ -286,7 +286,8 @@ Write a 3-4 paragraph preview (150-250 words total) that:
 4. Briefly notes any key absences, injuries, or conditions that could affect the outcome
 
 Style: Knowledgeable cycling analysis. Confident but balanced. No hype language, no hashtags, no emojis.
-Write in plain text (no markdown formatting, no bold, no headers).
+Use **Name Surname** (double asterisks) around rider names to highlight them.
+Separate paragraphs with blank lines. No markdown headers (#).
 Do NOT start with the race name — the reader already sees it on the page.`;
 
   try {

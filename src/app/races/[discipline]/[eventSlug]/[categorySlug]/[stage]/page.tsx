@@ -3,7 +3,8 @@ import Link from "next/link";
 import { Header } from "@/components/header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { db, races, raceEvents, raceResults, riders, teams, riderDisciplineStats } from "@/lib/db";
+import { db, races, raceEvents, raceResults, riders, teams, riderDisciplineStats, raceStartlist } from "@/lib/db";
+import { AiPreviewText } from "@/components/ai-preview";
 import { eq, and } from "drizzle-orm";
 import { format, formatDistanceToNow } from "date-fns";
 import {
@@ -199,11 +200,19 @@ export default async function StagePage({ params }: PageProps) {
     redirect(buildCategoryUrl(discipline, eventSlug, categorySlug));
   }
 
-  // Get stage results
-  const results = await getStageResults(stageRace.id, stageRace.discipline);
-
-  // Get all stages for navigation
-  const allStages = await getAllStages(parentRace.id);
+  // Get stage results and rider links for AI preview (from parent startlist)
+  const [results, allStages, stageRiderLinks] = await Promise.all([
+    getStageResults(stageRace.id, stageRace.discipline),
+    getAllStages(parentRace.id),
+    stageRace.aiPreview
+      ? db.select({ riderId: riders.id, name: riders.name })
+          .from(raceStartlist)
+          .innerJoin(riders, eq(raceStartlist.riderId, riders.id))
+          .where(eq(raceStartlist.raceId, parentRace.id))
+          .limit(100)
+          .then(rows => rows.map(r => ({ name: r.name, id: r.riderId })))
+      : Promise.resolve([]),
+  ]);
 
   const disciplineLabel = getDisciplineLabel(discipline);
   const categoryDisplay = formatCategoryDisplay(
@@ -329,7 +338,6 @@ export default async function StagePage({ params }: PageProps) {
         {stageRace.aiPreview && (
           <div className="mb-6">
             <div className="flex items-center gap-2 mb-3">
-              <span className="text-base">🔮</span>
               <h2 className="text-lg font-bold">{results.length > 0 ? "Pre-Stage Preview" : "AI Stage Preview"}</h2>
               {stageRace.aiPreviewGeneratedAt && (
                 <span className="text-xs text-muted-foreground ml-auto">
@@ -338,7 +346,7 @@ export default async function StagePage({ params }: PageProps) {
               )}
             </div>
             <div className="rounded-xl border border-border/50 bg-card/30 p-4 sm:p-5">
-              <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-line">{stageRace.aiPreview}</p>
+              <AiPreviewText text={stageRace.aiPreview} riderLinks={stageRiderLinks} />
             </div>
           </div>
         )}

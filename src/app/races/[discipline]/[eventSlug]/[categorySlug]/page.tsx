@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Header } from "@/components/header";
 import { PredictionList } from "@/components/prediction-card";
 import { WhatsAppJoinButton } from "@/components/whatsapp-join-button";
+import { AiPreviewText } from "@/components/ai-preview";
 import { FollowButton } from "@/components/follow-button";
 import { RaceLinksSection } from "@/components/race-links";
 import { Badge } from "@/components/ui/badge";
@@ -877,7 +878,6 @@ export default async function CategoryPage({ params }: PageProps) {
           <section className="border-b border-border/50">
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-6">
               <div className="flex items-center gap-2 mb-3">
-                <span className="text-base">🔮</span>
                 <h2 className="text-lg font-bold">{isCompleted ? "Pre-Race Preview" : "AI Race Preview"}</h2>
                 {race.aiPreviewGeneratedAt && (
                   <span className="text-xs text-muted-foreground ml-auto">
@@ -886,7 +886,10 @@ export default async function CategoryPage({ params }: PageProps) {
                 )}
               </div>
               <div className="rounded-xl border border-border/50 bg-card/30 p-4 sm:p-5">
-                <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-line">{race.aiPreview}</p>
+                <AiPreviewText
+                  text={race.aiPreview}
+                  riderLinks={startlist.map(({ rider }) => ({ name: rider.name, id: rider.id }))}
+                />
               </div>
             </div>
           </section>

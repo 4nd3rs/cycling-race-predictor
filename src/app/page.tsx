@@ -4,7 +4,7 @@ import { IntelCard } from "@/components/intel-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { db, races, raceEvents, riderRumours, riders, raceResults, predictions } from "@/lib/db";
+import { db, races, raceEvents, riderRumours, riders, raceResults, predictions, raceStartlist } from "@/lib/db";
 import { desc, eq, gte, lt, and, sql, isNotNull, isNull, asc } from "drizzle-orm";
 import { format, formatDistanceToNow } from "date-fns";
 import { toRaceDate, toDateStr, calendarDaysUntil, todayStr } from "@/lib/utils";
@@ -14,6 +14,7 @@ import { EventListView } from "@/components/event-card";
 import { MyFeedWidget } from "@/components/my-feed-widget";
 import { DisciplineFilter, CalendarFilters } from "@/components/race-filters";
 import { RaceFollowButton } from "@/components/race-follow-button";
+import { AiPreviewText } from "@/components/ai-preview";
 import { auth } from "@clerk/nextjs/server";
 import { SignInButton } from "@clerk/nextjs";
 
@@ -387,18 +388,29 @@ async function getHeroPredictions(event: HomepageEvent): Promise<Map<string, Arr
   } catch { return new Map(); }
 }
 
-async function getHeroAiPreview(event: HomepageEvent): Promise<string | null> {
-  // Get the AI preview from the elite men's race (or first elite category)
+interface HeroAiPreview {
+  text: string;
+  riderLinks: Array<{ name: string; id: string }>;
+}
+
+async function getHeroAiPreview(event: HomepageEvent): Promise<HeroAiPreview | null> {
   const eliteCat = event.categories.find(c => c.ageCategory === "elite" && c.gender === "men")
     ?? event.categories.find(c => c.ageCategory === "elite");
   if (!eliteCat) return null;
   try {
-    const [row] = await db
-      .select({ aiPreview: races.aiPreview })
-      .from(races)
-      .where(eq(races.id, eliteCat.id))
-      .limit(1);
-    return row?.aiPreview ?? null;
+    const [[row], startlistRiders] = await Promise.all([
+      db.select({ aiPreview: races.aiPreview }).from(races).where(eq(races.id, eliteCat.id)).limit(1),
+      db.select({ riderId: riders.id, name: riders.name })
+        .from(raceStartlist)
+        .innerJoin(riders, eq(raceStartlist.riderId, riders.id))
+        .where(eq(raceStartlist.raceId, eliteCat.id))
+        .limit(100),
+    ]);
+    if (!row?.aiPreview) return null;
+    return {
+      text: row.aiPreview,
+      riderLinks: startlistRiders.map(r => ({ name: r.name, id: r.riderId })),
+    };
   } catch { return null; }
 }
 
@@ -727,7 +739,7 @@ function NextRaceHero({
   genderFilter?: string | null;
   heroPredictions: Map<string, HeroPick[]>;
   stageProgress?: StageProgress | null;
-  aiPreview?: string | null;
+  aiPreview?: HeroAiPreview | null;
 }) {
   const raceDate = toRaceDate(ev.date);
   const daysUntil = calendarDaysUntil(ev.date);
@@ -881,7 +893,7 @@ function NextRaceHero({
                 <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">AI Race Preview</span>
               </div>
               <div className="px-3 py-3">
-                <p className="text-xs text-foreground/80 leading-relaxed line-clamp-[12]">{aiPreview}</p>
+                <AiPreviewText text={aiPreview.text} riderLinks={aiPreview.riderLinks} clampLines={10} />
               </div>
             </div>
           )}
