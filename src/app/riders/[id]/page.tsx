@@ -137,19 +137,6 @@ function getEloTier(elo: number) {
   return { label: "Developing", color: "bg-gray-300" };
 }
 
-function getSpecialtyIcon(specialty: string) {
-  const icons: Record<string, string> = {
-    climber: "⛰️",
-    sprinter: "⚡",
-    gc: "🏆",
-    tt: "⏱️",
-    classics: "🏛️",
-    puncheur: "💥",
-    technical: "🔧",
-    power: "💪",
-  };
-  return icons[specialty.toLowerCase()] || "🚴";
-}
 
 export default async function RiderDetailPage({ params }: PageProps) {
   const { id } = await params;
@@ -292,7 +279,7 @@ export default async function RiderDetailPage({ params }: PageProps) {
                     <img src={rider.photoUrl} alt={rider.name} className="w-full h-full object-cover object-top" />
                   </div>
                 ) : (
-                  <div className={`w-28 h-28 rounded-2xl flex items-center justify-center text-3xl font-black text-white bg-gradient-to-br from-primary/80 to-primary/40 border border-border/50`}>
+                  <div className={`w-28 h-28 rounded-2xl flex items-center justify-center text-3xl font-black text-foreground bg-card border border-border/50`}>
                     {initials}
                   </div>
                 )}
@@ -333,17 +320,17 @@ export default async function RiderDetailPage({ params }: PageProps) {
 
                 {/* Team social links */}
                 {currentTeam && (currentTeam.twitter || currentTeam.instagram) && (
-                  <div className="flex items-center gap-3 text-xs">
+                  <div className="flex items-center gap-3 text-xs tracking-wide">
                     {currentTeam.twitter && (
                       <a href={currentTeam.twitter} target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-muted-foreground hover:text-primary transition-colors">
-                        𝕏 {currentTeam.name?.split(" ")[0]}
+                        className="flex items-center gap-1 text-muted-foreground hover:text-primary transition-colors uppercase font-semibold">
+                        X
                       </a>
                     )}
                     {currentTeam.instagram && (
                       <a href={currentTeam.instagram} target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-muted-foreground hover:text-primary transition-colors">
-                        📸 Instagram
+                        className="flex items-center gap-1 text-muted-foreground hover:text-primary transition-colors uppercase font-semibold">
+                        IG
                       </a>
                     )}
                   </div>
@@ -429,7 +416,7 @@ export default async function RiderDetailPage({ params }: PageProps) {
         {upcomingRaces.length > 0 && (
           <section className="border-b border-border/50">
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-5">
-              <h2 className="text-base font-bold mb-3">📅 Upcoming Races</h2>
+              <h2 className="text-base font-bold mb-3 uppercase tracking-wider text-muted-foreground text-xs">Upcoming Races</h2>
               <div className="flex flex-wrap gap-2">
                 {upcomingRaces.map(({ race, event }) => {
                   const slug = event.slug;
@@ -451,7 +438,7 @@ export default async function RiderDetailPage({ params }: PageProps) {
         {(rumoursData.rumour?.summary || rumoursData.tips.length > 0) && (
           <section className="border-b border-border/50">
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-5">
-              <h2 className="text-base font-bold mb-3">🔍 Rider Intel</h2>
+              <h2 className="text-base font-bold mb-3 uppercase tracking-wider text-muted-foreground text-xs">Rider Intel</h2>
               <div className="grid gap-3 sm:grid-cols-2">
                 {rumoursData.rumour?.summary && (
                   <div className="rounded-lg border border-border/50 bg-card/30 p-3">
@@ -496,7 +483,7 @@ export default async function RiderDetailPage({ params }: PageProps) {
 
             {/* Recent Results */}
             <div className="lg:col-span-2">
-              <h2 className="text-base font-bold mb-3">🏁 Recent Results</h2>
+              <h2 className="text-base font-bold mb-3 uppercase tracking-wider text-muted-foreground text-xs">Recent Results</h2>
               {resultsData.length > 0 ? (
                 <div className="rounded-xl border border-border/50 divide-y divide-border/30">
                   {resultsData.map(({ result, race, event }) => {
@@ -512,8 +499,8 @@ export default async function RiderDetailPage({ params }: PageProps) {
                         ) : result.dns ? (
                           <span className="text-xs font-bold text-muted-foreground">DNS</span>
                         ) : (
-                          <span className={`text-sm font-black ${result.position === 1 ? "text-yellow-400" : result.position! <= 3 ? "text-orange-400" : ""}`}>
-                            {result.position === 1 ? "🥇" : result.position === 2 ? "🥈" : result.position === 3 ? "🥉" : `P${result.position}`}
+                          <span className={`text-xl font-display font-black tracking-tight ${result.position === 1 ? "text-primary" : result.position! <= 3 ? "text-muted-foreground" : "text-muted-foreground/60"}`}>
+                            {result.position}
                           </span>
                         )}
                       </div>
@@ -555,8 +542,8 @@ export default async function RiderDetailPage({ params }: PageProps) {
                     {topAffinities.length > 0 && (
                       <div className="flex flex-wrap gap-1">
                         {topAffinities.map(([profile]) => (
-                          <span key={profile} className="text-[10px] px-1.5 py-0.5 rounded bg-muted/50 text-muted-foreground capitalize">
-                            {getSpecialtyIcon(profile)} {profile}
+                          <span key={profile} className="text-[10px] px-1.5 py-0.5 rounded bg-muted/50 text-muted-foreground capitalize font-semibold tracking-wide">
+                            {profile}
                           </span>
                         ))}
                       </div>
@@ -582,42 +569,42 @@ export default async function RiderDetailPage({ params }: PageProps) {
                   <a href={rider.pcsUrl || `https://www.procyclingstats.com/rider/${rider.pcsId}`}
                     target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-2 text-sm hover:text-primary transition-colors">
-                    <span>📊</span> ProCyclingStats
+                    <span className="text-muted-foreground font-black tracking-widest text-[9px]">PCS</span> ProCyclingStats
                   </a>
                 )}
                 {rider.uciId && (
                   <a href={`https://www.uci.org/en/road/rankings/athlete/${rider.uciId}`}
                     target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-2 text-sm hover:text-primary transition-colors">
-                    <span>🏅</span> UCI Rankings
+                    <span className="text-muted-foreground font-black tracking-widest text-[9px]">UCI</span> UCI Rankings
                   </a>
                 )}
                 {rider.uciId && (
                   <a href={`https://firstcycling.com/rider.php?r=${rider.uciId}`}
                     target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-2 text-sm hover:text-primary transition-colors">
-                    <span>🔢</span> FirstCycling
+                    <span className="text-muted-foreground font-black tracking-widest text-[9px]">FC</span> FirstCycling
                   </a>
                 )}
                 {rider.wikiSlug && (
                   <a href={`https://en.wikipedia.org/wiki/${encodeURIComponent(rider.wikiSlug)}`}
                     target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-2 text-sm hover:text-primary transition-colors">
-                    <span>📖</span> Wikipedia
+                    <span className="text-muted-foreground font-black tracking-widest text-[9px]">W</span> Wikipedia
                   </a>
                 )}
                 {rider.instagramHandle && (
                   <a href={`https://instagram.com/${rider.instagramHandle}`}
                     target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-2 text-sm hover:text-primary transition-colors">
-                    <span>📸</span> @{rider.instagramHandle}
+                    <span className="text-muted-foreground font-black tracking-widest text-[9px]">IG</span> @{rider.instagramHandle}
                   </a>
                 )}
                 {rider.stravaId && (
                   <a href={`https://www.strava.com/athletes/${rider.stravaId}`}
                     target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-2 text-sm hover:text-primary transition-colors">
-                    <span>🚴</span> Strava
+                    <span className="text-muted-foreground font-black tracking-widest text-[9px]">SVA</span> Strava
                   </a>
                 )}
               </div>

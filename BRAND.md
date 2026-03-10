@@ -94,9 +94,9 @@ The rule is simple: if it looks like it could belong on a tech startup landing p
 
 ## Iconography
 
-**There are no icons in this system.**
+**We minimize the use of icons to preserve a typographic, editorial feel.**
 
-This is a deliberate choice. Icons are the visual shorthand of apps and dashboards. We use type instead.
+However, functional UI icons (like `<ChevronDown>`, `<Menu>`, `<Search>`, `<Trash2>`) from standard minimalist sets like Lucide are permitted *only where text would be clunky*.
 
 | Instead of | Use |
 |---|---|
@@ -107,7 +107,9 @@ This is a deliberate choice. Icons are the visual shorthand of apps and dashboar
 | 🕵️ detective | Text `INTEL` |
 | Any flag emoji | 3-letter country code (BEL, NED, FRA) or a small raster flag image |
 
-If a visual symbol is needed: use a typographic mark. A `·` bullet, an `—` em-dash, a `×` multiplier. These have weight without decoration.
+If a visual symbol is needed for metadata or content, prefer a typographic mark. A `·` bullet, an `—` em-dash, a `×` multiplier. These have weight without decoration.
+
+**IMPORTANT: Emojis are strictly forbidden.** Do not use emojis anywhere in the UI or generated graphics.
 
 ---
 
@@ -302,7 +304,7 @@ A checklist for every design decision:
 - **Not a betting site** — no green money colors, no odds-ticker aesthetics, no "LIVE" badges in red boxes
 - **Not a fantasy sports app** — no trophies, no podium podest clip-art, no achievement badges
 - **Not a content aggregator** — no clickbait thumbnails, no ALL CAPS WARNING designs, no "YOU WON'T BELIEVE" energy
-- **Not emoji-dependent** — no emoji anywhere, ever. Type does the work.
+- **Not emoji-dependent** — no emoji anywhere, ever. Type does the work. Functional UI icons (like a simple chevron or menu bars) are acceptable, but decorative emojis are banned.
 
 ---
 

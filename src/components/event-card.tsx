@@ -83,9 +83,9 @@ export function EventCard({
   const getStatusBadge = () => {
     if (isEventToday) {
       return (
-        <Badge className="bg-red-500 text-white animate-pulse">
+        <span className="text-primary font-bold text-xs uppercase tracking-widest animate-pulse">
           LIVE
-        </Badge>
+        </span>
       );
     }
     if (isCompleted) {
@@ -161,18 +161,21 @@ export function EventCard({
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="flex flex-wrap gap-2">
-          <Badge variant={disciplineBadge.variant}>{disciplineBadge.label}</Badge>
+        <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground font-semibold">
+          <span className="uppercase tracking-wide">{disciplineBadge.label}</span>
           {subDiscipline && (
-            <Badge variant="outline" className="bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
-              {getSubDisciplineShortLabel(subDiscipline)}
-            </Badge>
+            <>
+              <span>·</span>
+              <span className="uppercase tracking-wide">
+                {getSubDisciplineShortLabel(subDiscipline)}
+              </span>
+            </>
           )}
         </div>
 
         {/* Category links */}
-        <div className="flex flex-wrap gap-2">
-          {sortedCategories.map((cat) => {
+        <div className="flex flex-wrap items-center gap-1.5 text-sm text-foreground">
+          {sortedCategories.map((cat, i) => {
             // Build category URL using new structure if event has slug
             const categorySlug = cat.categorySlug || generateCategorySlug(cat.ageCategory, cat.gender);
             const categoryUrl = slug
@@ -180,15 +183,13 @@ export function EventCard({
               : `/races/${cat.id}`;
 
             return (
-              <Link key={cat.id} href={categoryUrl} prefetch={false}>
-                <Badge
-                  variant="outline"
-                  className="cursor-pointer hover:bg-muted transition-colors"
-                >
+              <span key={cat.id} className="flex items-center gap-1.5">
+                {i > 0 && <span className="text-muted-foreground/40">,</span>}
+                <Link href={categoryUrl} prefetch={false} className="hover:text-primary transition-colors hover:underline">
                   {formatCategoryDisplay(cat.ageCategory, cat.gender)}
-                  {cat.riderCount ? ` (${cat.riderCount})` : ""}
-                </Badge>
-              </Link>
+                  {cat.riderCount ? <span className="text-muted-foreground ml-1">({cat.riderCount})</span> : ""}
+                </Link>
+              </span>
             );
           })}
         </div>
@@ -323,9 +324,9 @@ export function EventListRow({
   const totalRiders = categories.reduce((s, c) => s + (c.riderCount || 0), 0);
 
   const statusEl = isEventToday ? (
-    <span className="rounded px-1.5 py-0.5 text-xs font-bold bg-red-500 text-white animate-pulse shrink-0">LIVE</span>
+    <span className="text-xs font-bold text-primary uppercase tracking-widest animate-pulse shrink-0">LIVE</span>
   ) : isCompleted ? (
-    <span className="rounded px-1.5 py-0.5 text-xs text-muted-foreground bg-muted/40 shrink-0">Done</span>
+    <span className="text-xs font-semibold text-muted-foreground shrink-0 border-b border-muted-foreground/50 pb-px">Completed</span>
   ) : (
 null
   );
@@ -338,11 +339,11 @@ null
       {/* Date */}
       <span className="w-14 shrink-0 text-xs font-mono text-muted-foreground tabular-nums">{dateStr}</span>
 
-      {/* Discipline + UCI category — single compact pill */}
+      {/* Discipline + UCI category — single compact string */}
       <div className="flex items-center shrink-0 w-16 sm:w-20">
-        <span className={cn("rounded px-1.5 py-0.5 text-xs font-medium whitespace-nowrap", discColor)}>
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
           {subDiscipline ? getSubDisciplineShortLabel(subDiscipline) : discLabel}
-          {uciCategory && <span className="opacity-70"> {normalizeUciCategory(uciCategory)}</span>}
+          {uciCategory && <span className="opacity-70 ml-1 font-normal tracking-normal">{normalizeUciCategory(uciCategory)}</span>}
         </span>
       </div>
 
@@ -356,15 +357,15 @@ null
 
 
 
-      {/* Category pills */}
-      <div className="hidden md:flex items-center gap-1 shrink-0">
-        {sortedCats.slice(0, 5).map((c) => (
-          <span key={c.id} className="rounded px-1 py-0.5 text-[10px] bg-muted/50 text-muted-foreground font-mono">
+      <div className="hidden md:flex items-center gap-1.5 shrink-0 text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+        {sortedCats.slice(0, 5).map((c, i) => (
+          <span key={c.id}>
+            {i > 0 && <span className="opacity-40 font-normal mr-1.5">,</span>}
             {catAbbr(c.ageCategory, c.gender)}
           </span>
         ))}
         {sortedCats.length > 5 && (
-          <span className="text-[10px] text-muted-foreground">+{sortedCats.length - 5}</span>
+          <span className="opacity-60 font-normal">+{sortedCats.length - 5}</span>
         )}
       </div>
 

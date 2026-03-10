@@ -84,37 +84,37 @@
 
 .dark {
   /* Brand: near-black background, race red primary, warm white text */
-  --background: oklch(0.07 0.005 250);  /* ~#0D0D0D */
-  --foreground: oklch(0.95 0.005 60);   /* ~#F2EDE6 warm white */
-  --card: oklch(0.11 0.01 250);
-  --card-foreground: oklch(0.95 0.005 60);
-  --popover: oklch(0.11 0.01 250);
-  --popover-foreground: oklch(0.95 0.005 60);
-  --primary: oklch(0.47 0.23 22);       /* #C8102E race red */
-  --primary-foreground: oklch(0.98 0 0);
-  --secondary: oklch(0.16 0.01 250);
-  --secondary-foreground: oklch(0.95 0.005 60);
-  --muted: oklch(0.14 0.01 250);
-  --muted-foreground: oklch(0.55 0.01 60);
-  --accent: oklch(0.88 0.18 95);        /* yellow — UI only, not in logo */
-  --accent-foreground: oklch(0.12 0.02 250);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 8%);
-  --input: oklch(1 0 0 / 10%);
-  --ring: oklch(0.47 0.23 22);          /* race red */
-  --chart-1: oklch(0.55 0.22 25);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.88 0.18 95);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.12 0.02 250);
-  --sidebar-foreground: oklch(0.95 0.005 250);
-  --sidebar-primary: oklch(0.55 0.22 25);
-  --sidebar-primary-foreground: oklch(0.98 0 0);
-  --sidebar-accent: oklch(0.18 0.02 250);
-  --sidebar-accent-foreground: oklch(0.95 0.005 250);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.55 0.22 25);
+  --background: #0D0D0D; 
+  --foreground: #F2EDE6;
+  --card: #161411;
+  --card-foreground: #F2EDE6;
+  --popover: #1E1B18;
+  --popover-foreground: #F2EDE6;
+  --primary: #C8102E;
+  --primary-foreground: #F2EDE6;
+  --secondary: #2C2823;
+  --secondary-foreground: #F2EDE6;
+  --muted: #1E1B18;
+  --muted-foreground: #7A7065;
+  --accent: #2C2823;
+  --accent-foreground: #F2EDE6;
+  --destructive: #C8102E;
+  --border: rgba(255, 255, 255, 0.06);
+  --input: rgba(255, 255, 255, 0.06);
+  --ring: #C8102E;
+  --chart-1: #C8102E;
+  --chart-2: #E8E0D5;
+  --chart-3: #7A7065;
+  --chart-4: #4A443E;
+  --chart-5: #2C2823;
+  --sidebar: #161411;
+  --sidebar-foreground: #F2EDE6;
+  --sidebar-primary: #C8102E;
+  --sidebar-primary-foreground: #F2EDE6;
+  --sidebar-accent: #2C2823;
+  --sidebar-accent-foreground: #F2EDE6;
+  --sidebar-border: rgba(255, 255, 255, 0.06);
+  --sidebar-ring: #C8102E;
 }
 
 @layer base {

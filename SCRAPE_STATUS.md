@@ -1,6 +1,6 @@
 # SCRAPE_STATUS.md — Pipeline Status
 
-_Last updated: 2026-03-08 21:00:39 (Stockholm)_
+_Last updated: 2026-03-09 11:56:43 (Stockholm)_
 
 ## 📅 Race Calendar
 - **Last run:** 2026-03-01 23:21:41
@@ -17,13 +17,13 @@ _Last updated: 2026-03-08 21:00:39 (Stockholm)_
 | Tirreno-Adriatico | 2026-03-09 | 83 | ✅ +83 new | 2026-03-06 14:54:42 |
 
 ## 🏁 Results
-- **Last run:** 2026-03-08 21:00:39
+- **Last run:** 2026-03-09 11:56:43
 - **Status:** ✅ OK
-- 154 results imported across 1 race(s). 0 race(s) missing pcsUrl.
+- 0 results imported across 1 race(s). 0 race(s) missing pcsUrl.
 
 | Race | Date | Results | Status | Scraped |
 |------|------|---------|--------|---------|
-| Paris-Nice | 2026-03-08 | 154 | ✅ imported | 2026-03-08 20:58:54 |
+| Tirreno-Adriatico | 2026-03-09 | 0 | ⏳ pending | 2026-03-09 11:54:28 |
 
 ---
 <!-- STATUS_JSON
@@ -46,17 +46,17 @@ _Last updated: 2026-03-08 21:00:39 (Stockholm)_
   "results": {
     "component": "results",
     "status": "ok",
-    "summary": "154 results imported across 1 race(s). 0 race(s) missing pcsUrl.",
+    "summary": "0 results imported across 1 race(s). 0 race(s) missing pcsUrl.",
     "raceRows": [
       {
-        "name": "Paris-Nice",
-        "date": "2026-03-08",
-        "count": 154,
-        "status": "✅ imported",
-        "scrapedAt": "2026-03-08 20:58:54"
+        "name": "Tirreno-Adriatico",
+        "date": "2026-03-09",
+        "count": 0,
+        "status": "⏳ pending",
+        "scrapedAt": "2026-03-09 11:54:28"
       }
     ],
-    "updatedAt": "2026-03-08 21:00:39"
+    "updatedAt": "2026-03-09 11:56:43"
   },
   "calendar": {
     "component": "calendar",
