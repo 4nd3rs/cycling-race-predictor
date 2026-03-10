@@ -3,23 +3,7 @@ import { and, eq } from "drizzle-orm";
 import type { GeneratedMessage } from "./generate";
 import type { BriefingType } from "./types";
 
-// ── Sending helpers ─────────────────────────────────────────────────────────
-
-async function sendTelegram(chatId: string, text: string): Promise<boolean> {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  if (!token) return false;
-  const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      parse_mode: "HTML",
-      disable_web_page_preview: true,
-    }),
-  });
-  return res.ok;
-}
+// ── Sending ─────────────────────────────────────────────────────────────────
 
 async function sendWhatsApp(phone: string, text: string): Promise<boolean> {
   const gw = process.env.OPENCLAW_GATEWAY_URL;
@@ -47,7 +31,6 @@ async function alreadySentBriefing(
   userId: string,
   briefingDate: string,
   briefingType: BriefingType,
-  channel: string,
 ): Promise<boolean> {
   try {
     const row = await db
@@ -58,20 +41,19 @@ async function alreadySentBriefing(
           eq(userBriefingLog.userId, userId),
           eq(userBriefingLog.briefingDate, briefingDate),
           eq(userBriefingLog.briefingType, briefingType),
-          eq(userBriefingLog.channel, channel),
+          eq(userBriefingLog.channel, "whatsapp"),
         )
       )
       .limit(1);
     return row.length > 0;
   } catch {
-    // Fallback to notificationLog if briefing table doesn't exist yet
     const dedupKey = `briefing-${briefingType}-${briefingDate}`;
     const row = await db.query.notificationLog.findFirst({
       where: and(
         eq(notificationLog.userId, userId),
         eq(notificationLog.entityId, dedupKey),
         eq(notificationLog.eventType, "briefing"),
-        eq(notificationLog.channel, channel),
+        eq(notificationLog.channel, "whatsapp"),
       ),
     });
     return !!row;
@@ -82,23 +64,20 @@ async function logBriefingSent(
   userId: string,
   briefingDate: string,
   briefingType: BriefingType,
-  channel: string,
   contentKey?: string,
 ) {
-  // Log in briefing table
   await db.insert(userBriefingLog).values({
     userId,
     briefingDate,
     briefingType,
-    channel,
+    channel: "whatsapp",
     contentKey: contentKey || null,
   }).onConflictDoNothing().catch(() => {});
 
-  // Also log in notificationLog for backward compat
   const dedupKey = `briefing-${briefingType}-${briefingDate}`;
   await db.insert(notificationLog).values({
     userId,
-    channel,
+    channel: "whatsapp",
     eventType: "briefing",
     entityId: dedupKey,
   }).onConflictDoNothing();
@@ -108,8 +87,7 @@ async function logBriefingSent(
 
 export interface DeliveryResult {
   userId: string;
-  telegramSent: boolean;
-  whatsappSent: boolean;
+  sent: boolean;
   skippedDedup: boolean;
 }
 
@@ -117,39 +95,20 @@ export async function deliverBriefing(
   userId: string,
   briefingType: BriefingType,
   message: GeneratedMessage,
-  telegramChatId: string | null,
-  whatsappPhone: string | null,
+  whatsappPhone: string,
 ): Promise<DeliveryResult> {
   const briefingDate = new Date().toISOString().slice(0, 10);
-  let telegramSent = false;
-  let whatsappSent = false;
-  let skippedDedup = false;
 
-  // Telegram
-  if (telegramChatId) {
-    if (await alreadySentBriefing(userId, briefingDate, briefingType, "telegram")) {
-      skippedDedup = true;
-    } else {
-      telegramSent = await sendTelegram(telegramChatId, message.html);
-      if (telegramSent) {
-        await logBriefingSent(userId, briefingDate, briefingType, "telegram");
-      }
-    }
+  if (await alreadySentBriefing(userId, briefingDate, briefingType)) {
+    return { userId, sent: false, skippedDedup: true };
   }
 
-  // WhatsApp
-  if (whatsappPhone) {
-    if (await alreadySentBriefing(userId, briefingDate, briefingType, "whatsapp")) {
-      skippedDedup = true;
-    } else {
-      whatsappSent = await sendWhatsApp(whatsappPhone, message.plain);
-      if (whatsappSent) {
-        await logBriefingSent(userId, briefingDate, briefingType, "whatsapp");
-      }
-    }
+  const sent = await sendWhatsApp(whatsappPhone, message.plain);
+  if (sent) {
+    await logBriefingSent(userId, briefingDate, briefingType);
   }
 
-  return { userId, telegramSent, whatsappSent, skippedDedup };
+  return { userId, sent, skippedDedup: false };
 }
 
 // ── Batch delivery ──────────────────────────────────────────────────────────
@@ -158,7 +117,6 @@ export interface BatchDeliveryPlan {
   userId: string;
   briefingType: BriefingType;
   message: GeneratedMessage;
-  telegramChatId: string | null;
   whatsappPhone: string | null;
 }
 
@@ -169,46 +127,17 @@ export async function deliverBatch(
   let sent = 0, skipped = 0, dupes = 0;
   const startTime = Date.now();
 
-  // Separate Telegram and WhatsApp tasks
-  const tgTasks: Array<() => Promise<void>> = [];
-  const waTasks: Array<() => Promise<void>> = [];
-
   for (const plan of plans) {
-    if (plan.telegramChatId) {
-      tgTasks.push(async () => {
-        const result = await deliverBriefing(
-          plan.userId, plan.briefingType, plan.message,
-          plan.telegramChatId, null
-        );
-        if (result.telegramSent) sent++;
-        else if (result.skippedDedup) dupes++;
-        else skipped++;
-      });
-    }
-    if (plan.whatsappPhone) {
-      waTasks.push(async () => {
-        const result = await deliverBriefing(
-          plan.userId, plan.briefingType, plan.message,
-          null, plan.whatsappPhone
-        );
-        if (result.whatsappSent) sent++;
-        else if (result.skippedDedup) dupes++;
-        else skipped++;
-      });
-    }
-  }
+    if (!plan.whatsappPhone) { skipped++; continue; }
+    if (Date.now() - startTime > timeBudgetMs) { skipped++; break; }
 
-  // Telegram: parallel batches of 20
-  for (let i = 0; i < tgTasks.length; i += 20) {
-    if (Date.now() - startTime > timeBudgetMs) break;
-    const batch = tgTasks.slice(i, i + 20);
-    await Promise.allSettled(batch.map(fn => fn()));
-  }
+    const result = await deliverBriefing(
+      plan.userId, plan.briefingType, plan.message, plan.whatsappPhone
+    );
+    if (result.sent) sent++;
+    else if (result.skippedDedup) dupes++;
+    else skipped++;
 
-  // WhatsApp: sequential with 1.5s delay
-  for (const task of waTasks) {
-    if (Date.now() - startTime > timeBudgetMs) { skipped += 1; break; }
-    await task();
     await sleep(1500);
   }
 

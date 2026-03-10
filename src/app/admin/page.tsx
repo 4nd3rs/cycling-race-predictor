@@ -9,7 +9,6 @@ import {
   raceResults,
   raceStartlist,
   uciSyncRuns,
-  userTelegram,
   riderDisciplineStats,
 } from "@/lib/db";
 import { desc, sql, count, gte, and, lte, isNotNull, eq } from "drizzle-orm";
@@ -92,7 +91,6 @@ async function getOverviewData() {
     racesWithPredictionsThisWeekResult,
     totalUsersResult,
     activeUsersResult,
-    telegramSubsResult,
     upcomingRacesResult,
     lastUciSyncResult,
   ] = await Promise.all([
@@ -114,7 +112,6 @@ async function getOverviewData() {
     // Users
     db.select({ c: count() }).from(users),
     db.select({ c: count() }).from(users).where(gte(users.updatedAt, thirtyDaysAgo)),
-    db.select({ c: count() }).from(userTelegram).where(isNotNull(userTelegram.telegramChatId)),
     // Upcoming races (next 7 days)
     db.select({
       id: races.id,
@@ -176,7 +173,6 @@ async function getOverviewData() {
     users: {
       total: totalUsersResult[0]?.c ?? 0,
       activeLast30: activeUsersResult[0]?.c ?? 0,
-      telegram: telegramSubsResult[0]?.c ?? 0,
     },
     upcomingRaces: upcomingRacesResult.map((r) => ({
       ...r,
@@ -277,7 +273,6 @@ export default async function AdminOverviewPage() {
           value={Number(data.users.total)}
           items={[
             { label: "active (30d)", value: Number(data.users.activeLast30) },
-            { label: "Telegram subs", value: Number(data.users.telegram) },
           ]}
         />
       </div>

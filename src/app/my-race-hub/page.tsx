@@ -4,7 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { Header } from "@/components/header";
 import { Badge } from "@/components/ui/badge";
 import { getAuthUser } from "@/lib/auth";
-import { db, users, userFollows, userTelegram, userWhatsapp, riders, raceEvents, races, raceStartlist, teams } from "@/lib/db";
+import { db, users, userFollows, userWhatsapp, riders, raceEvents, races, raceStartlist, teams } from "@/lib/db";
 import { eq, and, gte, lt, lte, inArray, desc } from "drizzle-orm";
 import { format, formatDistanceToNow, isPast, isToday } from "date-fns";
 import { getFlag } from "@/lib/country-flags";
@@ -22,9 +22,8 @@ async function getPageData(userId: string) {
   const [user] = await db.select().from(users).where(eq(users.clerkId, userId)).limit(1);
   if (!user) return null;
 
-  const [follows, telegramRows, whatsappRows] = await Promise.all([
+  const [follows, whatsappRows] = await Promise.all([
     db.select().from(userFollows).where(eq(userFollows.userId, user.id)),
-    db.select().from(userTelegram).where(eq(userTelegram.userId, user.id)).limit(1),
     db.select().from(userWhatsapp).where(eq(userWhatsapp.userId, user.id)).limit(1),
   ]);
 
@@ -103,7 +102,6 @@ async function getPageData(userId: string) {
 
   return {
     user,
-    telegram: telegramRows[0] || null,
     whatsapp: whatsappRows[0] || null,
     // schedule
     upcomingEvents: upcomingEvents.map(r => r.event),
@@ -194,7 +192,7 @@ export default async function MyRaceHubPage({ searchParams }: { searchParams: Pr
       LEFT JOIN race_events re ON re.id = r.race_event_id
       WHERE nl.user_id = ${data.user.id}
         AND nl.message_text IS NOT NULL
-        AND nl.channel = 'telegram'
+        AND nl.channel = 'whatsapp'
       ORDER BY nl.sent_at DESC
       LIMIT 30
     `;

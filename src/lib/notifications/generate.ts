@@ -232,7 +232,6 @@ async function callGemini(prompt: string): Promise<string | null> {
 // ── Public API ──────────────────────────────────────────────────────────────
 
 export interface GeneratedMessage {
-  html: string;   // For Telegram (HTML bold)
   plain: string;  // For WhatsApp (*bold*)
 }
 
@@ -246,8 +245,5 @@ export async function generateBriefing(
   const raw = await callGemini(prompt);
   if (!raw) return null;
 
-  // Convert *bold* to HTML <b>bold</b> for Telegram
-  const html = raw.replace(/\*([^*]+)\*/g, "<b>$1</b>");
-
-  return { html, plain: raw };
+  return { plain: raw };
 }

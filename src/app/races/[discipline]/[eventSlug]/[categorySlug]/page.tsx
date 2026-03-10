@@ -823,7 +823,7 @@ export default async function CategoryPage({ params }: PageProps) {
                   <RaceLinksSection links={event.externalLinks} />
                 )}
 
-                {/* Source PDF + Telegram subscribe */}
+                {/* Source PDF + Follow button */}
                 <div className="flex flex-wrap items-center gap-3 pt-1">
                   {(race.startlistUrl || event.sourceUrl) && (
                     <a href={race.startlistUrl || event.sourceUrl || ""} target="_blank" rel="noopener noreferrer"

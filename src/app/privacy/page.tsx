@@ -52,7 +52,7 @@ export default function PrivacyPage() {
           <h2 className="font-display text-xl font-bold tracking-tight text-foreground mb-3">Third-party services</h2>
           <ul className="list-disc pl-6 space-y-2">
             <li><strong className="text-foreground">Clerk</strong> — authentication and account management. <a href="https://clerk.com/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">clerk.com/privacy</a></li>
-            <li><strong className="text-foreground">Telegram</strong> — message delivery when you connect Telegram. Subject to Telegram&apos;s privacy policy.</li>
+            <li><strong className="text-foreground">WhatsApp</strong> — message delivery when you connect WhatsApp. Subject to WhatsApp&apos;s privacy policy.</li>
             <li><strong className="text-foreground">Vercel</strong> — hosting and infrastructure.</li>
             <li><strong className="text-foreground">Neon</strong> — database hosting. Data is stored in the EU.</li>
           </ul>

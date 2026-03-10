@@ -224,16 +224,16 @@ export async function generateRaceMessage(
   const raw = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
   if (!raw) return null;
 
-  // Telegram version: bold the first line
+  // HTML version: bold the first line
   const lines = raw.split("\n");
-  const telegramLines = lines.map((l, i) => (i === 0 && l.trim() ? `<b>${l.trim()}</b>` : l));
-  const telegramMessage = telegramLines.join("\n");
+  const htmlLines = lines.map((l, i) => (i === 0 && l.trim() ? `<b>${l.trim()}</b>` : l));
+  const htmlMessage = htmlLines.join("\n");
 
   // Log to user memory
   appendUserMemoryLog(user.userId, race.eventName, race.messageType, raw.slice(0, 120));
 
   return {
-    message: telegramMessage,
+    message: htmlMessage,
     plainText: raw,
   };
 }

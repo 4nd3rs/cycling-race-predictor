@@ -123,8 +123,6 @@ export interface UserBriefingPlan {
   briefingType: BriefingType;
   items: BriefingItem[];
   totalScore: number;
-  // User's channels
-  telegramChatId: string | null;
   whatsappPhone: string | null;
   whatsappFrequency: string | null;
 }
@@ -133,7 +131,6 @@ export interface UserBriefingPlan {
 
 export interface UserChannels {
   userId: string;
-  telegramChatId: string | null;
   whatsappPhone: string | null;
   whatsappFrequency: string | null;
   followedRiderIds: Set<string>;

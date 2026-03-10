@@ -4,13 +4,12 @@ import {
   db,
   users,
   userTips,
-  userTelegram,
   notificationLog,
   aiChatSessions,
   discussionThreads,
   discussionPosts,
 } from "@/lib/db";
-import { desc, sql, count, gte, and, eq, isNotNull } from "drizzle-orm";
+import { desc, sql, count, gte, and, eq } from "drizzle-orm";
 import {
   Card,
   CardContent,
@@ -59,7 +58,6 @@ async function getUsersData() {
     usersLast30dResult,
     totalChatSessionsResult,
     chatSessionsLast7dResult,
-    telegramSubsResult,
     recentNotificationsResult,
     topTipUsersResult,
     totalThreadsResult,
@@ -72,7 +70,6 @@ async function getUsersData() {
     db.select({ c: count() }).from(users).where(gte(users.createdAt, thirtyDaysAgo)),
     db.select({ c: count() }).from(aiChatSessions),
     db.select({ c: count() }).from(aiChatSessions).where(gte(aiChatSessions.createdAt, sevenDaysAgo)),
-    db.select({ c: count() }).from(userTelegram).where(isNotNull(userTelegram.telegramChatId)),
     db.select({
       id: notificationLog.id,
       userId: notificationLog.userId,
@@ -123,7 +120,6 @@ async function getUsersData() {
       chatLast7d: Number(chatSessionsLast7dResult[0]?.c ?? 0),
     },
     notifications: {
-      telegram: Number(telegramSubsResult[0]?.c ?? 0),
       recentLog: recentNotificationsResult,
     },
     topTipUsers: topTipUsersResult.map((r) => ({

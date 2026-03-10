@@ -83,7 +83,7 @@ async function hasBeenPosted(raceId: string, type: "marketing-preview" | "market
     .from(notificationLog)
     .where(and(
       eq(notificationLog.userId, "system"),
-      eq(notificationLog.channel, "telegram"),
+      eq(notificationLog.channel, "marketing"),
       eq(notificationLog.eventType, type),
       eq(notificationLog.entityId, raceId),
     ))
@@ -94,7 +94,7 @@ async function hasBeenPosted(raceId: string, type: "marketing-preview" | "market
 async function markPosted(raceId: string, type: "marketing-preview" | "marketing-result"): Promise<void> {
   await db.insert(notificationLog).values({
     userId: "system",
-    channel: "telegram",
+    channel: "marketing",
     eventType: type,
     entityId: raceId,
   }).catch(() => {});
@@ -187,29 +187,6 @@ async function getIntelSnippet(raceId: string, riderName: string): Promise<strin
     .limit(1);
 
   return fallback.length > 0 ? fallback[0].summary : null;
-}
-
-// ── Telegram posting (text-only, no Playwright graphics) ──────────────────────
-
-async function sendTelegramMessage(chatId: string, text: string): Promise<void> {
-  const botToken = process.env.TELEGRAM_BOT_TOKEN;
-  if (!botToken) throw new Error("TELEGRAM_BOT_TOKEN not set");
-
-  const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      parse_mode: "HTML",
-      disable_web_page_preview: true,
-    }),
-  });
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Telegram API error: ${res.status} ${body}`);
-  }
 }
 
 // ── Build captions ────────────────────────────────────────────────────────────
@@ -332,16 +309,6 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const channel = process.env.TELEGRAM_CHANNEL_ID;
-  const botToken = process.env.TELEGRAM_BOT_TOKEN;
-
-  if (!botToken || !channel) {
-    return NextResponse.json(
-      { error: "TELEGRAM_BOT_TOKEN and TELEGRAM_CHANNEL_ID must be set" },
-      { status: 500 }
-    );
-  }
-
   const results: Array<{ race: string; type: string; status: string }> = [];
 
   try {
@@ -385,8 +352,7 @@ export async function GET() {
       }
 
       try {
-        const message = await buildPreviewMessage(race, race.id, race.raceEventId);
-        await sendTelegramMessage(channel, message);
+        await buildPreviewMessage(race, race.id, race.raceEventId);
         await markPosted(race.id, "marketing-preview");
         results.push({ race: race.name, type: "preview", status: "posted" });
       } catch (err) {
@@ -432,8 +398,7 @@ export async function GET() {
       }
 
       try {
-        const message = await buildResultMessage(race, race.id);
-        await sendTelegramMessage(channel, message);
+        await buildResultMessage(race, race.id);
         await markPosted(race.id, "marketing-result");
         results.push({ race: race.name, type: "result", status: "posted" });
       } catch (err) {

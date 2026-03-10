@@ -3,7 +3,6 @@ import { verifyCronAuth } from "@/lib/cron-auth";
 import {
   db,
   userFollows,
-  userTelegram,
   userWhatsapp,
 } from "@/lib/db";
 import { eq, inArray } from "drizzle-orm";
@@ -20,46 +19,24 @@ export const maxDuration = 60;
 // ── Load all users with their channels and follows ──────────────────────────
 
 async function loadUsers(): Promise<UserChannels[]> {
-  // Get all users who have at least one channel
-  const [tgRows, waRows] = await Promise.all([
-    db.select({ userId: userTelegram.userId, chatId: userTelegram.telegramChatId })
-      .from(userTelegram),
-    db.select({
-      userId: userWhatsapp.userId,
-      phone: userWhatsapp.phoneNumber,
-      frequency: userWhatsapp.notificationFrequency,
-    }).from(userWhatsapp),
-  ]);
+  // Get all users who have WhatsApp configured
+  const waRows = await db.select({
+    userId: userWhatsapp.userId,
+    phone: userWhatsapp.phoneNumber,
+    frequency: userWhatsapp.notificationFrequency,
+  }).from(userWhatsapp);
 
-  // Merge into a map of userId → channels
   const userMap = new Map<string, {
-    telegramChatId: string | null;
     whatsappPhone: string | null;
     whatsappFrequency: string | null;
   }>();
 
-  for (const tg of tgRows) {
-    if (!tg.chatId) continue;
-    userMap.set(tg.userId, {
-      telegramChatId: tg.chatId,
-      whatsappPhone: null,
-      whatsappFrequency: null,
-    });
-  }
-
   for (const wa of waRows) {
     if (!wa.phone || wa.frequency === "off") continue;
-    const existing = userMap.get(wa.userId);
-    if (existing) {
-      existing.whatsappPhone = wa.phone;
-      existing.whatsappFrequency = wa.frequency;
-    } else {
-      userMap.set(wa.userId, {
-        telegramChatId: null,
-        whatsappPhone: wa.phone,
-        whatsappFrequency: wa.frequency,
-      });
-    }
+    userMap.set(wa.userId, {
+      whatsappPhone: wa.phone,
+      whatsappFrequency: wa.frequency,
+    });
   }
 
   if (userMap.size === 0) return [];
@@ -156,7 +133,6 @@ export async function GET(request: Request) {
         userId: user.userId,
         briefingType: plan.briefingType,
         message,
-        telegramChatId: plan.telegramChatId,
         whatsappPhone: plan.whatsappPhone,
       });
     }

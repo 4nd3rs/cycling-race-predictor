@@ -38,9 +38,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Pro Cycling Predictor — Race Briefings on Telegram",
+    title: "Pro Cycling Predictor — AI Race Predictions & WhatsApp Alerts",
     description:
-      "Personalised race briefings on Telegram. Startlists, predictions, rider intel — before every race.",
+      "Follow your favourite races and riders. Get predictions, results and race intel for every WorldTour race.",
     images: ["/opengraph-image.png"],
   },
 };

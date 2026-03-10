@@ -4,21 +4,21 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "FAQ — Pro Cycling Predictor",
   description:
-    "Frequently asked questions about Pro Cycling Predictor — race briefings on Telegram, TrueSkill predictions, and race coverage.",
+    "Frequently asked questions about Pro Cycling Predictor — race briefings, TrueSkill predictions, and race coverage.",
 };
 
 const faqs: { q: string; a: string | React.ReactNode }[] = [
   {
     q: "What is Pro Cycling Predictor?",
-    a: "Pro Cycling Predictor sends you personalised race briefings on Telegram before every race you follow. Follow the races and riders you care about, and we'll do the rest — startlists, predictions, rider intel, and weather, delivered straight to your chat.",
+    a: "Pro Cycling Predictor sends you personalised race briefings before every race you follow. Follow the races and riders you care about, and we'll do the rest — startlists, predictions, rider intel, and weather, delivered straight to your WhatsApp.",
   },
   {
     q: "How do the notifications work?",
-    a: "Sign up, connect your Telegram, and follow the races and riders you want to track. Before each race starts, you'll receive a personalised briefing with everything you need to know — who's on the startlist, who the data favours, and what the intel says. No app to open, no feed to check.",
+    a: "Sign up, join our WhatsApp group, and follow the races and riders you want to track. Before each race starts, you'll receive a personalised briefing with everything you need to know — who's on the startlist, who the data favours, and what the intel says. No app to open, no feed to check.",
   },
   {
     q: "Which platforms are supported for notifications?",
-    a: "Telegram. Both are free to use. You can connect one or both — briefings will be sent to whichever you've connected.",
+    a: "WhatsApp. Join our group to receive race briefings, predictions, and results for every race you follow.",
   },
   {
     q: "What's in a race briefing?",

@@ -465,7 +465,7 @@ export const eloHistory = pgTable(
 );
 
 // ============================================================================
-// USER FOLLOWS & TELEGRAM
+// USER FOLLOWS & NOTIFICATIONS
 // ============================================================================
 
 // User follows (rider or race_event)
@@ -485,16 +485,6 @@ export const userFollows = pgTable(
   ]
 );
 
-// Telegram connection per user
-export const userTelegram = pgTable("user_telegram", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull().unique(),
-  telegramChatId: varchar("telegram_chat_id", { length: 50 }),
-  connectToken: varchar("connect_token", { length: 64 }).unique(),
-  connectedAt: timestamp("connected_at"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
 export const userWhatsapp = pgTable("user_whatsapp", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull().unique(),
@@ -509,7 +499,7 @@ export const userWhatsapp = pgTable("user_whatsapp", {
 export const notificationLog = pgTable("notification_log", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: text("user_id").notNull(),
-  channel: varchar("channel", { length: 20 }).notNull(), // "telegram" | "whatsapp"
+  channel: varchar("channel", { length: 20 }).notNull(), // "whatsapp" | "marketing"
   eventType: varchar("event_type", { length: 50 }).notNull(), // "follow", "prediction", "result", "startlist", "intel"
   entityId: text("entity_id").notNull(), // race/rider ID
   sentAt: timestamp("sent_at").defaultNow().notNull(),
@@ -762,8 +752,6 @@ export type UciSyncRun = typeof uciSyncRuns.$inferSelect;
 export type NewUciSyncRun = typeof uciSyncRuns.$inferInsert;
 export type UserFollow = typeof userFollows.$inferSelect;
 export type NewUserFollow = typeof userFollows.$inferInsert;
-export type UserTelegram = typeof userTelegram.$inferSelect;
-export type NewUserTelegram = typeof userTelegram.$inferInsert;
 export type UserWhatsapp = typeof userWhatsapp.$inferSelect;
 export type NewUserWhatsapp = typeof userWhatsapp.$inferInsert;
 
@@ -788,12 +776,12 @@ export const waGroupMembers = pgTable("wa_group_members", {
 export type WaGroupMember = typeof waGroupMembers.$inferSelect;
 export type NewWaGroupMember = typeof waGroupMembers.$inferInsert;
 
-// ── Marketing Posts (dedup tracking for Telegram/Instagram) ──────────────────
+// ── Marketing Posts (dedup tracking for Instagram) ───────────────────────────
 export const marketingPosts = pgTable("marketing_posts", {
   id: uuid("id").primaryKey().defaultRandom(),
   raceId: text("race_id").notNull(),
   postType: varchar("post_type", { length: 20 }).notNull(), // "preview" | "result" | "ig-preview" | "ig-result"
-  channel: varchar("channel", { length: 20 }).notNull(),    // "telegram" | "instagram"
+  channel: varchar("channel", { length: 20 }).notNull(),    // "instagram"
   postedAt: timestamp("posted_at", { withTimezone: true }).defaultNow().notNull(),
 });
 export type MarketingPost = typeof marketingPosts.$inferSelect;

@@ -61,10 +61,9 @@ export function decide(
   const briefingType = briefingTypeForWindow(window);
   const items: BriefingItem[] = [];
 
-  // Check if user has any delivery channel
-  const hasTg = !!user.telegramChatId;
+  // Check if user has a delivery channel
   const hasWa = user.whatsappPhone && passesFrequencyGate(briefingType, user.whatsappFrequency);
-  if (!hasTg && !hasWa) return null;
+  if (!hasWa) return null;
 
   // ── Morning briefing ────────────────────────────────────────────────────
 
@@ -376,7 +375,6 @@ export function decide(
     briefingType,
     items: deduped,
     totalScore,
-    telegramChatId: user.telegramChatId,
     whatsappPhone: hasWa ? user.whatsappPhone : null,
     whatsappFrequency: user.whatsappFrequency,
   };

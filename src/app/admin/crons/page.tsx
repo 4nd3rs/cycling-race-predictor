@@ -224,9 +224,9 @@ export default async function CronsPage() {
       schedule: "daily @ 09:00",
       scheduleDesc: "Every day at 09:00 Stockholm",
       lastActivity: null,
-      lastActivityLabel: "Posts to Telegram (no DB trace)",
+      lastActivityLabel: "Posts to Instagram (no DB trace)",
       nextRun: nextDailyRun(9),
-      notes: "Posts preview/results cards to @procyclingpredictions",
+      notes: "Posts preview/results cards to Instagram",
     },
     {
       id: "uci-sync",

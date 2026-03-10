@@ -110,14 +110,6 @@ async function enrichRidersForRace(raceId: string): Promise<void> {
 }
 
 async function main() {
-  const channel = process.env.TELEGRAM_CHANNEL_ID;
-  const botToken = process.env.TELEGRAM_BOT_TOKEN;
-
-  if (!botToken || !channel) {
-    console.error("TELEGRAM_BOT_TOKEN and TELEGRAM_CHANNEL_ID must be set");
-    process.exit(1);
-  }
-
   let postsCount = 0;
   const latestIntel = loadTodayIntel();
   if (latestIntel.length > 0) console.log(`📡 Loaded ${latestIntel.length} intel items for today`);
@@ -152,24 +144,6 @@ async function main() {
   }));
 
   for (const race of upcomingRaces) {
-    if (await hasPosted(race.id, "preview", "telegram")) {
-      console.log(`⏭️  Already posted preview: ${race.name}`);
-      continue;
-    }
-
-    console.log(`📸 Posting preview: ${race.name} (${race.date})`);
-    try {
-      execSync(
-        `node_modules/.bin/tsx scripts/agents/post-to-telegram.ts --race-id ${race.id} --type preview --channel "${channel}"`,
-        { encoding: "utf-8", stdio: "inherit", cwd: process.cwd() }
-      );
-      await markPosted(race.id, "preview", "telegram");
-      postsCount++;
-      console.log(`✅ Preview posted: ${race.name}\n`);
-    } catch (err) {
-      console.error(`❌ Failed to post preview for ${race.name}:`, err);
-    }
-
     // Instagram Stories — enrich rider photos first, then post
     const igPreviewSlug = await getEventSlug(race);
     if (igPreviewSlug && shouldPostToInstagram(race) && !(await hasPosted(race.id, "ig-preview", "instagram"))) {
@@ -222,24 +196,6 @@ async function main() {
   }));
 
   for (const race of completedRaces) {
-    if (await hasPosted(race.id, "result", "telegram")) {
-      console.log(`⏭️  Already posted result: ${race.name}`);
-      continue;
-    }
-
-    console.log(`📸 Posting result: ${race.name} (${race.date})`);
-    try {
-      execSync(
-        `node_modules/.bin/tsx scripts/agents/post-to-telegram.ts --race-id ${race.id} --type result --channel "${channel}"`,
-        { encoding: "utf-8", stdio: "inherit", cwd: process.cwd() }
-      );
-      await markPosted(race.id, "result", "telegram");
-      postsCount++;
-      console.log(`✅ Result posted: ${race.name}\n`);
-    } catch (err) {
-      console.error(`❌ Failed to post result for ${race.name}:`, err);
-    }
-
     // Instagram Stories — enrich rider photos first, then post
     const igResultSlug = await getEventSlug(race);
     if (igResultSlug && shouldPostToInstagram(race) && !(await hasPosted(race.id, "ig-result", "instagram"))) {
