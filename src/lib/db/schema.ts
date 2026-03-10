@@ -798,3 +798,33 @@ export const marketingPosts = pgTable("marketing_posts", {
 });
 export type MarketingPost = typeof marketingPosts.$inferSelect;
 export type NewMarketingPost = typeof marketingPosts.$inferInsert;
+
+// ── Startlist Events (track startlist changes for notifications) ─────────────
+export const startlistEvents = pgTable("startlist_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  raceId: uuid("race_id").notNull().references(() => races.id),
+  riderId: uuid("rider_id").notNull().references(() => riders.id),
+  eventType: varchar("event_type", { length: 20 }).notNull(), // "added" | "removed"
+  detectedAt: timestamp("detected_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_startlist_events_detected").on(table.detectedAt),
+  index("idx_startlist_events_rider").on(table.riderId),
+]);
+export type StartlistEvent = typeof startlistEvents.$inferSelect;
+export type NewStartlistEvent = typeof startlistEvents.$inferInsert;
+
+// ── User Briefing Log (dedup + audit for daily briefing system) ──────────────
+export const userBriefingLog = pgTable("user_briefing_log", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id").notNull(),
+  briefingDate: date("briefing_date").notNull(),
+  briefingType: varchar("briefing_type", { length: 20 }).notNull(), // "morning" | "midday-alert" | "evening"
+  channel: varchar("channel", { length: 20 }).notNull(),
+  contentKey: text("content_key"), // hash of content items, skip if same content already sent
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+}, (table) => [
+  unique("user_briefing_unique").on(table.userId, table.briefingDate, table.briefingType, table.channel),
+  index("idx_briefing_date").on(table.briefingDate),
+]);
+export type UserBriefingLog = typeof userBriefingLog.$inferSelect;
+export type NewUserBriefingLog = typeof userBriefingLog.$inferInsert;

@@ -7,12 +7,12 @@ import {
   riders,
   riderDisciplineStats,
   raceEvents,
+  startlistEvents,
 } from "@/lib/db";
 import { eq, gte, lte, and, asc, notExists } from "drizzle-orm";
 import { findOrCreateRider, findOrCreateTeam } from "@/lib/riders/find-or-create";
 import { scrapeDo } from "@/lib/scraper/scrape-do";
 import * as cheerio from "cheerio";
-import { notifyRiderFollowers } from "@/lib/notify-followers";
 
 export const maxDuration = 60;
 
@@ -176,6 +176,12 @@ async function syncStartlistForRace(race: {
         });
         inserted++;
         newRiderIds.push(riderId);
+        // Write startlist event for notification system
+        await db.insert(startlistEvents).values({
+          raceId: race.id,
+          riderId,
+          eventType: "added",
+        }).onConflictDoNothing().catch(() => {});
       } else {
         const bibChanged = entry.bibNumber && existingByRider.bibNumber !== entry.bibNumber;
         const teamMissing = teamId && !existingByRider.teamId;
@@ -193,36 +199,6 @@ async function syncStartlistForRace(race: {
     }
   }
 
-  // Notify followers of newly added riders
-  if (newRiderIds.length > 0 && race.raceEventId) {
-    try {
-      const [eventRow] = await db
-        .select({ name: raceEvents.name, slug: raceEvents.slug, discipline: raceEvents.discipline })
-        .from(raceEvents)
-        .where(eq(raceEvents.id, race.raceEventId))
-        .limit(1);
-      if (eventRow) {
-        const raceUrl = eventRow.slug
-          ? `https://procyclingpredictor.com/races/${eventRow.discipline}/${eventRow.slug}`
-          : `https://procyclingpredictor.com`;
-        for (const riderId of newRiderIds) {
-          const riderRow = await db.query.riders.findFirst({ where: eq(riders.id, riderId) });
-          if (!riderRow) continue;
-          const msg = [
-            `📋 <b>${riderRow.name} is starting ${eventRow.name}!</b>`,
-            ``,
-            `Your followed rider has been added to the startlist.`,
-            ``,
-            `👉 <a href="${raceUrl}">Full startlist & predictions on Pro Cycling Predictor</a>`,
-          ].join("\n");
-          await notifyRiderFollowers(riderId, msg).catch(() => {});
-        }
-      }
-    } catch {
-      // Notification errors are non-fatal
-    }
-  }
-
   return { inserted, updated, errors };
 }
 
@@ -236,6 +212,7 @@ export async function GET() {
   try {
     const today = new Date().toISOString().slice(0, 10);
     const maxDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const refreshMaxDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
     // Find upcoming races that have a pcsUrl but no startlist entries yet
     const racesToSync = await db
@@ -259,6 +236,7 @@ export async function GET() {
     let totalInserted = 0;
     let totalUpdated = 0;
     let totalErrors = 0;
+    let totalRemoved = 0;
 
     for (const race of racesToSync) {
       const result = await syncStartlistForRace(race);
@@ -267,12 +245,66 @@ export async function GET() {
       totalErrors += result.errors;
     }
 
+    // Re-sync races within 3 days that already have startlists (detect removals)
+    // Only if we have budget left (max 1 refresh per run to stay within 60s)
+    if (racesToSync.length < MAX_RACES) {
+      const racesToRefresh = await db
+        .select()
+        .from(races)
+        .where(
+          and(
+            eq(races.status, "active"),
+            gte(races.date, today),
+            lte(races.date, refreshMaxDate),
+          )
+        )
+        .orderBy(asc(races.date))
+        .limit(1);
+
+      for (const race of racesToRefresh) {
+        if (!race.pcsUrl) continue;
+        // Track existing rider IDs before re-sync
+        const beforeIds = new Set(
+          (await db.select({ riderId: raceStartlist.riderId })
+            .from(raceStartlist)
+            .where(eq(raceStartlist.raceId, race.id))
+          ).map(r => r.riderId)
+        );
+        if (beforeIds.size === 0) continue; // Skip if no existing startlist
+
+        const result = await syncStartlistForRace(race);
+        totalInserted += result.inserted;
+        totalUpdated += result.updated;
+        totalErrors += result.errors;
+
+        // After re-sync, check for removals by comparing scraped riders to DB
+        // The scraped riders are the ones now in the DB, so we check if any beforeIds are gone
+        const afterIds = new Set(
+          (await db.select({ riderId: raceStartlist.riderId })
+            .from(raceStartlist)
+            .where(eq(raceStartlist.raceId, race.id))
+          ).map(r => r.riderId)
+        );
+        for (const riderId of beforeIds) {
+          if (!afterIds.has(riderId)) {
+            await db.insert(startlistEvents).values({
+              raceId: race.id,
+              riderId,
+              eventType: "removed",
+            }).onConflictDoNothing().catch(() => {});
+            totalRemoved++;
+          }
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       racesProcessed: racesToSync.length,
       totalInserted,
       totalUpdated,
       totalErrors,
+      totalRemoved,
     });
   } catch (error) {
     console.error("[cron/sync-startlists]", error);

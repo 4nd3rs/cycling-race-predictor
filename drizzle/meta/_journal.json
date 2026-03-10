@@ -57,6 +57,20 @@
       "when": 1773059677398,
       "tag": "0007_add-ai-preview",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1773138026735,
+      "tag": "0008_wa-notification-frequency",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1773138058800,
+      "tag": "0009_dear_maggott",
+      "breakpoints": true
     }
   ]
 }
