@@ -724,6 +724,86 @@ export async function scrapeRacePage(raceUrl: string): Promise<{
 }
 
 // ============================================================================
+// CLASSIFICATION LEADERS (stage races)
+// ============================================================================
+
+export interface ClassificationLeader {
+  riderName: string;
+  riderPcsId: string;
+  value?: string; // time or points
+}
+
+/**
+ * Scrape the leader of a classification page (GC, Points, KOM, Youth).
+ * Returns the first-place rider from the classification table.
+ */
+async function scrapeClassificationPage(url: string): Promise<ClassificationLeader | null> {
+  try {
+    const html = await lightFetch(url);
+    const $ = cheerio.load(html);
+
+    // Find the first rider in the results table
+    const firstRow = $("table.results tbody tr").first();
+    if (!firstRow.length) return null;
+
+    const riderLink = firstRow.find("a[href*='rider/']").first();
+    const riderName = riderLink.text().trim();
+    const riderHref = riderLink.attr("href") || "";
+    const riderPcsId = riderHref.split("rider/")[1]?.split("/")[0] || "";
+
+    if (!riderName || !riderPcsId) return null;
+
+    // Extract value (time or points) — typically in the last meaningful td
+    let value: string | undefined;
+    firstRow.find("td").each((_, cell) => {
+      const text = $(cell).text().trim();
+      // Time format (H:MM:SS or similar) or points number
+      if (text.match(/^\d+:\d{2}:\d{2}$/) || text.match(/^\d+h\d+/) || text.match(/^\d+$/)) {
+        value = text;
+      }
+    });
+
+    return { riderName, riderPcsId, value };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Scrape all classification leaders for a stage race.
+ * Fetches GC, Points, KOM, and Youth classification pages from PCS.
+ */
+export async function scrapeClassificationLeaders(pcsUrl: string): Promise<{
+  gc?: ClassificationLeader;
+  points?: ClassificationLeader;
+  kom?: ClassificationLeader;
+  youth?: ClassificationLeader;
+}> {
+  const baseUrl = pcsUrl.replace(/\/(result|gc|points|kom|youth|stage-\d+)\/?.*$/, "");
+
+  const [gc, points, kom, youth] = await Promise.all([
+    scrapeClassificationPage(`${baseUrl}/gc`),
+    scrapeClassificationPage(`${baseUrl}/points`),
+    scrapeClassificationPage(`${baseUrl}/kom`),
+    scrapeClassificationPage(`${baseUrl}/youth`),
+  ]);
+
+  const result: {
+    gc?: ClassificationLeader;
+    points?: ClassificationLeader;
+    kom?: ClassificationLeader;
+    youth?: ClassificationLeader;
+  } = {};
+
+  if (gc) result.gc = gc;
+  if (points) result.points = points;
+  if (kom) result.kom = kom;
+  if (youth) result.youth = youth;
+
+  return result;
+}
+
+// ============================================================================
 // STAGE RACE HELPERS
 // ============================================================================
 

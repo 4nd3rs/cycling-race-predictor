@@ -629,12 +629,15 @@ export default async function CategoryPage({ params }: PageProps) {
   // Get startlist (with stats for point-based sorting)
   const startlist = await getRaceStartlist(race.id, race);
 
-  // Get sibling races + stages
+  // Get sibling races + stages + classification leaders
   const isStageRace = race.raceType === "stage_race" || (race.endDate !== null && race.endDate !== race.date);
   const [siblingRaces, stages] = await Promise.all([
     getSiblingRaces(event.id, race.id, discipline, eventSlug),
     isStageRace ? getStages(race.id) : Promise.resolve([]),
   ]);
+
+  // Fetch classification leaders for stage races
+  const classificationLeaders = isStageRace ? race.classificationLeaders : null;
 
   // Generate ELO predictions only if no AI predictions exist
   if (startlist.length > 0 && !isCompleted) {
@@ -890,6 +893,30 @@ export default async function CategoryPage({ params }: PageProps) {
                   text={race.aiPreview}
                   riderLinks={startlist.map(({ rider }) => ({ name: rider.name, id: rider.id }))}
                 />
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* ── Classification Leaders (stage races) ──────────────────────── */}
+        {classificationLeaders && Object.keys(classificationLeaders).length > 0 && (
+          <section className="border-b border-border/50">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-4">
+              <div className="flex flex-wrap gap-2">
+                {([
+                  { key: "gc" as const, label: "GC", color: "text-[#E3A72F]", border: "border-[#E3A72F]/50" },
+                  { key: "points" as const, label: "Points", color: "text-[#00A651]", border: "border-[#00A651]/50" },
+                  { key: "kom" as const, label: "KOM", color: "text-[#E2424D]", border: "border-[#E2424D]/50" },
+                  { key: "youth" as const, label: "Youth", color: "text-white", border: "border-white/30" },
+                ] as const).filter(j => classificationLeaders[j.key]).map(j => {
+                  const leader = classificationLeaders[j.key]!;
+                  return (
+                    <Link key={j.key} href={leader.riderId ? `/riders/${leader.riderId}` : "#"} prefetch={false} className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border ${j.border} bg-card/50 hover:bg-card/80 transition-colors`}>
+                      <span className={`text-[10px] font-black uppercase tracking-widest ${j.color}`}>{j.label}</span>
+                      <span className="text-sm font-bold text-foreground">{leader.riderName}</span>
+                    </Link>
+                  );
+                })}
               </div>
             </div>
           </section>

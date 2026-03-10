@@ -8,7 +8,7 @@ import {
 } from "@/lib/db";
 import { and, eq, lte, gte, asc, desc, isNull, sql } from "drizzle-orm";
 import { findOrCreateRider } from "@/lib/riders/find-or-create";
-import { scrapeRaceResults, detectStageCount, scrapeStageMetadata } from "@/lib/scraper/pcs";
+import { scrapeRaceResults, detectStageCount, scrapeStageMetadata, scrapeClassificationLeaders } from "@/lib/scraper/pcs";
 import {
   notifyRaceEventCombined,
   notifyRiderFollowers,
@@ -361,6 +361,50 @@ export async function GET() {
             }
 
             await sleep(1500);
+          }
+
+          // Scrape classification leaders (GC, Points, KOM, Youth) and save to parent race
+          if (totalStageInserts > 0 || stageRecords.some(s => s.status === "completed")) {
+            try {
+              const leaders = await scrapeClassificationLeaders(race.pcsUrl);
+              if (leaders.gc || leaders.points || leaders.kom || leaders.youth) {
+                // Resolve rider IDs from PCS IDs
+                const resolveRider = async (leader: { riderName: string; riderPcsId: string; value?: string } | undefined) => {
+                  if (!leader) return undefined;
+                  const [rider] = await db
+                    .select({ id: riders.id })
+                    .from(riders)
+                    .where(eq(riders.pcsId, leader.riderPcsId))
+                    .limit(1);
+                  return {
+                    riderId: rider?.id ?? "",
+                    riderName: leader.riderName,
+                    ...(leader.value ? { time: leader.value } : {}),
+                  };
+                };
+
+                const [gcLeader, pointsLeader, komLeader, youthLeader] = await Promise.all([
+                  resolveRider(leaders.gc),
+                  resolveRider(leaders.points),
+                  resolveRider(leaders.kom),
+                  resolveRider(leaders.youth),
+                ]);
+
+                const completedCount = stageRecords.filter(s => s.status === "completed").length;
+                const classificationLeaders: Record<string, unknown> = { updatedAfterStage: completedCount };
+                if (gcLeader) classificationLeaders.gc = gcLeader;
+                if (pointsLeader) classificationLeaders.points = { ...pointsLeader, points: pointsLeader.time, time: undefined };
+                if (komLeader) classificationLeaders.kom = { ...komLeader, points: komLeader.time, time: undefined };
+                if (youthLeader) classificationLeaders.youth = youthLeader;
+
+                await db.update(races)
+                  .set({ classificationLeaders })
+                  .where(eq(races.id, race.id));
+                console.log(`[results-hunter] Updated classification leaders for ${race.name}`);
+              }
+            } catch (err) {
+              console.error(`[results-hunter] Failed to scrape classification leaders for ${race.name}:`, err);
+            }
           }
 
           // Check if race is finished — scrape GC

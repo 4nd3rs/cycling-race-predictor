@@ -15,6 +15,7 @@ import {
   buildCategoryUrl,
 } from "@/lib/url-utils";
 import { formatCategoryDisplay } from "@/lib/category-utils";
+import { getStageFavorites } from "@/lib/prediction/stage-favorites";
 
 export const revalidate = 300; // revalidate every 5 minutes
 
@@ -202,8 +203,8 @@ export default async function StagePage({ params }: PageProps) {
     redirect(buildCategoryUrl(discipline, eventSlug, categorySlug));
   }
 
-  // Get stage results and rider links for AI preview (from parent startlist)
-  const [results, allStages, stageRiderLinks] = await Promise.all([
+  // Get stage results, all stages, rider links, and classification leaders
+  const [results, allStages, stageRiderLinks, parentRaceData] = await Promise.all([
     getStageResults(stageRace.id, stageRace.discipline),
     getAllStages(parentRace.id),
     stageRace.aiPreview
@@ -214,7 +215,24 @@ export default async function StagePage({ params }: PageProps) {
           .limit(100)
           .then(rows => rows.map(r => ({ name: r.name, id: r.riderId })))
       : Promise.resolve([]),
+    db.select({ classificationLeaders: races.classificationLeaders })
+      .from(races)
+      .where(eq(races.id, parentRace.id))
+      .limit(1)
+      .then(rows => rows[0] ?? null),
   ]);
+
+  // Fetch stage favorites only if no results yet
+  const stageFavorites = results.length === 0
+    ? await getStageFavorites(parentRace.id, stageRace.profileType, stageRace.discipline, 5).catch(() => [])
+    : [];
+
+  const classificationLeaders = parentRaceData?.classificationLeaders as {
+    gc?: { riderId: string; riderName: string };
+    points?: { riderId: string; riderName: string };
+    kom?: { riderId: string; riderName: string };
+    youth?: { riderId: string; riderName: string };
+  } | null;
 
   const disciplineLabel = getDisciplineLabel(discipline);
   const categoryDisplay = formatCategoryDisplay(
@@ -294,6 +312,51 @@ export default async function StagePage({ params }: PageProps) {
             </Link>
           </div>
         </div>
+
+        {/* Classification Leaders */}
+        {classificationLeaders && Object.keys(classificationLeaders).length > 0 && (
+          <div className="mb-6 flex flex-wrap gap-2">
+            {([
+              { key: "gc" as const, label: "GC", color: "text-[#E3A72F]", border: "border-[#E3A72F]/50" },
+              { key: "points" as const, label: "Points", color: "text-[#00A651]", border: "border-[#00A651]/50" },
+              { key: "kom" as const, label: "KOM", color: "text-[#E2424D]", border: "border-[#E2424D]/50" },
+              { key: "youth" as const, label: "Youth", color: "text-white", border: "border-white/30" },
+            ] as const).filter(j => classificationLeaders[j.key]).map(j => {
+              const leader = classificationLeaders[j.key]!;
+              return (
+                <Link key={j.key} href={leader.riderId ? `/riders/${leader.riderId}` : "#"} prefetch={false} className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border ${j.border} bg-card/50 hover:bg-card/80 transition-colors`}>
+                  <span className={`text-[10px] font-black uppercase tracking-widest ${j.color}`}>{j.label}</span>
+                  <span className="text-sm font-bold text-foreground">{leader.riderName}</span>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Stage Favourites (before results, only for upcoming stages) */}
+        {stageFavorites.length > 0 && results.length === 0 && (
+          <div className="mb-6">
+            <h2 className="text-lg font-bold mb-3">Stage Favourites</h2>
+            <div className="rounded-lg border border-border/50 overflow-hidden">
+              <ol className="divide-y divide-border/20">
+                {stageFavorites.map((fav, i) => (
+                  <li key={fav.riderId} className="flex items-center gap-3 px-3 py-2.5">
+                    <span className="text-sm font-bold tabular-nums text-muted-foreground w-5 shrink-0">{i + 1}</span>
+                    {fav.photoUrl ? (
+                      <img src={fav.photoUrl} alt={fav.name} className="w-7 h-7 rounded-full object-cover shrink-0 opacity-90" />
+                    ) : (
+                      <div className="w-7 h-7 rounded-full bg-muted/40 shrink-0" />
+                    )}
+                    <Link href={`/riders/${fav.riderId}`} prefetch={false} className="text-sm font-semibold flex-1 leading-tight truncate hover:text-primary transition-colors">{fav.name}</Link>
+                    {fav.winPct > 0 && (
+                      <span className="text-xs font-bold tabular-nums text-primary shrink-0">{fav.winPct.toFixed(1)}%</span>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </div>
+        )}
 
         {/* Prev/Next Stage Navigation */}
         {allStages.length > 1 && (

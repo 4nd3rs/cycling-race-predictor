@@ -171,6 +171,14 @@ export const races = pgTable(
     // AI preview text (pre-race analysis explaining riders, news, and race info)
     aiPreview: text("ai_preview"),
     aiPreviewGeneratedAt: timestamp("ai_preview_generated_at"),
+    // Classification leaders (stage races): GC, Points, KOM, Youth
+    classificationLeaders: jsonb("classification_leaders").$type<{
+      gc?: { riderId: string; riderName: string; time?: string };
+      points?: { riderId: string; riderName: string; points?: string };
+      kom?: { riderId: string; riderName: string; points?: string };
+      youth?: { riderId: string; riderName: string; time?: string };
+      updatedAfterStage?: number;
+    }>(),
     // Post-race analysis
     postRaceAnalysis: text("post_race_analysis"), // AI-generated prediction vs result analysis
     analysisGeneratedAt: timestamp("analysis_generated_at"), // When analysis was last generated

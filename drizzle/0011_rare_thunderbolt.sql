@@ -1,0 +1,1 @@
+ALTER TABLE "races" ADD COLUMN "classification_leaders" jsonb;

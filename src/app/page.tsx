@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { db, races, raceEvents, riderRumours, riders, raceResults, predictions, raceStartlist } from "@/lib/db";
 import { desc, eq, gte, lt, and, sql, isNotNull, isNull, asc } from "drizzle-orm";
+import { getStageFavorites, type StageFavorite } from "@/lib/prediction/stage-favorites";
 import { format, formatDistanceToNow } from "date-fns";
 import { toRaceDate, toDateStr, calendarDaysUntil, todayStr } from "@/lib/utils";
 import { getFlag } from "@/lib/country-flags";
@@ -308,8 +309,15 @@ async function getRecentResults(): Promise<EventPodium[]> {
 interface StageProgress {
   totalStages: number;
   completedStages: number;
-  todayStage: { number: number; name: string } | null;
+  todayStage: { number: number; name: string; profileType: string | null; distanceKm: string | null; elevationM: number | null; aiPreview: string | null } | null;
   gcLeader: { name: string; nationality: string | null; photoUrl: string | null } | null;
+  jerseys?: {
+    gc?: { riderName: string; riderId: string };
+    points?: { riderName: string; riderId: string };
+    kom?: { riderName: string; riderId: string };
+    youth?: { riderName: string; riderId: string };
+  };
+  todayStageFavorites?: StageFavorite[];
 }
 
 async function getHeroStageProgress(event: HomepageEvent): Promise<StageProgress | null> {
@@ -339,31 +347,86 @@ async function getHeroStageProgress(event: HomepageEvent): Promise<StageProgress
 
     const today = todayStr();
     const completedStages = stages.filter(s => s.status === "completed" || (s.date && s.date < today)).length;
-    const todayStage = stages.find(s => s.date === today);
+    const todayStageRow = stages.find(s => s.date === today);
 
-    // Get GC leader from latest completed stage results (position 1 from parent race)
+    // Fetch classification leaders from parent race + GC leader fallback
+    const [parentRaceRow] = await db.select({
+      classificationLeaders: races.classificationLeaders,
+    }).from(races).where(eq(races.id, parentRace.id)).limit(1);
+
+    const classLeaders = parentRaceRow?.classificationLeaders as StageProgress["jerseys"] & { updatedAfterStage?: number } | null;
+
+    // Get GC leader from classification leaders or from results
     let gcLeader: StageProgress["gcLeader"] = null;
-    const lastCompleted = [...stages].reverse().find(s => s.status === "completed");
-    if (lastCompleted) {
-      const [leader] = await db.select({
-        name: riders.name,
-        nationality: riders.nationality,
-        photoUrl: riders.photoUrl,
-      })
-        .from(raceResults)
-        .innerJoin(riders, eq(raceResults.riderId, riders.id))
-        .where(and(eq(raceResults.raceId, parentRace.id), eq(raceResults.position, 1)))
-        .limit(1);
-      if (leader) {
-        gcLeader = { name: leader.name, nationality: leader.nationality, photoUrl: leader.photoUrl ?? null };
+    if (classLeaders?.gc) {
+      const [rider] = await db.select({ name: riders.name, nationality: riders.nationality, photoUrl: riders.photoUrl })
+        .from(riders).where(eq(riders.id, classLeaders.gc.riderId)).limit(1);
+      if (rider) gcLeader = { name: rider.name, nationality: rider.nationality, photoUrl: rider.photoUrl ?? null };
+    }
+    if (!gcLeader) {
+      const lastCompleted = [...stages].reverse().find(s => s.status === "completed");
+      if (lastCompleted) {
+        const [leader] = await db.select({
+          name: riders.name,
+          nationality: riders.nationality,
+          photoUrl: riders.photoUrl,
+        })
+          .from(raceResults)
+          .innerJoin(riders, eq(raceResults.riderId, riders.id))
+          .where(and(eq(raceResults.raceId, parentRace.id), eq(raceResults.position, 1)))
+          .limit(1);
+        if (leader) {
+          gcLeader = { name: leader.name, nationality: leader.nationality, photoUrl: leader.photoUrl ?? null };
+        }
       }
+    }
+
+    // Build jerseys object
+    const jerseys: StageProgress["jerseys"] = {};
+    if (classLeaders?.gc) jerseys.gc = { riderName: classLeaders.gc.riderName, riderId: classLeaders.gc.riderId };
+    if (classLeaders?.points) jerseys.points = { riderName: classLeaders.points.riderName, riderId: classLeaders.points.riderId };
+    if (classLeaders?.kom) jerseys.kom = { riderName: classLeaders.kom.riderName, riderId: classLeaders.kom.riderId };
+    if (classLeaders?.youth) jerseys.youth = { riderName: classLeaders.youth.riderName, riderId: classLeaders.youth.riderId };
+
+    // Today's stage details
+    let todayStage: StageProgress["todayStage"] = null;
+    let todayStageFavorites: StageFavorite[] | undefined;
+    if (todayStageRow) {
+      // Fetch full stage details
+      const [stageDetail] = await db.select({
+        profileType: races.profileType,
+        distanceKm: races.distanceKm,
+        elevationM: races.elevationM,
+        aiPreview: races.aiPreview,
+      }).from(races).where(eq(races.id, todayStageRow.id)).limit(1);
+
+      todayStage = {
+        number: todayStageRow.stageNumber ?? 0,
+        name: todayStageRow.name,
+        profileType: stageDetail?.profileType ?? null,
+        distanceKm: stageDetail?.distanceKm ?? null,
+        elevationM: stageDetail?.elevationM ?? null,
+        aiPreview: stageDetail?.aiPreview ?? null,
+      };
+
+      // Get stage-specific favorites
+      try {
+        todayStageFavorites = await getStageFavorites(
+          parentRace.id,
+          stageDetail?.profileType ?? null,
+          event.discipline,
+          5,
+        );
+      } catch { /* non-critical */ }
     }
 
     return {
       totalStages: stages.length,
       completedStages,
-      todayStage: todayStage ? { number: todayStage.stageNumber ?? 0, name: todayStage.name } : null,
+      todayStage,
       gcLeader,
+      jerseys: Object.keys(jerseys).length > 0 ? jerseys : undefined,
+      todayStageFavorites,
     };
   } catch {
     return null;
@@ -829,11 +892,33 @@ function NextRaceHero({
         </div>
       </div>
 
-      {/* Stage race progress */}
+      {/* Stage race progress + jerseys */}
       {stageProgress && (
-        <div className="mb-6 max-w-lg">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-            {stageProgress.gcLeader && (
+        <div className="mb-6 space-y-3">
+          {/* Jersey badges row */}
+          {stageProgress.jerseys && Object.keys(stageProgress.jerseys).length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {([
+                { key: "gc" as const, label: "GC", color: "text-[#E3A72F]", border: "border-[#E3A72F]/40" },
+                { key: "points" as const, label: "PTS", color: "text-[#00A651]", border: "border-[#00A651]/40" },
+                { key: "kom" as const, label: "KOM", color: "text-[#E2424D]", border: "border-[#E2424D]/40" },
+                { key: "youth" as const, label: "YTH", color: "text-white", border: "border-white/30" },
+              ] as const).filter(j => stageProgress.jerseys?.[j.key]).map(j => {
+                const leader = stageProgress.jerseys![j.key]!;
+                const surname = leader.riderName.split(" ").pop()?.toUpperCase() ?? leader.riderName;
+                return (
+                  <Link key={j.key} href={`/riders/${leader.riderId}`} prefetch={false} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded border ${j.border} bg-card/50 hover:bg-card/80 transition-colors`}>
+                    <span className={`text-[10px] font-black uppercase tracking-widest ${j.color}`}>{j.label}</span>
+                    <span className="text-xs font-bold text-foreground">{surname}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Stage info + progress */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4 max-w-lg">
+            {stageProgress.gcLeader && !stageProgress.jerseys?.gc && (
               <div className="flex items-center gap-3 bg-card px-3 py-2 border-l-2 border-[#E3A72F] shadow-sm shrink-0">
                 <span className="text-[10px] font-black uppercase tracking-widest text-[#E3A72F] w-6 text-center">GC</span>
                 {stageProgress.gcLeader.photoUrl ? (
@@ -844,7 +929,7 @@ function NextRaceHero({
                 <span className="font-bold text-sm tracking-tight leading-none text-foreground truncate min-w-0 max-w-[140px]">{stageProgress.gcLeader.name}</span>
               </div>
             )}
-            
+
             <div className="flex flex-col justify-center">
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">STAGE RACE</span>
@@ -857,11 +942,22 @@ function NextRaceHero({
                 const stageUrl = ev.slug && eliteCat?.categorySlug
                   ? buildStageUrl(ev.discipline, ev.slug, eliteCat.categorySlug, stageProgress.todayStage.number)
                   : null;
-                
+
+                const profileLabel = stageProgress.todayStage.profileType
+                  ? { flat: "Flat", hilly: "Hilly", mountain: "Mountain", tt: "Time Trial", cobbles: "Cobbles" }[stageProgress.todayStage.profileType] ?? stageProgress.todayStage.profileType
+                  : null;
+
                 const stageEl = (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse shrink-0" />
                     <span className="font-bold text-[13px] text-foreground uppercase tracking-wide">Stage {stageProgress.todayStage.number} Today</span>
+                    {profileLabel && (
+                      <span className="text-[11px] text-muted-foreground font-medium">
+                        {profileLabel}
+                        {stageProgress.todayStage.distanceKm && ` -- ${parseFloat(stageProgress.todayStage.distanceKm).toFixed(0)} km`}
+                        {stageProgress.todayStage.elevationM && ` -- ${stageProgress.todayStage.elevationM}m elev.`}
+                      </span>
+                    )}
                   </div>
                 );
 
@@ -877,13 +973,30 @@ function NextRaceHero({
       )}
 
       {/* Predictions + AI Preview */}
-      {(hasPredictions || aiPreview) && (
-        <div className={`flex flex-col ${aiPreview && hasPredictions ? "lg:flex-row" : ""} gap-4 mb-6`}>
+      {(() => {
+        // If today's stage has favorites, show those instead of overall predictions for men
+        const hasStageFavs = stageProgress?.todayStageFavorites && stageProgress.todayStageFavorites.length > 0;
+        const stageAiPreview = stageProgress?.todayStage?.aiPreview;
+        const effectiveAiPreview = stageAiPreview ? { text: stageAiPreview, riderLinks: aiPreview?.riderLinks ?? [] } : aiPreview;
+        const effectiveAiPreviewLabel = stageAiPreview
+          ? `Stage ${stageProgress?.todayStage?.number} Preview`
+          : "AI Race Preview";
+
+        // For men's picks, use stage favorites when available
+        const effectiveMenPicks = hasStageFavs ? stageProgress!.todayStageFavorites! : menPicks;
+        const effectiveMenLabel = hasStageFavs
+          ? `Stage ${stageProgress?.todayStage?.number} Favourites`
+          : "Men's Favourites";
+        const effectiveHasPredictions = effectiveMenPicks.length > 0 || womenPicks.length > 0;
+        const effectiveBothGenders = effectiveMenPicks.length > 0 && womenPicks.length > 0;
+
+        return (effectiveHasPredictions || effectiveAiPreview) ? (
+        <div className={`flex flex-col ${effectiveAiPreview && effectiveHasPredictions ? "lg:flex-row" : ""} gap-4 mb-6`}>
           {/* Predictions panel */}
-          {hasPredictions && (
-            <div className={`grid gap-4 ${bothGenders ? "sm:grid-cols-2" : "max-w-xs"} ${aiPreview ? "lg:w-1/2 lg:max-w-none" : ""}`}>
+          {effectiveHasPredictions && (
+            <div className={`grid gap-4 ${effectiveBothGenders ? "sm:grid-cols-2" : "max-w-xs"} ${effectiveAiPreview ? "lg:w-1/2 lg:max-w-none" : ""}`}>
               {[
-                { gender: "men", picks: menPicks, label: "Men's Favourites" },
+                { gender: "men", picks: effectiveMenPicks, label: effectiveMenLabel },
                 { gender: "women", picks: womenPicks, label: "Women's Favourites" },
               ]
                 .filter(({ picks }) => picks.length > 0)
@@ -918,19 +1031,20 @@ function NextRaceHero({
             </div>
           )}
 
-          {/* AI Preview */}
-          {aiPreview && (
-            <div className={`rounded-lg border border-border/40 bg-black/20 backdrop-blur-sm overflow-hidden ${hasPredictions ? "lg:w-1/2" : "max-w-lg"}`}>
+          {/* AI Preview (stage-specific when available) */}
+          {effectiveAiPreview && (
+            <div className={`rounded-lg border border-border/40 bg-black/20 backdrop-blur-sm overflow-hidden ${effectiveHasPredictions ? "lg:w-1/2" : "max-w-lg"}`}>
               <div className="px-3 py-2 border-b border-border/30 flex items-center gap-2">
-                <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">AI Race Preview</span>
+                <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">{effectiveAiPreviewLabel}</span>
               </div>
               <div className="px-3 py-3">
-                <AiPreviewText text={aiPreview.text} riderLinks={aiPreview.riderLinks} clampLines={compact ? 6 : 10} />
+                <AiPreviewText text={effectiveAiPreview.text} riderLinks={effectiveAiPreview.riderLinks} clampLines={compact ? 6 : 10} />
               </div>
             </div>
           )}
         </div>
-      )}
+      ) : null;
+      })()}
 
       {/* CTA row */}
       <div className="flex items-center gap-4">
