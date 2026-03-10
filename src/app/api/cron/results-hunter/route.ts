@@ -316,7 +316,7 @@ export async function GET() {
 
           // Get all child stage records (may already exist from previous run)
           const stageRecords = await db
-            .select({ id: races.id, stageNumber: races.stageNumber, status: races.status, name: races.name })
+            .select({ id: races.id, stageNumber: races.stageNumber, status: races.status, name: races.name, date: races.date })
             .from(races)
             .where(eq(races.parentRaceId, race.id))
             .orderBy(races.stageNumber);
@@ -339,11 +339,13 @@ export async function GET() {
 
           let totalStageInserts = 0;
 
-          // Scrape per-stage results
+          // Scrape per-stage results (only for stages on or before today)
           for (const stageRec of stageRecords) {
             if (Date.now() - startTime > (maxDuration - 30) * 1000) break;
             if (!stageRec.stageNumber) continue;
             if (stageRec.status === "completed") continue;
+            // Skip future stages — no results to scrape
+            if (stageRec.date && stageRec.date > today) continue;
 
             const stageResults = await scrapeRaceResults(
               `${race.pcsUrl}/stage-${stageRec.stageNumber}/result`
@@ -363,8 +365,8 @@ export async function GET() {
             await sleep(1500);
           }
 
-          // Scrape classification leaders (GC, Points, KOM, Youth) and save to parent race
-          if (totalStageInserts > 0 || stageRecords.some(s => s.status === "completed")) {
+          // Scrape classification leaders (GC, Points, KOM, Youth) only when new results were imported
+          if (totalStageInserts > 0) {
             try {
               const leaders = await scrapeClassificationLeaders(race.pcsUrl);
               if (leaders.gc || leaders.points || leaders.kom || leaders.youth) {
