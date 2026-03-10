@@ -9,7 +9,7 @@ import {
   raceEvents,
   startlistEvents,
 } from "@/lib/db";
-import { eq, gte, lte, and, asc, notExists } from "drizzle-orm";
+import { eq, gte, lte, and, asc, notExists, isNull } from "drizzle-orm";
 import { findOrCreateRider, findOrCreateTeam } from "@/lib/riders/find-or-create";
 import { scrapeDo } from "@/lib/scraper/scrape-do";
 import * as cheerio from "cheerio";
@@ -215,6 +215,7 @@ export async function GET() {
     const refreshMaxDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
     // Find upcoming races that have a pcsUrl but no startlist entries yet
+    // Skip stages (parentRaceId != null) — stages inherit the parent's startlist
     const racesToSync = await db
       .select()
       .from(races)
@@ -223,6 +224,7 @@ export async function GET() {
           eq(races.status, "active"),
           gte(races.date, today),
           lte(races.date, maxDate),
+          isNull(races.parentRaceId),
           notExists(
             db.select({ id: raceStartlist.id })
               .from(raceStartlist)
@@ -256,6 +258,7 @@ export async function GET() {
             eq(races.status, "active"),
             gte(races.date, today),
             lte(races.date, refreshMaxDate),
+            isNull(races.parentRaceId),
           )
         )
         .orderBy(asc(races.date))

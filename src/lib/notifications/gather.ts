@@ -148,19 +148,22 @@ export async function gatherContext(): Promise<DailyContext> {
   const recentResults = completedRows.filter(r => r.raceEventId).map(toGatheredRace);
 
   // ── Startlists for today + tomorrow races ─────────────────────────────────
+  // For stages, use the parent race's startlist
 
-  const allRaceIds = [
-    ...todayRaces.map(r => r.raceId),
-    ...tomorrowRaces.map(r => r.raceId),
-    ...recentResults.map(r => r.raceId),
-  ];
+  const allRaces = [...todayRaces, ...tomorrowRaces, ...recentResults];
+  const allRaceIds = allRaces.map(r => r.raceId);
+  // Also include parent race IDs for stages that need to inherit startlists
+  const parentRaceIds = allRaces
+    .filter(r => r.parentRaceId)
+    .map(r => r.parentRaceId!);
+  const queryRaceIds = [...new Set([...allRaceIds, ...parentRaceIds])];
 
   const startlistsByRace = new Map<string, Set<string>>();
   const startlistTeamsByRace = new Map<string, Map<string, string>>();
   const riderNameMap = new Map<string, string>();
   const teamNameMap = new Map<string, string>();
 
-  if (allRaceIds.length > 0) {
+  if (queryRaceIds.length > 0) {
     const slRows = await db
       .select({
         raceId: raceStartlist.raceId,
@@ -172,7 +175,7 @@ export async function gatherContext(): Promise<DailyContext> {
       .from(raceStartlist)
       .innerJoin(riders, eq(raceStartlist.riderId, riders.id))
       .leftJoin(teams, eq(raceStartlist.teamId, teams.id))
-      .where(inArray(raceStartlist.raceId, allRaceIds));
+      .where(inArray(raceStartlist.raceId, queryRaceIds));
 
     for (const sl of slRows) {
       if (!startlistsByRace.has(sl.raceId)) startlistsByRace.set(sl.raceId, new Set());
@@ -186,13 +189,28 @@ export async function gatherContext(): Promise<DailyContext> {
 
       riderNameMap.set(sl.riderId, sl.riderName);
     }
+
+    // For stages without their own startlist, inherit from parent
+    for (const race of allRaces) {
+      if (race.parentRaceId && !startlistsByRace.has(race.raceId)) {
+        const parentSl = startlistsByRace.get(race.parentRaceId);
+        if (parentSl) {
+          startlistsByRace.set(race.raceId, parentSl);
+        }
+        const parentTeams = startlistTeamsByRace.get(race.parentRaceId);
+        if (parentTeams) {
+          startlistTeamsByRace.set(race.raceId, parentTeams);
+        }
+      }
+    }
   }
 
   // ── Predictions for all races ─────────────────────────────────────────────
+  // Include parent race IDs so stages can inherit predictions
 
   const predictionsByRace = new Map<string, GatheredPrediction[]>();
 
-  if (allRaceIds.length > 0) {
+  if (queryRaceIds.length > 0) {
     const predRows = await db
       .select({
         raceId: predictions.raceId,
@@ -205,7 +223,7 @@ export async function gatherContext(): Promise<DailyContext> {
       .from(predictions)
       .innerJoin(riders, eq(predictions.riderId, riders.id))
       .leftJoin(teams, eq(riders.teamId, teams.id))
-      .where(inArray(predictions.raceId, allRaceIds))
+      .where(inArray(predictions.raceId, queryRaceIds))
       .orderBy(asc(predictions.predictedPosition));
 
     for (const p of predRows) {
@@ -218,6 +236,16 @@ export async function gatherContext(): Promise<DailyContext> {
         predictedPosition: p.predictedPosition,
         winProbability: parseFloat(String(p.winProbability || "0")),
       });
+    }
+  }
+
+  // For stages without their own predictions, inherit from parent
+  for (const race of allRaces) {
+    if (race.parentRaceId && !predictionsByRace.has(race.raceId)) {
+      const parentPreds = predictionsByRace.get(race.parentRaceId);
+      if (parentPreds) {
+        predictionsByRace.set(race.raceId, parentPreds);
+      }
     }
   }
 
