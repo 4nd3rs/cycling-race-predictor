@@ -77,7 +77,7 @@ async function getHighHypeRaces(discipline?: string | null, gender?: string | nu
     // Include upcoming races AND ongoing stage races (start date passed but end date not yet)
     const dateCondition = sql`(${raceEvents.date} >= ${today} OR ${races.endDate} >= ${today})`;
     const conditions: Parameters<typeof and>[0][] = [dateCondition, eq(races.status, "active"), isNull(races.parentRaceId)];
-    if (discipline && discipline !== "all") conditions.push(eq(raceEvents.discipline, discipline as any));
+    if (discipline && discipline !== "all") conditions.push(eq(raceEvents.discipline, discipline));
     if (gender && gender !== "all") conditions.push(eq(races.gender, gender));
     const result = await db
       .select({
@@ -463,7 +463,7 @@ async function getFilteredCalendarEvents(
   const today = todayStr();
   try {
     const conditions: Parameters<typeof and>[0][] = [gte(raceEvents.date, today), isNull(races.parentRaceId)];
-    if (discipline && discipline !== "all") conditions.push(eq(raceEvents.discipline, discipline as any));
+    if (discipline && discipline !== "all") conditions.push(eq(raceEvents.discipline, discipline));
     if (country) conditions.push(eq(raceEvents.country, country));
 
     const rows = await db

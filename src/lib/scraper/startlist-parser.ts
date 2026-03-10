@@ -257,28 +257,5 @@ export function isValidStartlistUrl(url: string): boolean {
   }
 }
 
-/**
- * Normalize rider name for matching
- * Handles different name formats: "FIRST LAST", "Last, First", etc.
- */
-export function normalizeRiderName(name: string): string {
-  // Remove extra whitespace
-  let normalized = name.trim().replace(/\s+/g, " ");
-
-  // Handle "LAST, First" format
-  if (normalized.includes(",")) {
-    const parts = normalized.split(",").map((p) => p.trim());
-    if (parts.length === 2) {
-      normalized = `${parts[1]} ${parts[0]}`;
-    }
-  }
-
-  // Convert to title case
-  normalized = normalized
-    .toLowerCase()
-    .split(" ")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-
-  return normalized;
-}
+// Re-export normalizeRiderName from the shared module
+export { normalizeRiderName } from "@/lib/normalize-name";

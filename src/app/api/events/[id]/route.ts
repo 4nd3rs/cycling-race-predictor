@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, raceEvents, races, raceResults, raceStartlist } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+import { requireAdmin } from "@/lib/auth";
 
 const updateEventSchema = z.object({
   name: z.string().min(1).optional(),
@@ -49,6 +50,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await requireAdmin();
     const { id } = await params;
     const body = await request.json();
 
@@ -102,7 +104,8 @@ export async function PATCH(
     });
 
     return NextResponse.json({ event: updatedEvent });
-  } catch (error) {
+  } catch (error: unknown) {
+    if (error instanceof Response) return error;
     console.error("Error updating event:", error);
     return NextResponse.json(
       { error: "Failed to update event" },
@@ -116,6 +119,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await requireAdmin();
     const { id } = await params;
 
     // Check event exists
@@ -154,7 +158,8 @@ export async function DELETE(
         racesDeleted: raceIds.length,
       },
     });
-  } catch (error) {
+  } catch (error: unknown) {
+    if (error instanceof Response) return error;
     console.error("Error deleting event:", error);
     return NextResponse.json(
       { error: "Failed to delete event" },

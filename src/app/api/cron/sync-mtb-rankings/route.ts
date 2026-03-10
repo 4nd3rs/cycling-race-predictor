@@ -13,11 +13,13 @@
  */
 
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
+import { verifyCronAuth } from "@/lib/cron-auth";
 import { db, riderDisciplineStats } from "@/lib/db";
 import { riders } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
+import { postToDiscord } from "@/lib/discord";
+import { stripAccents as _stripAccents } from "@/lib/normalize-name";
 
 export const maxDuration = 300;
 
@@ -25,32 +27,6 @@ const BASE = "https://dataride.uci.ch";
 const IFRAME_URL = `${BASE}/iframe/rankings/7`;
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36";
 const LIMIT = 300;
-const DISCORD_CHANNEL = "1476643255243509912";
-
-// ── Auth ──────────────────────────────────────────────────────────────────────
-
-async function verifyCronAuth(): Promise<boolean> {
-  const headersList = await headers();
-  const authHeader = headersList.get("authorization");
-  if (process.env.NODE_ENV === "development") return true;
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) return false;
-  return authHeader === `Bearer ${cronSecret}`;
-}
-
-// ── Discord ───────────────────────────────────────────────────────────────────
-
-async function postToDiscord(msg: string): Promise<void> {
-  const token = process.env.DISCORD_BOT_TOKEN;
-  if (!token) return;
-  try {
-    await fetch(`https://discord.com/api/v10/channels/${DISCORD_CHANNEL}/messages`, {
-      method: "POST",
-      headers: { "Authorization": `Bot ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ content: msg }),
-    });
-  } catch {}
-}
 
 // ── Category matching ─────────────────────────────────────────────────────────
 
@@ -74,7 +50,7 @@ function matchCategory(groupName: string): { ageCategory: string; gender: string
 // ── Name matching ─────────────────────────────────────────────────────────────
 
 function stripAccents(s: string) {
-  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  return _stripAccents(s).toLowerCase().trim();
 }
 
 function findRider(

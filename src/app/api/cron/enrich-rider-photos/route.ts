@@ -1,19 +1,10 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
+import { verifyCronAuth } from "@/lib/cron-auth";
 import { db, riders, raceResults, raceStartlist, races } from "@/lib/db";
 import { and, eq, isNull, gte, lte } from "drizzle-orm";
 import { scrapeRider } from "@/lib/scraper/pcs";
 
 export const maxDuration = 120;
-
-async function verifyCronAuth(): Promise<boolean> {
-  const headersList = await headers();
-  const authHeader = headersList.get("authorization");
-  if (process.env.NODE_ENV === "development") return true;
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) return false;
-  return authHeader === `Bearer ${cronSecret}`;
-}
 
 // ── Wikipedia API helpers ───────────────────────────────────────────────────
 

@@ -5,7 +5,7 @@
  * Runs daily.
  */
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
+import { verifyCronAuth } from "@/lib/cron-auth";
 import { db, waGroupMembers, userWhatsapp } from "@/lib/db";
 import { eq, isNull } from "drizzle-orm";
 
@@ -13,17 +13,6 @@ export const maxDuration = 30;
 
 const APP_URL = "https://procyclingpredictor.com";
 const ADMIN_PHONE = "46707961967@s.whatsapp.net"; // Anders — receives admin report
-
-// ── Auth ──────────────────────────────────────────────────────────────────────
-
-async function verifyCronAuth(): Promise<boolean> {
-  const headersList = await headers();
-  const authHeader = headersList.get("authorization");
-  if (process.env.NODE_ENV === "development") return true;
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) { console.warn("CRON_SECRET not set"); return false; }
-  return authHeader === `Bearer ${cronSecret}`;
-}
 
 // ── WA Gateway ────────────────────────────────────────────────────────────────
 

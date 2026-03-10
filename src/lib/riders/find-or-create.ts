@@ -8,6 +8,12 @@
 import { db, riders, teams } from "@/lib/db";
 import { eq, ilike } from "drizzle-orm";
 import { normalizeNationality } from "@/lib/nationality-codes";
+import {
+  stripAccents,
+  normalizeRiderName,
+} from "@/lib/normalize-name";
+
+export { normalizeRiderName } from "@/lib/normalize-name";
 import type { Rider, Team } from "@/lib/db/schema";
 
 export interface RiderInput {
@@ -139,66 +145,4 @@ export async function findOrCreateTeam(
   return team;
 }
 
-/**
- * Normalize rider name for matching.
- * Handles multiple formats:
- * - "LAST, First" → "First Last"
- * - "LASTNAME Firstname" (UCI/XCOdata format: ALL_CAPS last + Title first) → "Firstname Lastname"
- * - Plain "First Last" → title case normalization
- */
-export function normalizeRiderName(name: string): string {
-  let normalized = name.trim().replace(/\s+/g, " ");
-
-  // Handle "LAST, First" format
-  if (normalized.includes(",")) {
-    const parts = normalized.split(",").map((p) => p.trim());
-    if (parts.length === 2) {
-      normalized = `${parts[1]} ${parts[0]}`;
-    }
-  } else {
-    // Detect "LASTNAME Firstname" UCI format:
-    // When the name has 2+ words and the first N words are ALL_CAPS (last name),
-    // and the remaining word(s) have mixed case (first name).
-    // e.g. "SÖDERQVIST Jakob" → "Jakob Söderqvist"
-    //      "VAN DER POEL Mathieu" → "Mathieu Van Der Poel"
-    const words = normalized.split(" ");
-    if (words.length >= 2) {
-      // Strip accents for case detection
-      const stripAcc = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-      // Find the split point: last consecutive all-caps word from the start
-      let lastCapIdx = -1;
-      for (let i = 0; i < words.length - 1; i++) {
-        const w = stripAcc(words[i]);
-        if (w === w.toUpperCase() && w.length > 1 && /[A-Za-z]/.test(w)) {
-          lastCapIdx = i;
-        } else {
-          break;
-        }
-      }
-      if (lastCapIdx >= 0) {
-        // Split: words[0..lastCapIdx] are the last name, rest is first name
-        const lastNameParts = words.slice(0, lastCapIdx + 1);
-        const firstNameParts = words.slice(lastCapIdx + 1);
-        normalized = [...firstNameParts, ...lastNameParts].join(" ");
-      }
-    }
-  }
-
-  // Convert to title case
-  normalized = normalized
-    .toLowerCase()
-    .split(" ")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-
-  return normalized;
-}
-
-/**
- * Strip accents from a string for fuzzy matching.
- */
-function stripAccents(str: string): string {
-  return str
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-}
+// normalizeRiderName and stripAccents imported from @/lib/normalize-name

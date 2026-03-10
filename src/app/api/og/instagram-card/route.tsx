@@ -250,8 +250,10 @@ export async function GET(req: NextRequest) {
         { name: "Inter",            data: interRegular,   weight: 400, style: "normal" },
       ],
     });
-  } catch (err: any) {
-    return new Response(JSON.stringify({ error: err.message, stack: err.stack?.slice(0, 500) }), {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack?.slice(0, 500) : undefined;
+    return new Response(JSON.stringify({ error: message, stack }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
     });

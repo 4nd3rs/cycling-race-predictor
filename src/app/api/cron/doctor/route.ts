@@ -1,40 +1,13 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
+import { verifyCronAuth } from "@/lib/cron-auth";
 import { db, races, raceResults, raceStartlist, raceEvents, riders, riderDisciplineStats, predictions } from "@/lib/db";
 import { and, eq, lt, gte, lte, isNull, exists, notExists, sql, asc, inArray, ne } from "drizzle-orm";
 import { scrapeDo } from "@/lib/scraper/scrape-do";
 import * as cheerio from "cheerio";
 import { neon } from "@neondatabase/serverless";
+import { postToDiscord } from "@/lib/discord";
 
 export const maxDuration = 300;
-
-// ── Auth ──────────────────────────────────────────────────────────────────────
-
-async function verifyCronAuth(): Promise<boolean> {
-  const headersList = await headers();
-  const authHeader = headersList.get("authorization");
-  if (process.env.NODE_ENV === "development") return true;
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) { console.warn("CRON_SECRET not set"); return false; }
-  return authHeader === `Bearer ${cronSecret}`;
-}
-
-// ── Discord notification ──────────────────────────────────────────────────────
-
-async function postToDiscord(message: string): Promise<void> {
-  const token = process.env.DISCORD_BOT_TOKEN;
-  const channelId = "1476643255243509912"; // #pcp-data
-  if (!token) { console.warn("[doctor] No DISCORD_BOT_TOKEN set"); return; }
-  try {
-    await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
-      method: "POST",
-      headers: { "Authorization": `Bot ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ content: message }),
-    });
-  } catch (e) {
-    console.error("[doctor] Discord post failed:", e);
-  }
-}
 
 // ── Check 1: Duplicate riders ─────────────────────────────────────────────────
 

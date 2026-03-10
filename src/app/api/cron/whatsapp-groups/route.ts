@@ -6,7 +6,7 @@
  * Runs every 2 hours — each run checks all windows and posts what's needed.
  */
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
+import { verifyCronAuth } from "@/lib/cron-auth";
 import {
   db,
   races,
@@ -28,17 +28,6 @@ export const maxDuration = 60;
 const APP_URL = "https://procyclingpredictor.com";
 const ROAD_GROUP = "120363425402092416@g.us";
 const MTB_GROUP = "120363405998540593@g.us";
-
-// ── Auth ──────────────────────────────────────────────────────────────────────
-
-async function verifyCronAuth(): Promise<boolean> {
-  const headersList = await headers();
-  const authHeader = headersList.get("authorization");
-  if (process.env.NODE_ENV === "development") return true;
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) { console.warn("CRON_SECRET not set"); return false; }
-  return authHeader === `Bearer ${cronSecret}`;
-}
 
 // ── WA Gateway ────────────────────────────────────────────────────────────────
 

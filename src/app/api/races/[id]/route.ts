@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { db, races, raceResults, raceStartlist, predictions } from "@/lib/db";
 import { eq } from "drizzle-orm";
+import { requireAdmin } from "@/lib/auth";
 
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await requireAdmin();
     const { id } = await params;
 
     // Get the race first to verify it exists
@@ -29,7 +31,8 @@ export async function DELETE(
     await db.delete(races).where(eq(races.id, id));
 
     return NextResponse.json({ success: true, deletedRace: race.name });
-  } catch (error) {
+  } catch (error: unknown) {
+    if (error instanceof Response) return error;
     console.error("Error deleting race:", error);
     return NextResponse.json(
       { error: "Failed to delete race" },

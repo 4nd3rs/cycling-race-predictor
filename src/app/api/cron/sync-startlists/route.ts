@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
+import { verifyCronAuth } from "@/lib/cron-auth";
 import {
   db,
   races,
   raceStartlist,
   riders,
-  teams,
   riderDisciplineStats,
   raceEvents,
 } from "@/lib/db";
-import { eq, gte, lte, and, ilike, asc, notExists } from "drizzle-orm";
+import { eq, gte, lte, and, asc, notExists } from "drizzle-orm";
+import { findOrCreateRider, findOrCreateTeam } from "@/lib/riders/find-or-create";
 import { scrapeDo } from "@/lib/scraper/scrape-do";
 import * as cheerio from "cheerio";
 import { notifyRiderFollowers } from "@/lib/notify-followers";
@@ -18,90 +18,7 @@ export const maxDuration = 60;
 
 const MAX_RACES = 2;
 
-// ── Auth ──────────────────────────────────────────────────────────────────────
-
-async function verifyCronAuth(): Promise<boolean> {
-  const headersList = await headers();
-  const authHeader = headersList.get("authorization");
-  if (process.env.NODE_ENV === "development") return true;
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) { console.warn("CRON_SECRET not set"); return false; }
-  return authHeader === `Bearer ${cronSecret}`;
-}
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function stripAccents(str: string): string {
-  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-}
-
-function normalizeName(name: string): string {
-  return name
-    .toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z\s]/g, "")
-    .trim()
-    .split(/\s+/).sort().join(" ");
-}
-
-async function findOrCreateTeam(name: string): Promise<string> {
-  const existing = await db.query.teams.findFirst({
-    where: ilike(teams.name, name),
-  });
-  if (existing) return existing.id;
-  const [created] = await db
-    .insert(teams)
-    .values({ name, discipline: "road" })
-    .returning({ id: teams.id });
-  return created.id;
-}
-
-async function findOrCreateRider(
-  name: string,
-  pcsId: string | null,
-  teamId: string
-): Promise<string> {
-  if (pcsId) {
-    const byPcsId = await db.query.riders.findFirst({
-      where: eq(riders.pcsId, pcsId),
-    });
-    if (byPcsId) {
-      await db.update(riders).set({ teamId }).where(eq(riders.id, byPcsId.id));
-      return byPcsId.id;
-    }
-  }
-
-  const byName = await db.query.riders.findFirst({
-    where: ilike(riders.name, name),
-  });
-  if (byName) {
-    await db.update(riders).set({ teamId, ...(pcsId ? { pcsId } : {}) }).where(eq(riders.id, byName.id));
-    return byName.id;
-  }
-
-  const allRiders = await db.select({ id: riders.id, name: riders.name })
-    .from(riders)
-    .limit(5000);
-  const stripped = stripAccents(name);
-  const match = allRiders.find(r => stripAccents(r.name) === stripped);
-  if (match) {
-    await db.update(riders).set({ teamId, ...(pcsId ? { pcsId } : {}) }).where(eq(riders.id, match.id));
-    return match.id;
-  }
-
-  const normalized = normalizeName(name);
-  const normalizedMatch = allRiders.find(r => normalizeName(r.name) === normalized);
-  if (normalizedMatch) {
-    await db.update(riders).set({ teamId, ...(pcsId ? { pcsId } : {}) }).where(eq(riders.id, normalizedMatch.id));
-    return normalizedMatch.id;
-  }
-
-  const [created] = await db
-    .insert(riders)
-    .values({ name, pcsId: pcsId || undefined, teamId })
-    .returning({ id: riders.id });
-  return created.id;
-}
 
 async function ensureDisciplineStats(
   riderId: string,
@@ -218,8 +135,10 @@ async function syncStartlistForRace(race: {
 
   for (const entry of entries) {
     try {
-      const teamId = entry.teamName ? await findOrCreateTeam(entry.teamName) : null;
-      const riderId = await findOrCreateRider(entry.riderName, entry.riderPcsId || null, teamId!);
+      const team = entry.teamName ? await findOrCreateTeam(entry.teamName, "road") : null;
+      const teamId = team?.id ?? null;
+      const rider = await findOrCreateRider({ name: entry.riderName, pcsId: entry.riderPcsId || null, teamId });
+      const riderId = rider.id;
 
       const existingByRider = await db.query.raceStartlist.findFirst({
         where: and(eq(raceStartlist.raceId, race.id), eq(raceStartlist.riderId, riderId)),

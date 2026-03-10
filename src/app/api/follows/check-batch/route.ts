@@ -41,9 +41,9 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ results });
-  } catch (e: any) {
+  } catch (e: unknown) {
     if (e instanceof Response) return e;
     console.error("[follows/check-batch]", e);
-    return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
+    return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
   }
 }

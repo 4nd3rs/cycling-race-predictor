@@ -5,41 +5,21 @@
  */
 
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
+import { verifyCronAuth } from "@/lib/cron-auth";
 import { db, riderDisciplineStats } from "@/lib/db";
 import { riders } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 import { scrapeDo } from "@/lib/scraper/scrape-do";
 import * as cheerio from "cheerio";
+import { postToDiscord } from "@/lib/discord";
+import { stripAccents as _stripAccents } from "@/lib/normalize-name";
 
 export const maxDuration = 300;
 
 const LIMIT = 300;
-const DISCORD_CHANNEL = "1476643255243509912";
-
-async function verifyCronAuth(): Promise<boolean> {
-  const headersList = await headers();
-  const authHeader = headersList.get("authorization");
-  if (process.env.NODE_ENV === "development") return true;
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) return false;
-  return authHeader === `Bearer ${cronSecret}`;
-}
-
-async function postToDiscord(msg: string): Promise<void> {
-  const token = process.env.DISCORD_BOT_TOKEN;
-  if (!token) return;
-  try {
-    await fetch(`https://discord.com/api/v10/channels/${DISCORD_CHANNEL}/messages`, {
-      method: "POST",
-      headers: { Authorization: `Bot ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ content: msg }),
-    });
-  } catch {}
-}
 
 function stripAccents(s: string) {
-  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  return _stripAccents(s).toLowerCase().trim();
 }
 
 interface Entry { rank: number; name: string; uciPoints: number }

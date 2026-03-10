@@ -158,31 +158,3 @@ export async function parseRacePdfWithAI(pdfUrl: string): Promise<ParsedRaceData
     return null;
   }
 }
-
-/**
- * Filter results by category
- */
-export function filterResultsByCategory(
-  results: RaceResult[],
-  ageCategory: string,
-  gender: string
-): RaceResult[] {
-  return results.filter((r) => {
-    const cat = r.category.toLowerCase().replace(/\./g, "").replace(/\s+/g, "");
-
-    // Map our internal format to PDF categories
-    const targetCategories: string[] = [];
-
-    if (gender === "women") {
-      if (ageCategory === "elite") targetCategories.push("felit", "felite");
-      if (ageCategory === "u23") targetCategories.push("fsub23");
-      if (ageCategory === "junior") targetCategories.push("fjunior");
-    } else {
-      if (ageCategory === "elite") targetCategories.push("elit", "elite");
-      if (ageCategory === "u23") targetCategories.push("sub23");
-      if (ageCategory === "junior") targetCategories.push("junior");
-    }
-
-    return targetCategories.includes(cat);
-  });
-}

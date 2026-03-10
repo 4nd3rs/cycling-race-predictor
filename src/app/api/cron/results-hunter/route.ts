@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
+import { verifyCronAuth } from "@/lib/cron-auth";
 import {
   db,
   races,
   riders,
   raceResults,
 } from "@/lib/db";
-import { and, ilike, eq, lte, gte, asc, desc, isNull, sql } from "drizzle-orm";
+import { and, eq, lte, gte, asc, desc, isNull, sql } from "drizzle-orm";
+import { findOrCreateRider } from "@/lib/riders/find-or-create";
 import { scrapeRaceResults, detectStageCount, scrapeStageMetadata } from "@/lib/scraper/pcs";
 import {
   notifyRaceEventCombined,
@@ -17,64 +18,6 @@ import {
 } from "@/lib/notify-followers";
 
 export const maxDuration = 300;
-
-// ── Auth ──────────────────────────────────────────────────────────────────────
-
-async function verifyCronAuth(): Promise<boolean> {
-  const headersList = await headers();
-  const authHeader = headersList.get("authorization");
-  if (process.env.NODE_ENV === "development") return true;
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) { console.warn("CRON_SECRET not set"); return false; }
-  return authHeader === `Bearer ${cronSecret}`;
-}
-
-// ── Rider lookup ──────────────────────────────────────────────────────────────
-
-function normalizeRiderName(name: string): string {
-  let normalized = name.trim().replace(/\s+/g, " ");
-  if (normalized.includes(",")) {
-    const parts = normalized.split(",").map((p) => p.trim());
-    if (parts.length === 2) {
-      normalized = `${parts[1]} ${parts[0]}`;
-    }
-  }
-  return normalized
-    .toLowerCase()
-    .split(" ")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-}
-
-function stripAccents(str: string): string {
-  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-}
-
-async function findOrCreateRider(name: string): Promise<string> {
-  const normalizedName = normalizeRiderName(name);
-
-  let rider = await db.query.riders.findFirst({
-    where: ilike(riders.name, normalizedName),
-  });
-
-  if (!rider) {
-    const strippedName = stripAccents(normalizedName);
-    if (strippedName !== normalizedName) {
-      rider = await db.query.riders.findFirst({
-        where: ilike(riders.name, strippedName),
-      });
-    }
-  }
-
-  if (rider) return rider.id;
-
-  const [newRider] = await db
-    .insert(riders)
-    .values({ name: normalizedName })
-    .returning();
-
-  return newRider.id;
-}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -103,7 +46,8 @@ async function importResults(
     }
     if (!riderId && result.riderName) {
       try {
-        riderId = await findOrCreateRider(result.riderName);
+        const rider = await findOrCreateRider({ name: result.riderName });
+        riderId = rider.id;
       } catch { continue; }
     }
     if (!riderId) continue;

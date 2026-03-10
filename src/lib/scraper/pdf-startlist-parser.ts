@@ -25,14 +25,6 @@ export interface ParsedStartlistData {
   entries: StartlistEntry[];
 }
 
-export interface CategoryMapping {
-  rawCategory: string;
-  ageCategory: "elite" | "u23" | "junior";
-  gender: "men" | "women";
-  key: string;
-  displayName: string;
-}
-
 /**
  * Parse a single rider line from UCI-style startlist text.
  * Format A (with gender suffix): {bib}{UCI ID}{LASTNAME}{FirstName}{NAT}{Team}{M|W}
@@ -236,58 +228,6 @@ export function parseStartlistText(text: string): ParsedStartlistData {
 export async function parseStartlistTextWithAI(text: string): Promise<ParsedStartlistData | null> {
   const result = parseStartlistText(text);
   return result.entries.length > 0 ? result : null;
-}
-
-/**
- * Map raw PDF categories to standardized format
- */
-export function mapPdfCategories(rawCategories: string[]): CategoryMapping[] {
-  const mappings: CategoryMapping[] = [];
-
-  for (const raw of rawCategories) {
-    const upper = raw.toUpperCase().trim();
-
-    // Skip unsupported categories
-    if (upper.includes("CADETE") || upper.includes("MASTER") || upper.includes("OPEN")) {
-      continue;
-    }
-
-    let ageCategory: "elite" | "u23" | "junior";
-    let gender: "men" | "women" = "men"; // Default
-
-    // Determine age category
-    if (upper.includes("ELITE") || upper === "ÉLITE" || upper === "ÉLIT") {
-      ageCategory = "elite";
-    } else if (upper.includes("U23") || upper.includes("SUB23") || upper.includes("SUB-23")) {
-      ageCategory = "u23";
-    } else if (upper.includes("JUNIOR")) {
-      ageCategory = "junior";
-    } else {
-      // Unknown category, skip
-      continue;
-    }
-
-    // Determine gender (if specified in category name)
-    if (upper.includes("WOMEN") || upper.includes("FEMALE") || upper.includes("FÉMINA") || upper.includes("FEMINA")) {
-      gender = "women";
-    }
-
-    const key = `${ageCategory}_${gender}`;
-    const displayName = `${ageCategory === "elite" ? "Elite" : ageCategory === "u23" ? "U23" : "Junior"} ${gender === "men" ? "Men" : "Women"}`;
-
-    // Avoid duplicates
-    if (!mappings.some((m) => m.key === key)) {
-      mappings.push({
-        rawCategory: raw,
-        ageCategory,
-        gender,
-        key,
-        displayName,
-      });
-    }
-  }
-
-  return mappings;
 }
 
 /**

@@ -5,10 +5,10 @@
  */
 
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
+import { verifyCronAuth } from "@/lib/cron-auth";
 import { db, races, raceResults, raceEvents, riderDisciplineStats } from "@/lib/db";
-import { riders } from "@/lib/db/schema";
 import { and, eq, gte, lte, or, isNull, ne } from "drizzle-orm";
+import { findOrCreateRider } from "@/lib/riders/find-or-create";
 import { processRaceElo } from "@/lib/prediction/process-race-elo";
 import {
   scrapeResults,
@@ -16,63 +16,11 @@ import {
   type TimingSystem,
   SUPPORTED_TIMING_SYSTEMS,
 } from "@/lib/scraper/timing-adapters";
+import { postToDiscord } from "@/lib/discord";
 
 export const maxDuration = 300;
 
-const DISCORD_CHANNEL = "1476643255243509912";
 const DAYS_BACK = 7;
-
-// ── Auth & Discord ─────────────────────────────────────────────────────────────
-
-async function verifyCronAuth(): Promise<boolean> {
-  const headersList = await headers();
-  const authHeader = headersList.get("authorization");
-  if (process.env.NODE_ENV === "development") return true;
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) return false;
-  return authHeader === `Bearer ${cronSecret}`;
-}
-
-async function postToDiscord(msg: string): Promise<void> {
-  const token = process.env.DISCORD_BOT_TOKEN;
-  if (!token) return;
-  try {
-    await fetch(`https://discord.com/api/v10/channels/${DISCORD_CHANNEL}/messages`, {
-      method: "POST",
-      headers: { Authorization: `Bot ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ content: msg }),
-    });
-  } catch {}
-}
-
-// ── Rider cache & import ──────────────────────────────────────────────────────
-
-let riderCache: Map<string, string> | null = null;
-
-async function getRiderCache(): Promise<Map<string, string>> {
-  if (riderCache) return riderCache;
-  const all = await db.select({ id: riders.id, name: riders.name }).from(riders).limit(20000);
-  riderCache = new Map();
-  for (const r of all) {
-    const stripped = r.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-    const norm = stripped.replace(/[^a-z\s]/g, "").trim().split(/\s+/).sort().join(" ");
-    riderCache.set(`name:${stripped}`, r.id);
-    riderCache.set(`norm:${norm}`, r.id);
-  }
-  return riderCache;
-}
-
-async function findOrCreateRider(name: string): Promise<string> {
-  const cache = await getRiderCache();
-  const stripped = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-  if (cache.has(`name:${stripped}`)) return cache.get(`name:${stripped}`)!;
-  const norm = stripped.replace(/[^a-z\s]/g, "").trim().split(/\s+/).sort().join(" ");
-  if (cache.has(`norm:${norm}`)) return cache.get(`norm:${norm}`)!;
-  const [created] = await db.insert(riders).values({ name }).returning({ id: riders.id });
-  cache.set(`name:${stripped}`, created.id);
-  cache.set(`norm:${norm}`, created.id);
-  return created.id;
-}
 
 // ── Main handler ───────────────────────────────────────────────────────────────
 
@@ -178,7 +126,7 @@ export async function GET() {
       let inserted = 0;
 
       for (const r of toImport) {
-        const riderId = await findOrCreateRider(r.riderName);
+        const { id: riderId } = await findOrCreateRider({ name: r.riderName });
         if (existing.has(riderId)) continue;
         await db.insert(raceResults).values({
           raceId: race.id,

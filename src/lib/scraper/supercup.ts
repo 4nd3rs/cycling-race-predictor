@@ -8,15 +8,7 @@
 import * as cheerio from "cheerio";
 // @ts-expect-error - pdf-parse v1.x doesn't have types
 import pdfParse from "pdf-parse/lib/pdf-parse.js";
-
-function normalizeName(name: string): string {
-  return name
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z\s]/g, "")
-    .trim();
-}
+import { normalizeFuzzy as normalizeName } from "@/lib/normalize-name";
 
 export interface SuperCupStanding {
   rank: number;

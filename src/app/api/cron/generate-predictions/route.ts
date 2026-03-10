@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
+import { verifyCronAuth } from "@/lib/cron-auth";
 import {
   db, races, raceEvents, raceStartlist, riderDisciplineStats, predictions,
   riders, riderRumours, raceNews, raceResults, teams
@@ -9,38 +9,13 @@ import { calculateElo, calculateAllProbabilities, type RiderSkill } from "@/lib/
 import { calculateForm, formMultiplier, RACE_CATEGORY_WEIGHTS, type RecentResult } from "@/lib/prediction/form";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { neon } from "@neondatabase/serverless";
+import { postToDiscord } from "@/lib/discord";
 
 export const maxDuration = 300;
 
 const genai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? "");
-const DISCORD_CHANNEL = "1476643255243509912";
 const MIN_STARTLIST = 3;
 const STALE_HOURS = 6; // Regenerate if predictions are older than this
-
-// ── Auth ──────────────────────────────────────────────────────────────────────
-
-async function verifyCronAuth(): Promise<boolean> {
-  const headersList = await headers();
-  const authHeader = headersList.get("authorization");
-  if (process.env.NODE_ENV === "development") return true;
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) return false;
-  return authHeader === `Bearer ${cronSecret}`;
-}
-
-// ── Discord ───────────────────────────────────────────────────────────────────
-
-async function postToDiscord(message: string): Promise<void> {
-  const token = process.env.DISCORD_BOT_TOKEN;
-  if (!token) return;
-  try {
-    await fetch(`https://discord.com/api/v10/channels/${DISCORD_CHANNEL}/messages`, {
-      method: "POST",
-      headers: { "Authorization": `Bot ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ content: message }),
-    });
-  } catch {}
-}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

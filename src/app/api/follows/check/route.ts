@@ -27,9 +27,9 @@ export async function GET(req: NextRequest) {
     .limit(1);
 
   return NextResponse.json({ following: !!existing });
-  } catch (e: any) {
+  } catch (e: unknown) {
     if (e instanceof Response) return e;
     console.error("[follows/check]", e);
-    return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
+    return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
   }
 }

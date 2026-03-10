@@ -11,6 +11,8 @@
  * 3. POST ObjectRankings → paginated rider data (pageSize=100)
  */
 
+import { normalizeFuzzy as normalizeName } from "@/lib/normalize-name";
+
 const BASE_URL = "https://dataride.uci.org/iframe";
 const DISCIPLINE_ID = 7; // Mountain Bike
 const RACE_TYPE_XCO = 92; // Cross-country Olympic
@@ -386,11 +388,3 @@ export function findRiderByName(
   return null;
 }
 
-function normalizeName(name: string): string {
-  return name
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z\s]/g, "")
-    .trim();
-}

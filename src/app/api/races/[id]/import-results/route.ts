@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, races, raceResults } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+import { requireAdmin } from "@/lib/auth";
 import { processRaceElo } from "@/lib/prediction/process-race-elo";
 import {
   parseCopaCatalanaPdfUrl,
@@ -21,6 +22,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await requireAdmin();
     const { id: raceId } = await params;
     const body = await request.json();
 
@@ -146,7 +148,8 @@ export async function POST(
         dns: r.dns,
       })),
     });
-  } catch (error) {
+  } catch (error: unknown) {
+    if (error instanceof Response) return error;
     console.error("Error importing results:", error);
     return NextResponse.json(
       { error: "Failed to import results" },

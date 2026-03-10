@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
+import { verifyCronAuth } from "@/lib/cron-auth";
 
 export const maxDuration = 60;
 import { db, userTips, riders, users, riderRumours } from "@/lib/db";
@@ -10,26 +10,6 @@ import {
   generateRumourSummary,
 } from "@/lib/ai";
 import { eq, and, sql, desc } from "drizzle-orm";
-
-// Vercel cron jobs are authenticated via CRON_SECRET header
-async function verifyCronAuth(): Promise<boolean> {
-  const headersList = await headers();
-  const authHeader = headersList.get("authorization");
-
-  // In development, allow without auth
-  if (process.env.NODE_ENV === "development") {
-    return true;
-  }
-
-  // Verify Vercel's cron secret
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) {
-    console.warn("CRON_SECRET not set");
-    return false;
-  }
-
-  return authHeader === `Bearer ${cronSecret}`;
-}
 
 export async function GET() {
   // Verify cron authentication

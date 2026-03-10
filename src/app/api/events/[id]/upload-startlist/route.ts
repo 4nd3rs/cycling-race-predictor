@@ -10,22 +10,11 @@ import {
 } from "@/lib/scraper/pdf-startlist-parser";
 // @ts-expect-error - pdf-parse v1.x doesn't have types
 import pdfParse from "pdf-parse/lib/pdf-parse.js";
+import { normalizeFuzzy as normalizeName } from "@/lib/normalize-name";
 
 async function extractPdfText(buffer: Buffer): Promise<string> {
   const data = await pdfParse(buffer);
   return data.text;
-}
-
-/**
- * Normalize name for fuzzy matching
- */
-function normalizeName(name: string): string {
-  return name
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z\s]/g, "")
-    .trim();
 }
 
 /**

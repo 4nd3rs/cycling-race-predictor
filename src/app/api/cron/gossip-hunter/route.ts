@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
+import { verifyCronAuth } from "@/lib/cron-auth";
 import {
   db,
   riders,
@@ -11,17 +11,6 @@ import { eq, and, gte, lte, ilike, desc } from "drizzle-orm";
 import { notifyRiderFollowers } from "@/lib/notify-followers";
 
 export const maxDuration = 60;
-
-// ── Auth ──────────────────────────────────────────────────────────────────────
-
-async function verifyCronAuth(): Promise<boolean> {
-  const headersList = await headers();
-  const authHeader = headersList.get("authorization");
-  if (process.env.NODE_ENV === "development") return true;
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) { console.warn("CRON_SECRET not set"); return false; }
-  return authHeader === `Bearer ${cronSecret}`;
-}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
