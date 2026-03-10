@@ -42,7 +42,7 @@ export function AiPreviewText({
       >
         <div className="space-y-2.5">
           {paragraphs.map((p, i) => (
-            <p key={i} className="text-[13px] text-foreground/85 leading-[1.45em]">
+            <p key={i} className="text-sm md:text-base text-[#E8E0D5] leading-relaxed mb-3 last:mb-0">
               {renderSegments(p, riderMap)}
             </p>
           ))}
@@ -54,9 +54,9 @@ export function AiPreviewText({
       )}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="mt-1.5 text-xs font-semibold text-primary hover:text-primary/80 transition-colors"
+        className="mt-2 text-[11px] uppercase tracking-widest font-bold text-primary hover:text-primary/80 transition-colors"
       >
-        {expanded ? "Show less" : "Read more"}
+        {expanded ? "Show less" : "Read Full Preview →"}
       </button>
     </div>
   );

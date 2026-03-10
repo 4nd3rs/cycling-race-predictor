@@ -668,25 +668,24 @@ export default async function Home({ searchParams }: HomePageProps) {
           </div>
         </section>
 
-        {/* ---- LATEST INTEL ---- */}
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-10 overflow-hidden">
+        {/* ---- LATEST NEWS & BUZZ ---- */}
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-10 overflow-hidden mb-12">
           <div className="min-w-0 overflow-hidden">
               <h2 className="text-xl font-bold tracking-tight mb-6">
-                Latest Intel
+                Latest News & Buzz
               </h2>
               {latestIntel.length > 0 ? (
-                <div className="rounded-lg border border-border/40 overflow-hidden divide-y divide-border/20">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
                   {latestIntel.map(({ rumour, rider }) => (
-                    <IntelCard
-                      key={rumour.id}
-                      riderId={rider.id}
-                      riderName={rider.name}
-                      photoUrl={rider.photoUrl}
-                      summary={rumour.summary}
-                      aggregateScore={rumour.aggregateScore}
-                      tipCount={rumour.tipCount}
-                      lastUpdated={rumour.lastUpdated}
-                    />
+                    <div key={rumour.id} className="border-b border-[#3A3530]/50">
+                      <IntelCard
+                        riderId={rider.id}
+                        riderName={rider.name}
+                        summary={rumour.summary}
+                        tipCount={rumour.tipCount}
+                        lastUpdated={rumour.lastUpdated}
+                      />
+                    </div>
                   ))}
                 </div>
               ) : (
@@ -832,46 +831,47 @@ function NextRaceHero({
 
       {/* Stage race progress */}
       {stageProgress && (
-        <div className="mb-6 rounded-lg border border-border/40 bg-black/20 backdrop-blur-sm p-4 max-w-md">
-          <div className="flex items-center gap-3 mb-3">
-            <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Stage Race</span>
-            <span className="text-xs text-muted-foreground">
-              {stageProgress.completedStages} of {stageProgress.totalStages} stages completed
-            </span>
-          </div>
-
-          {/* Progress bar */}
-          <div className="h-1.5 rounded-full bg-muted/30 mb-3 overflow-hidden">
-            <div
-              className="h-full rounded-full bg-primary transition-all"
-              style={{ width: `${(stageProgress.completedStages / stageProgress.totalStages) * 100}%` }}
-            />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-            {stageProgress.todayStage && (() => {
-              const eliteCat = ev.categories.find(c => c.ageCategory === "elite" && c.categorySlug);
-              const stageUrl = ev.slug && eliteCat?.categorySlug
-                ? buildStageUrl(ev.discipline, ev.slug, eliteCat.categorySlug, stageProgress.todayStage.number)
-                : null;
-              return stageUrl ? (
-                <Link href={stageUrl} prefetch={false} className="flex items-center gap-1.5 hover:text-primary transition-colors">
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                  <span className="font-semibold text-foreground">Stage {stageProgress.todayStage.number} today</span>
-                </Link>
-              ) : (
-                <span className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                  <span className="font-semibold text-foreground">Stage {stageProgress.todayStage.number} today</span>
-                </span>
-              );
-            })()}
+        <div className="mb-6 max-w-lg">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
             {stageProgress.gcLeader && (
-              <span className="flex items-center gap-1.5 text-muted-foreground">
-                <span className="text-yellow-500">&#9679;</span>
-                <span>GC Leader: <span className="text-foreground font-medium">{stageProgress.gcLeader.name}</span></span>
-              </span>
+              <div className="flex items-center gap-3 bg-card px-3 py-2 border-l-2 border-[#E3A72F] shadow-sm shrink-0">
+                <span className="text-[10px] font-black uppercase tracking-widest text-[#E3A72F] w-6 text-center">GC</span>
+                {stageProgress.gcLeader.photoUrl ? (
+                  <img src={stageProgress.gcLeader.photoUrl} alt={stageProgress.gcLeader.name} className="w-8 h-8 rounded-full object-cover shrink-0 grayscale hover:grayscale-0 transition-all border border-border/50" />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-border shrink-0 border border-border/50" />
+                )}
+                <span className="font-bold text-sm tracking-tight leading-none text-foreground truncate min-w-0 max-w-[140px]">{stageProgress.gcLeader.name}</span>
+              </div>
             )}
+            
+            <div className="flex flex-col justify-center">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">STAGE RACE</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
+                  {stageProgress.completedStages} / {stageProgress.totalStages} DONE
+                </span>
+              </div>
+              {stageProgress.todayStage && (() => {
+                const eliteCat = ev.categories.find(c => c.ageCategory === "elite" && c.categorySlug);
+                const stageUrl = ev.slug && eliteCat?.categorySlug
+                  ? buildStageUrl(ev.discipline, ev.slug, eliteCat.categorySlug, stageProgress.todayStage.number)
+                  : null;
+                
+                const stageEl = (
+                  <div className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse shrink-0" />
+                    <span className="font-bold text-[13px] text-foreground uppercase tracking-wide">Stage {stageProgress.todayStage.number} Today</span>
+                  </div>
+                );
+
+                return stageUrl ? (
+                  <Link href={stageUrl} prefetch={false} className="hover:opacity-80 transition-opacity">
+                    {stageEl}
+                  </Link>
+                ) : stageEl;
+              })()}
+            </div>
           </div>
         </div>
       )}
@@ -968,6 +968,26 @@ function catLabel(ageCategory: string, gender: string) {
   return CAT_LABEL[`${ageCategory}-${gender}`] ?? `${ageCategory} ${gender}`;
 }
 
+function formatRiderName(name: string) {
+  const words = name.trim().split(" ");
+  if (words.length <= 1) return name.toUpperCase();
+  
+  // Find words that are strictly ALL CAPS
+  const allCapsWords = words.filter(w => w === w.toUpperCase() && /[A-Z]/.test(w));
+  
+  if (allCapsWords.length > 0 && allCapsWords.length < words.length) {
+    // Assume all caps words are the last name
+    const lastName = allCapsWords.join(" ");
+    const firstName = words.filter(w => !allCapsWords.includes(w)).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+    return `${lastName} ${firstName}`;
+  }
+  
+  // Fallback: Assume last word is last name
+  const lastName = words.pop()!.toUpperCase();
+  const firstName = words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+  return `${lastName} ${firstName}`;
+}
+
 function ResultCard({ ev }: { ev: EventPodium }) {
   const url = ev.eventSlug ? buildEventUrl(ev.discipline, ev.eventSlug) : `/races/${ev.eventId}`;
   const isMtb = ev.discipline === "mtb";
@@ -984,43 +1004,40 @@ function ResultCard({ ev }: { ev: EventPodium }) {
   const otherCats = sorted.filter(c => !(c.ageCategory === "elite" && (c.gender === "men" || c.gender === "women")));
 
   return (
-    <Link
-      href={url}
-      prefetch={false}
-      className="group rounded-xl border border-white/8 bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/15 transition-all overflow-hidden flex flex-col"
-    >
+    <div className="flex flex-col group relative bg-card h-full">
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-white/8">
-        <span className="text-base shrink-0">{getFlag(ev.country)}</span>
-        <span className="flex-1 text-sm font-bold truncate group-hover:text-primary transition-colors leading-tight">
-          {ev.eventName}
-        </span>
-        <div className="flex items-center gap-1.5 shrink-0">
-          <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${getDisciplineColor(ev.discipline)}`}>
-            {getDisciplineLabel(ev.discipline)}
-          </Badge>
-          <span className="text-[11px] text-muted-foreground whitespace-nowrap">
-            {format(toRaceDate(ev.date), "MMM d")}
-          </span>
+      <div className="flex items-start justify-between gap-4 mb-4">
+        <div>
+          <Link href={url} prefetch={false} className="inline-block group-hover:text-primary transition-colors">
+            <h3 className="font-bold text-lg leading-tight uppercase tracking-tight">{ev.eventName}</h3>
+          </Link>
+          <div className="flex items-center gap-2 mt-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            <span>{format(toRaceDate(ev.date), "MMM d")}</span>
+          </div>
         </div>
+        <div className="text-xl shrink-0 group-hover:scale-110 transition-transform">{getFlag(ev.country)}</div>
       </div>
 
+      <div className="w-full h-px bg-border/50 mb-4" />
+
       {/* Body */}
-      <div className="px-3 py-2.5 flex-1">
+      <div className="flex-1">
         {isMtb ? (
           // MTB: winner per category in a compact list
-          <div className="space-y-1.5">
+          <div className="space-y-4">
             {sorted.map(cat => (
-              <div key={`${cat.ageCategory}-${cat.gender}`} className="flex items-center gap-2">
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground w-20 shrink-0">
+              <div key={`${cat.ageCategory}-${cat.gender}`}>
+                <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5 border-b border-border/30 pb-1 w-full">
                   {catLabel(cat.ageCategory, cat.gender)}
-                </span>
+                </p>
                 {cat.podium[0] ? (
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <span className="text-sm">🥇</span>
-                    <span className="text-xs font-medium truncate">{cat.podium[0].riderName}</span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-sm font-black font-display text-primary w-4 text-left">1</span>
+                    <span className="text-[13px] font-semibold truncate leading-tight flex-1">
+                      {formatRiderName(cat.podium[0].riderName)}
+                    </span>
                     {cat.podium[0].nationality && (
-                      <span className="text-[11px] shrink-0">{getFlag(cat.podium[0].nationality)}</span>
+                      <span className="text-xs shrink-0">{getFlag(cat.podium[0].nationality)}</span>
                     )}
                   </div>
                 ) : null}
@@ -1029,7 +1046,7 @@ function ResultCard({ ev }: { ev: EventPodium }) {
           </div>
         ) : (
           // Road: top 3 in two columns
-          <div className={`grid gap-x-4 ${menCat && womenCat ? "grid-cols-2" : "grid-cols-1"}`}>
+          <div className={`grid gap-x-6 gap-y-6 ${menCat && womenCat ? "grid-cols-2" : "grid-cols-1"}`}>
             {[
               { cat: menCat,   label: "Men" },
               { cat: womenCat, label: "Women" },
@@ -1037,17 +1054,16 @@ function ResultCard({ ev }: { ev: EventPodium }) {
               .filter(({ cat }) => cat && cat.podium.length > 0)
               .map(({ cat, label }) => (
                 <div key={label}>
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-1">{label}</p>
-                  <ol className="space-y-1">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-[#7A7065] mb-2 border-b border-[#3A3530] pb-1 w-full">{label}</p>
+                  <ol className="flex flex-col">
                     {cat!.podium.map((entry, i) => (
-                      <li key={i} className="flex items-center gap-1.5">
-                        <span className="text-sm w-5 shrink-0">{MEDAL[i] ?? i + 1}</span>
-                        {entry.photoUrl ? (
-                          <img src={entry.photoUrl} alt={entry.riderName} className="w-5 h-5 rounded-full object-cover shrink-0 opacity-80" />
-                        ) : (
-                          <div className="w-5 h-5 rounded-full bg-white/10 shrink-0" />
-                        )}
-                        <span className="text-xs truncate font-medium">{entry.riderName}</span>
+                      <li key={i} className="flex items-center gap-2 py-1.5 border-b border-[#3A3530]/50 last:border-0">
+                        <span className={`text-sm font-black font-display w-3 shrink-0 text-left ${i === 0 ? "text-primary" : "text-muted-foreground"}`}>
+                          {i + 1}
+                        </span>
+                        <span className="text-sm font-semibold truncate flex-1 leading-none tracking-tight">
+                          {formatRiderName(entry.riderName)}
+                        </span>
                       </li>
                     ))}
                   </ol>
@@ -1055,23 +1071,29 @@ function ResultCard({ ev }: { ev: EventPodium }) {
               ))}
           </div>
         )}
+        
         {/* MTB: other cats beyond elite already included above; for road show non-elite winners inline */}
         {!isMtb && otherCats.length > 0 && (
-          <div className="mt-2 pt-2 border-t border-white/5 space-y-1">
+          <div className="mt-5 space-y-3">
             {otherCats.map(cat => (
-              <div key={`${cat.ageCategory}-${cat.gender}`} className="flex items-center gap-2">
-                <span className="text-[10px] text-muted-foreground w-20 shrink-0 uppercase tracking-wide font-semibold">
+              <div key={`${cat.ageCategory}-${cat.gender}`}>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-[#7A7065] mb-1.5 border-b border-[#3A3530] pb-1 w-full">
                   {catLabel(cat.ageCategory, cat.gender)}
-                </span>
+                </p>
                 {cat.podium[0] && (
-                  <span className="text-xs font-medium truncate">🥇 {cat.podium[0].riderName}</span>
+                  <div className="flex items-center gap-2 py-1">
+                    <span className="text-sm font-black font-display text-primary w-3 shrink-0 text-left">1</span>
+                    <span className="text-sm font-semibold truncate flex-1 leading-none tracking-tight">
+                      {formatRiderName(cat.podium[0].riderName)}
+                    </span>
+                  </div>
                 )}
               </div>
             ))}
           </div>
         )}
       </div>
-    </Link>
+    </div>
   );
 }
 
