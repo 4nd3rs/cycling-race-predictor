@@ -115,11 +115,49 @@ async function raceExists(name: string, dateStr: string): Promise<boolean> {
   return !!existingRace;
 }
 
+// ── Category parsing ─────────────────────────────────────────────────────────
+
+const WOMEN_KEYWORDS = /\b(women|woman|femmes?|f[eé]minin[ea]?s?|donne|ladies|dames?)\b|(?:^|\s)(WE|WJ|WU)(?:\s|$)/i;
+
+function parseRaceCategories(name: string): Array<{ gender: string; ageCategory: string; cleanName: string }> {
+  const ageMap: Record<string, string> = { E: "elite", U: "u23", J: "junior" };
+  const genderMap: Record<string, string> = { M: "men", W: "women" };
+
+  // Match short codes like ME, WE, MU, WU, MJ, WJ as standalone tokens
+  const tokens = name.toUpperCase().split(/[\s\-_|]+/);
+  const shortCodes = ["ME", "WE", "MU", "WU", "MJ", "WJ"];
+  const found = tokens.filter(t => shortCodes.includes(t));
+
+  if (found.length > 0) {
+    let cleanName = name
+      .replace(/\s*[-–]?\s*(ME|WE|MU|WU|MJ|WJ)\b/gi, "")
+      .replace(/\s*[-–]\s*(Elite|U23|Junior)\s*(Men|Women|Man|Woman)\s*$/i, "")
+      .replace(/\s*[-–]\s*(Men|Women)\s*(Elite|U23|Junior)\s*$/i, "")
+      .replace(/\s+/g, " ").trim();
+    return [...new Set(found)].map(code => ({
+      gender: genderMap[code[0]] ?? "men",
+      ageCategory: ageMap[code[1]] ?? "elite",
+      cleanName,
+    }));
+  }
+
+  // Detect explicitly gendered race names
+  if (WOMEN_KEYWORDS.test(name)) {
+    return [{ gender: "women", ageCategory: "elite", cleanName: name }];
+  }
+
+  // No gender marker → men-only (women's races on PCS always have explicit indicator)
+  return [{ gender: "men", ageCategory: "elite", cleanName: name }];
+}
+
 // ── Upsert ────────────────────────────────────────────────────────────────────
 
 async function upsertRace(race: ScrapedRace): Promise<"inserted" | "existed" | "error"> {
   try {
-    const exists = await raceExists(race.name, race.date);
+    const categories = parseRaceCategories(race.name);
+    const eventName = categories[0].cleanName;
+
+    const exists = await raceExists(eventName, race.date);
     if (exists) {
       // Backfill pcsUrl on existing races if missing
       if (race.pcsUrl) {
@@ -130,7 +168,7 @@ async function upsertRace(race: ScrapedRace): Promise<"inserted" | "existed" | "
           .select({ id: races.id, pcsUrl: races.pcsUrl })
           .from(races)
           .where(and(
-            ilike(races.name, `%${race.name}%`),
+            ilike(races.name, `%${eventName}%`),
             gte(races.date, dayBefore.toISOString().split("T")[0]),
             lte(races.date, dayAfter.toISOString().split("T")[0])
           ));
@@ -141,7 +179,7 @@ async function upsertRace(race: ScrapedRace): Promise<"inserted" | "existed" | "
       return "existed";
     }
 
-    const baseSlug = generateEventSlug(race.name);
+    const baseSlug = generateEventSlug(eventName);
     if (BLOCKED_PCS_SLUGS.has(baseSlug)) return "existed";
 
     const existingSlugs = await db
@@ -154,7 +192,7 @@ async function upsertRace(race: ScrapedRace): Promise<"inserted" | "existed" | "
     const [newEvent] = await db
       .insert(raceEvents)
       .values({
-        name: race.name, slug: eventSlug, date: race.date,
+        name: eventName, slug: eventSlug, date: race.date,
         endDate: race.endDate || null, discipline: race.discipline,
         subDiscipline: race.subDiscipline || null, country: race.country || null,
         sourceUrl: race.sourceUrl || race.pcsUrl || null,
@@ -166,15 +204,17 @@ async function upsertRace(race: ScrapedRace): Promise<"inserted" | "existed" | "
 
     if (!newEvent) return "existed";
 
-    for (const gender of ["men", "women"]) {
-      const categorySlug = generateCategorySlug("elite", gender);
-      const genderLabel = gender.charAt(0).toUpperCase() + gender.slice(1);
+    for (const cat of categories) {
+      const categorySlug = generateCategorySlug(cat.ageCategory, cat.gender);
+      const genderLabel = cat.gender.charAt(0).toUpperCase() + cat.gender.slice(1);
+      const ageLabelMap: Record<string, string> = { elite: "Elite", u23: "U23", junior: "Junior" };
+      const ageLabel = ageLabelMap[cat.ageCategory] ?? "Elite";
       await db.insert(races).values({
-        name: `${race.name} - Elite ${genderLabel}`,
+        name: `${cat.cleanName} - ${ageLabel} ${genderLabel}`,
         categorySlug, date: race.date, endDate: race.endDate || null,
         discipline: race.discipline,
         raceType: race.subDiscipline || (race.endDate ? "stage_race" : "one_day"),
-        ageCategory: "elite", gender,
+        ageCategory: cat.ageCategory, gender: cat.gender,
         uciCategory: race.uciCategory || null, country: race.country || null,
         raceEventId: newEvent.id, pcsUrl: race.pcsUrl || null, status: "active",
       }).onConflictDoNothing();
