@@ -2,10 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
     {
-      "path": "/api/cron/doctor",
-      "schedule": "0 */2 * * *"
-    },
-    {
       "path": "/api/cron/generate-predictions",
       "schedule": "30 */2 * * *"
     },
@@ -22,10 +18,6 @@
       "schedule": "0 10 * * 2"
     },
     {
-      "path": "/api/cron/sync-road-uci",
-      "schedule": "0 14 * * 2"
-    },
-    {
       "path": "/api/cron/scrape-mtb-results",
       "schedule": "0 */6 * * *"
     },
@@ -34,24 +26,8 @@
       "schedule": "30 */2 * * *"
     },
     {
-      "path": "/api/cron/results-hunter",
-      "schedule": "20 */2 * * *"
-    },
-    {
       "path": "/api/cron/scrape-race-news",
       "schedule": "15 */2 * * *"
-    },
-    {
-      "path": "/api/cron/sync-startlists",
-      "schedule": "45 */2 * * *"
-    },
-    {
-      "path": "/api/cron/sync-race-calendar",
-      "schedule": "0 5 * * *"
-    },
-    {
-      "path": "/api/cron/enrich-rider-photos",
-      "schedule": "25 */6 * * *"
     },
     {
       "path": "/api/cron/whatsapp-groups",
